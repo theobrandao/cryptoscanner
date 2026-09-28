@@ -124,3 +124,51 @@ describe("fallback entre provedores", () => {
     await expect(getCandles("XYZ", "4h")).rejects.toThrow(/desconhecido/);
   });
 });
+
+describe("binance: bases REST com fallback regional", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("cai para data-api.binance.vision quando api.binance.com responde 451 e memoriza o bloqueio", async () => {
+    const { binanceProvider, binanceBases, resetBinanceBases } = await import("@/services/market/providers/binance");
+    resetBinanceBases();
+    expect(binanceBases()).toEqual(["https://api.binance.com", "https://data-api.binance.vision"]);
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        calls.push(url);
+        if (url.startsWith("https://api.binance.com")) return new Response("{}", { status: 451, headers: { "content-type": "application/json" } });
+        const kline = [1790611200000, "1", "2", "0.5", "1.5", "10", 1790625599999, "15", 5, "5", "7", "0"];
+        return new Response(JSON.stringify([kline, kline]), { status: 200, headers: { "content-type": "application/json" } });
+      }),
+    );
+    const candles = await binanceProvider.getCandles(btc, "4h", 50);
+    expect(candles).toHaveLength(2);
+    expect(calls.some((u) => u.startsWith("https://api.binance.com"))).toBe(true);
+    expect(calls.at(-1)?.startsWith("https://data-api.binance.vision")).toBe(true);
+    // segunda chamada: a base bloqueada é pulada
+    calls.length = 0;
+    await binanceProvider.getCandles(btc, "4h", 50);
+    expect(calls.every((u) => u.startsWith("https://data-api.binance.vision"))).toBe(true);
+    resetBinanceBases();
+  });
+
+  it("não troca de base em erro de parâmetro (400)", async () => {
+    const { binanceProvider, resetBinanceBases } = await import("@/services/market/providers/binance");
+    resetBinanceBases();
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        calls.push(String(input));
+        return new Response('{"code":-1121}', { status: 400, headers: { "content-type": "application/json" } });
+      }),
+    );
+    await expect(binanceProvider.getCandles(btc, "4h", 50)).rejects.toBeInstanceOf(ProviderError);
+    expect(calls.every((u) => u.startsWith("https://api.binance.com"))).toBe(true);
+    resetBinanceBases();
+  });
+});

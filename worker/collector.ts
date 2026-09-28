@@ -50,10 +50,17 @@ export class TickerCollector {
     if (this.pollTimer) clearInterval(this.pollTimer);
   }
 
+  /** Alterna entre a base principal e a base "market data only" (data-stream.binance.vision) a cada falha. */
+  private wsAttempt = 0;
+
   private connect() {
     const streams = ASSETS.map((a) => `${a.binancePair.toLowerCase()}@miniTicker`).join("/");
-    const url = `${getEnv().BINANCE_WS_URL}?streams=${streams}`;
-    log.info("conectando WebSocket", { url: getEnv().BINANCE_WS_URL });
+    const env = getEnv();
+    const bases = [env.BINANCE_WS_URL, env.BINANCE_WS_FALLBACK_URL].filter((b, i, arr) => b && arr.indexOf(b) === i);
+    const base = bases[this.wsAttempt % bases.length] ?? env.BINANCE_WS_URL;
+    this.wsAttempt++;
+    const url = `${base}?streams=${streams}`;
+    log.info("conectando WebSocket", { url: base });
     const ws = new WebSocket(url);
     this.ws = ws;
     ws.on("open", () => {

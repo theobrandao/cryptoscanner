@@ -57,42 +57,74 @@ function wrap(err: unknown): never {
   throw new ProviderError("binance", err instanceof Error ? err.message : String(err));
 }
 
+/**
+ * Bases REST em ordem de preferência. `BINANCE_REST_URL` (api.binance.com) responde 451 em regiões
+ * restritas; `data-api.binance.vision` é a base oficial "market data only" da Binance (endpoints de
+ * segurança NONE, sem chave) e atende essas regiões. Quando uma base responde 451 ela é evitada por
+ * 10 min (memória do processo), para não pagar a ida e volta a cada chamada.
+ */
+const BLOCK_MS = 10 * 60_000;
+const blockedUntil = new Map<string, number>();
+
+export function binanceBases(): string[] {
+  const env = getEnv();
+  const bases = [env.BINANCE_REST_URL, ...env.BINANCE_REST_FALLBACK_URLS.split(",").map((s) => s.trim()).filter(Boolean)];
+  return [...new Set(bases.map((b) => b.replace(/\/$/, "")))];
+}
+
+/** Executa `fn` na primeira base disponível; cai para a próxima em 451 (ou erro de rede). */
+async function withBase<T>(fn: (base: string) => Promise<T>): Promise<T> {
+  const now = Date.now();
+  const bases = binanceBases();
+  const candidates = bases.filter((b) => (blockedUntil.get(b) ?? 0) < now);
+  const order = candidates.length > 0 ? candidates : bases;
+  let last: unknown;
+  for (const base of order) {
+    try {
+      return await fn(base);
+    } catch (err) {
+      last = err;
+      const status = err instanceof HttpError ? err.status : 0;
+      // 451 (região) ou falha de rede: tenta a próxima base; erros 4xx de parâmetro não são regionais
+      if (status === 451 || status === 0 || status >= 500) {
+        if (status === 451) blockedUntil.set(base, now + BLOCK_MS);
+        continue;
+      }
+      break;
+    }
+  }
+  wrap(last);
+}
+
+/** Usado em testes. */
+export function resetBinanceBases(): void {
+  blockedUntil.clear();
+}
+
 export const binanceProvider: MarketProvider = {
   name: "binance",
 
   async ping() {
-    try {
-      await fetchJson(`${getEnv().BINANCE_REST_URL}/api/v3/ping`, { retries: 0, timeoutMs: 4000 });
-    } catch (err) {
-      wrap(err);
-    }
+    await withBase((base) => fetchJson(`${base}/api/v3/ping`, { retries: 0, timeoutMs: 4000 }));
   },
 
   async getCandles(asset, timeframe: Timeframe, limit) {
-    const url = `${getEnv().BINANCE_REST_URL}/api/v3/klines?symbol=${asset.binancePair}&interval=${timeframe}&limit=${Math.min(1000, limit)}`;
-    try {
-      const raw = await fetchJson<Kline[]>(url, { retries: 1 });
-      return parseKlines(raw);
-    } catch (err) {
-      wrap(err);
-    }
+    const raw = await withBase((base) =>
+      fetchJson<Kline[]>(`${base}/api/v3/klines?symbol=${asset.binancePair}&interval=${timeframe}&limit=${Math.min(1000, limit)}`, { retries: 1 }),
+    );
+    return parseKlines(raw);
   },
 
   async getTickers(assets) {
     const symbols = JSON.stringify(assets.map((a) => a.binancePair));
-    const url = `${getEnv().BINANCE_REST_URL}/api/v3/ticker/24hr?symbols=${encodeURIComponent(symbols)}`;
-    try {
-      const raw = await fetchJson<Ticker24h[]>(url, { retries: 1 });
-      const byPair = new Map(raw.map((t) => [t.symbol, t]));
-      const out: Ticker[] = [];
-      for (const a of assets) {
-        const t = byPair.get(a.binancePair);
-        if (t) out.push(parseTicker24h(t, a));
-      }
-      if (out.length === 0) throw new ProviderError("binance", "resposta sem tickers");
-      return out;
-    } catch (err) {
-      wrap(err);
+    const raw = await withBase((base) => fetchJson<Ticker24h[]>(`${base}/api/v3/ticker/24hr?symbols=${encodeURIComponent(symbols)}`, { retries: 1 }));
+    const byPair = new Map(raw.map((t) => [t.symbol, t]));
+    const out: Ticker[] = [];
+    for (const a of assets) {
+      const t = byPair.get(a.binancePair);
+      if (t) out.push(parseTicker24h(t, a));
     }
+    if (out.length === 0) throw new ProviderError("binance", "resposta sem tickers");
+    return out;
   },
 };

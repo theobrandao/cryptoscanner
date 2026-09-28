@@ -34,7 +34,7 @@ Edite `.env.local`/`.env` (ver `.env.example`, todos comentados). Principais:
 | `AUTH_SECRET` | Segredo do JWT de sessão (≥ 32 caracteres; obrigatório em produção) |
 | `DATABASE_URL` | PostgreSQL. Sem ela o site funciona só com recursos públicos (scanner, gráficos, panorama) e as rotas de conta respondem 503 |
 | `REDIS_URL` | Cache compartilhado web/worker. Sem ela, cache em memória por processo |
-| `MARKET_PROVIDERS` | Ordem de fallback: `binance,kraken` (Binance responde 451 fora das regiões atendidas; a Kraken cobre) |
+| `MARKET_PROVIDERS` | Ordem de fallback: `binance,kraken`. A Binance tenta `BINANCE_REST_URL` e depois `BINANCE_REST_FALLBACK_URLS` (`data-api.binance.vision`, sem bloqueio regional); a Kraken só entra se ambas falharem |
 | `COINGECKO_API_KEY` | Opcional; câmbio BRL, market cap e dados globais |
 | `LLM_PROVIDER`, `ANTHROPIC_API_KEY`, `LLM_MODEL` | `none` (padrão, 100 % determinístico) ou `anthropic` para narrativa, reclassificação de manchetes e análise de imagem |
 | `TELEGRAM_BOT_TOKEN` | Bot próprio para alertas dos agentes (o usuário informa o Chat ID) |
@@ -48,7 +48,7 @@ Todas públicas e sem chave por padrão:
 
 | Fonte | Uso | Endpoint |
 |---|---|---|
-| Binance Spot | candles/tickers (primária) + WebSocket no worker | `api.binance.com/api/v3/klines`, `/ticker/24hr`, `stream.binance.com` |
+| Binance Spot | candles/tickers (primária) + WebSocket no worker | `api.binance.com/api/v3/klines`, `/ticker/24hr`, `stream.binance.com`; em regiões com HTTP 451 cai automaticamente para a base oficial só de dados `data-api.binance.vision` / `data-stream.binance.vision` |
 | Kraken | candles/tickers (fallback) | `api.kraken.com/0/public/OHLC`, `/Ticker` |
 | CoinGecko | USD→BRL, market cap, dados globais | `/simple/price`, `/coins/markets`, `/global` |
 | alternative.me | Índice Medo & Ganância | `/fng/` |
