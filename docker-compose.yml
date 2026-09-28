@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cryptoscanner
+      POSTGRES_PASSWORD: cryptoscanner
+      POSTGRES_DB: cryptoscanner
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cryptoscanner"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
+    command: ["npx", "prisma", "migrate", "deploy"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://cryptoscanner:cryptoscanner@postgres:5432/cryptoscanner?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://cryptoscanner:cryptoscanner@postgres:5432/cryptoscanner?schema=public
+      REDIS_URL: redis://redis:6379
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://cryptoscanner:cryptoscanner@postgres:5432/cryptoscanner?schema=public
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  redisdata:

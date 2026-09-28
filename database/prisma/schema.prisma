@@ -1,0 +1,357 @@
+// Esquema de dados do CryptoScanner.
+// Gerado/aplicado com: npm run db:migrate (produção) ou npm run db:migrate:dev (desenvolvimento).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------
+// Usuários, planos e preferências
+// ------------------------------------------------------------------
+
+enum Plan {
+  FREE
+  PRO
+  PLATINUM
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  plan         Plan     @default(FREE)
+  role         Role     @default(USER)
+  telegramChatId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  preference     UserPreference?
+  watchlists     Watchlist[]
+  agents         Agent[]
+  alerts         Alert[]
+  chartAnalyses  ChartAnalysis[]
+  scanHistory    ScanHistoryEntry[]
+  supportTickets SupportTicket[]
+  agentExecutions AgentExecution[]
+}
+
+model UserPreference {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  theme            String   @default("dark") // dark | light | system
+  currency         String   @default("USD")  // USD | BRL
+  defaultTimeframe String   @default("4h")
+  autoRefreshSec   Int      @default(30)
+  language         String   @default("pt-BR")
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------------------
+// Ativos e dados de mercado
+// ------------------------------------------------------------------
+
+model Asset {
+  id           String   @id @default(cuid())
+  symbol       String   @unique // BTC
+  name         String            // Bitcoin
+  binancePair  String   @unique  // BTCUSDT
+  krakenPair   String?           // XBTUSD
+  coingeckoId  String?           // bitcoin
+  quote        String   @default("USDT")
+  active       Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  candles        Candle[]
+  indicators     Indicator[]
+  snapshots      MarketSnapshot[]
+  scannerResults ScannerResult[]
+  watchlistItems WatchlistItem[]
+  alerts         Alert[]
+}
+
+// Snapshot de ticker (preço/variação/volume) coletado pelo worker.
+model MarketSnapshot {
+  id             String   @id @default(cuid())
+  assetId        String
+  price          Float
+  changePct24h   Float
+  high24h        Float
+  low24h         Float
+  volume24h      Float    // volume em moeda base
+  quoteVolume24h Float    // volume em moeda de cotação (USDT/USD)
+  source         String   // binance | kraken | coingecko
+  collectedAt    DateTime @default(now())
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, collectedAt(sort: Desc)])
+}
+
+model Candle {
+  id        String   @id @default(cuid())
+  assetId   String
+  timeframe String   // 5m 15m 30m 1h 4h 1d 1w
+  openTime  DateTime
+  closeTime DateTime
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float
+  source    String
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, timeframe, openTime])
+  @@index([assetId, timeframe, openTime(sort: Desc)])
+}
+
+// Último valor calculado de cada indicador por ativo/timeframe (materializado pelo worker).
+model Indicator {
+  id         String   @id @default(cuid())
+  assetId    String
+  timeframe  String
+  name       String   // ema8, rsi14, macd, bb20, atr14, stochrsi...
+  value      Json
+  computedAt DateTime @default(now())
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, timeframe, name])
+}
+
+// ------------------------------------------------------------------
+// Scanner
+// ------------------------------------------------------------------
+
+model ScannerResult {
+  id          String   @id @default(cuid())
+  runId       String   // agrupa os resultados de um ciclo
+  assetId     String
+  timeframe   String
+  pattern     String   // chave do padrão (double_bottom, head_shoulders...)
+  direction   String   // bullish | bearish | neutral
+  confidence  Float    // 0..100
+  price       Float
+  target      Float?
+  stop        Float?
+  details     Json
+  detectedAt  DateTime @default(now())
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([assetId, timeframe, detectedAt(sort: Desc)])
+}
+
+// Histórico de alertas do scanner por usuário (aba "Histórico de Alertas").
+model ScanHistoryEntry {
+  id         String   @id @default(cuid())
+  userId     String
+  symbol     String
+  timeframe  String
+  kind       String   // pattern | volume
+  title      String
+  direction  String
+  confidence Float?
+  payload    Json
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ------------------------------------------------------------------
+// Watchlist / Carteira
+// ------------------------------------------------------------------
+
+model Watchlist {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String   @default("Favoritos")
+  isDefault Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items WatchlistItem[]
+
+  @@index([userId])
+}
+
+model WatchlistItem {
+  id          String   @id @default(cuid())
+  watchlistId String
+  assetId     String
+  note        String?
+  // posição simulada (opcional) para a página Carteira
+  quantity    Float?
+  avgPrice    Float?
+  addedAt     DateTime @default(now())
+
+  watchlist Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  asset     Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, assetId])
+}
+
+// ------------------------------------------------------------------
+// Agentes (configuração do usuário) e execuções
+// ------------------------------------------------------------------
+
+enum AgentStatus {
+  ACTIVE
+  PAUSED
+  STOPPED
+}
+
+model Agent {
+  id             String      @id @default(cuid())
+  userId         String
+  name           String
+  icon           String      @default("🤖")
+  description    String?
+  symbols        String[]    // ["BTC","ETH"]
+  operationType  String      // day_trade | swing_trade
+  timeframe      String      // 1h 4h 1d 1w
+  strategies     String[]    // chaves de agents/strategies
+  minConfidence  Int         @default(70)
+  notification   String      @default("log") // log | telegram | both
+  status         AgentStatus @default(ACTIVE)
+  lastRunAt      DateTime?
+  lastAlertAt    DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executions AgentExecution[]
+  logs       AgentLog[]
+
+  @@index([userId, status])
+}
+
+// Uma execução do pipeline multiagente (por ativo/timeframe), disparada pelo worker, pela API ou por um Agent.
+model AgentExecution {
+  id          String   @id @default(cuid())
+  agentId     String?  // Agent do usuário (opcional: execuções ad hoc não têm)
+  userId      String?
+  symbol      String
+  timeframe   String
+  trigger     String   // api | worker | agent
+  status      String   // running | succeeded | failed | partial
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+  durationMs  Int?
+  error       String?
+
+  agent   Agent?        @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  user    User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  results AgentResult[]
+
+  @@index([symbol, timeframe, startedAt(sort: Desc)])
+  @@index([agentId, startedAt(sort: Desc)])
+}
+
+// Saída de cada agente dentro de uma execução.
+model AgentResult {
+  id          String   @id @default(cuid())
+  executionId String
+  agentName   String   // market-agent, scanner-agent, ...
+  status      String   // ok | fallback | error | skipped
+  output      Json
+  logs        Json
+  durationMs  Int
+  createdAt   DateTime @default(now())
+
+  execution AgentExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([executionId])
+}
+
+model AgentLog {
+  id        String   @id @default(cuid())
+  agentId   String
+  level     String   // info | signal | warn | error
+  symbol    String?
+  message   String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, createdAt(sort: Desc)])
+}
+
+// ------------------------------------------------------------------
+// Alertas de preço/indicador do usuário
+// ------------------------------------------------------------------
+
+model Alert {
+  id          String    @id @default(cuid())
+  userId      String
+  assetId     String
+  kind        String    // price_above | price_below | rsi_above | rsi_below | pattern | volume
+  timeframe   String    @default("4h")
+  threshold   Float?
+  pattern     String?
+  channel     String    @default("log") // log | telegram | both
+  active      Boolean   @default(true)
+  triggeredAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+}
+
+// ------------------------------------------------------------------
+// Análise de gráfico por IA (imagem)
+// ------------------------------------------------------------------
+
+model ChartAnalysis {
+  id          String   @id @default(cuid())
+  userId      String
+  symbol      String?
+  timeframe   String?
+  imageSha256 String
+  imageMime   String
+  provider    String
+  model       String
+  result      Json
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ------------------------------------------------------------------
+// Suporte
+// ------------------------------------------------------------------
+
+model SupportTicket {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String
+  subject   String
+  message   String
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}

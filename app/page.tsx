@@ -1,69 +1,69 @@
-import Image from "next/image";
+import Link from "next/link";
+import type { Metadata } from "next";
+import { PageShell } from "@/components/layout/page-shell";
+import { HomeMarket } from "@/components/market/home-market";
+import { Card, CardContent } from "@/components/ui/card";
+import { DISCLAIMER_TEXT } from "@/components/layout/nav-config";
 
-export default function Home() {
+export const metadata: Metadata = { title: "CryptoScanner — Scanner de padrões e agentes de IA para cripto" };
+
+const FEATURES = [
+  { icon: "📊", title: "Scanner de Padrões Gráficos", text: "17 padrões detectados por pivôs fractais e ATR em 20 ativos, com alvo, stop e confiança.", href: "/scanner" },
+  { icon: "🤖", title: "Agentes de IA Autônomos", text: "Agentes configuráveis que verificam estratégias a cada 5 minutos e alertam no painel ou no Telegram.", href: "/agentes" },
+  { icon: "🔔", title: "Alertas Inteligentes", text: "Volume anômalo (≥100% sobre a média), preço, RSI e padrões — com cooldown e histórico.", href: "/scanner" },
+  { icon: "📈", title: "Gráficos com indicadores", text: "Candles com EMA 8/25/100/200, Bollinger, StochRSI, MACD, suportes/resistências e Fibonacci.", href: "/graficos" },
+  { icon: "🧠", title: "Análise consolidada", text: "Orquestrador que cruza técnica, tendência, risco e sentimento, aponta conflitos e dados ausentes.", href: "/graficos" },
+  { icon: "💼", title: "Carteira e watchlist", text: "Favoritos, posições simuladas com P&L e análises de gráfico salvas.", href: "/carteira" },
+];
+
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <PageShell>
+      <section className="grid items-center gap-8 py-6 lg:grid-cols-2 lg:py-10">
+        <div>
+          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
+            <span className="h-2 w-2 rounded-full bg-success live-dot" /> Dados públicos em tempo real · Binance / Kraken
+          </span>
+          <h1 className="mt-4 text-3xl font-black leading-tight tracking-tight sm:text-5xl">
+            Analise Bitcoin & Crypto com <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">agentes de IA</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-4 max-w-xl text-base text-muted-foreground">
+            Scanner de padrões gráficos, indicadores calculados programaticamente e um sistema multiagente que consolida análise técnica, tendência, risco e sentimento — sem promessas de resultado.
           </p>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Link href="/scanner" className="inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+              📊 Abrir o Scanner
+            </Link>
+            <Link href="/agentes" className="inline-flex h-11 items-center rounded-md border border-border bg-card px-6 text-sm font-semibold hover:bg-muted">
+              🤖 Criar um agente
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <HomeMarket />
+      </section>
+
+      <section className="py-6">
+        <h2 className="text-xl font-bold">Tudo que você precisa para analisar melhor</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map((f) => (
+            <Link key={f.title} href={f.href}>
+              <Card className="h-full transition-colors hover:border-primary/50">
+                <CardContent className="p-4">
+                  <div className="text-2xl">{f.icon}</div>
+                  <div className="mt-2 font-semibold">{f.title}</div>
+                  <p className="mt-1 text-sm text-muted-foreground">{f.text}</p>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
         </div>
-      </main>
-    </div>
+      </section>
+
+      <section className="py-6">
+        <Card>
+          <CardContent className="p-4 text-xs text-muted-foreground">{DISCLAIMER_TEXT}</CardContent>
+        </Card>
+      </section>
+    </PageShell>
   );
 }

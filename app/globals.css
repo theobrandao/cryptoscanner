@@ -1,26 +1,143 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------
+   Tokens de tema (próprios). Escuro é o padrão; claro via .light no <html>.
+   ------------------------------------------------------------------ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f5fb;
+  --foreground: #16122b;
+  --card: #ffffff;
+  --card-foreground: #16122b;
+  --muted: #eceaf6;
+  --muted-foreground: #5f5a7a;
+  --border: #dcd8ec;
+  --input: #dcd8ec;
+  --primary: #6d3df5;
+  --primary-foreground: #ffffff;
+  --accent: #0ea5b7;
+  --accent-foreground: #ffffff;
+  --success: #12a66b;
+  --danger: #e2445c;
+  --warning: #d98a06;
+  --ring: #6d3df5;
+  --chart-up: #12a66b;
+  --chart-down: #e2445c;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: #0d0a1c;
+  --foreground: #ece9fb;
+  --card: #151130;
+  --card-foreground: #ece9fb;
+  --muted: #1e1a3d;
+  --muted-foreground: #9a94bf;
+  --border: #2a2550;
+  --input: #2a2550;
+  --primary: #8b5cf6;
+  --primary-foreground: #ffffff;
+  --accent: #22d3ee;
+  --accent-foreground: #061418;
+  --success: #22c55e;
+  --danger: #f43f5e;
+  --warning: #f59e0b;
+  --ring: #8b5cf6;
+  --chart-up: #22c55e;
+  --chart-down: #f43f5e;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-ring: var(--ring);
+  --color-chart-up: var(--chart-up);
+  --color-chart-down: var(--chart-down);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
+}
+html.light {
+  color-scheme: light;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.dark body {
+  background-image:
+    radial-gradient(1200px 500px at 10% -10%, rgba(139, 92, 246, 0.16), transparent 60%),
+    radial-gradient(900px 400px at 100% 0%, rgba(34, 211, 238, 0.08), transparent 60%);
+  background-attachment: fixed;
+}
+
+* {
+  border-color: var(--border);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* barra de rolagem discreta */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--muted-foreground) 35%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.live-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--muted) 25%, color-mix(in oklab, var(--muted) 60%, var(--card)) 37%, var(--muted) 63%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
 }
