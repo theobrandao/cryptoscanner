@@ -13,6 +13,7 @@ export const PATTERN_KEYS = [
   "head_shoulders",
   "descending_triangle",
   "bear_flag",
+  "rising_wedge",
   "pivot_bearish",
   "resistance_touch",
   "bull_trap",
@@ -101,6 +102,12 @@ export const PATTERN_CATALOG: Record<PatternKey, PatternInfo> = {
     label: "Bandeira de Baixa",
     direction: "bearish",
     description: "Impulso forte de baixa seguido de consolidação curta em canal estreito.",
+  },
+  rising_wedge: {
+    key: "rising_wedge",
+    label: "Cunha de Alta",
+    direction: "bearish",
+    description: "Topos e fundos ascendentes convergentes; a inclinação dos fundos é mais acentuada que a dos topos, sinal de exaustão da alta.",
   },
   pivot_bearish: {
     key: "pivot_bearish",

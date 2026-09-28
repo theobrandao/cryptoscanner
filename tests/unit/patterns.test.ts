@@ -4,10 +4,10 @@ import { PATTERN_CATALOG, PATTERN_KEYS, PATTERN_LIST } from "@/lib/patterns/cata
 import { candlesFromCloses, doubleBottomCloses, doubleTopCloses, syntheticSeries } from "../helpers";
 
 describe("catálogo de padrões", () => {
-  it("cobre os 17 padrões públicos (16 chaves; cunha de baixa com viés de alta)", () => {
-    expect(PATTERN_KEYS.length).toBe(16);
+  it("cobre os 17 padrões (8 de alta, 8 de baixa, 1 neutro)", () => {
+    expect(PATTERN_KEYS.length).toBe(17);
     expect(PATTERN_LIST.filter((p) => p.direction === "bullish").length).toBe(8);
-    expect(PATTERN_LIST.filter((p) => p.direction === "bearish").length).toBe(7);
+    expect(PATTERN_LIST.filter((p) => p.direction === "bearish").length).toBe(8);
     expect(PATTERN_LIST.filter((p) => p.direction === "neutral").length).toBe(1);
     expect(PATTERN_CATALOG.double_bottom.label).toBe("Fundo Duplo");
   });
@@ -48,6 +48,26 @@ describe("detecção", () => {
     const m = detectPatterns(candlesFromCloses(zig), { minConfidence: 50 });
     expect(m.some((x) => x.key === "pivot_bullish")).toBe(true);
     expect(m.some((x) => x.key === "pivot_bearish")).toBe(false);
+  });
+
+  it("detecta cunha de alta (viés de baixa) em zigue-zague ascendente convergente", () => {
+    const wedge = Array.from({ length: 80 }, (_, i) => 100 + i * 0.3 + (6 - 0.06 * i) * Math.sin(i / 2.5));
+    const m = detectPatterns(candlesFromCloses(wedge), { minConfidence: 50 });
+    const rw = m.find((x) => x.key === "rising_wedge");
+    expect(rw).toBeDefined();
+    expect(rw!.direction).toBe("bearish");
+    expect(rw!.target).toBeLessThan(rw!.price);
+    expect(rw!.stop).toBeGreaterThan(rw!.price);
+    expect(m.some((x) => x.key === "falling_wedge")).toBe(false);
+  });
+
+  it("detecta cunha de baixa (viés de alta) na série espelhada", () => {
+    const wedge = Array.from({ length: 80 }, (_, i) => 100 - i * 0.3 + (6 - 0.06 * i) * Math.sin(i / 2.5));
+    const m = detectPatterns(candlesFromCloses(wedge), { minConfidence: 50 });
+    const fw = m.find((x) => x.key === "falling_wedge");
+    expect(fw).toBeDefined();
+    expect(fw!.direction).toBe("bullish");
+    expect(m.some((x) => x.key === "rising_wedge")).toBe(false);
   });
 
   it("respeita a confiança mínima e ordena por confiança", () => {

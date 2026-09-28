@@ -1,4 +1,4 @@
-import { AGENT_DEFINITIONS } from "@/agents/orchestrator";
+import { AGENT_DEFINITIONS, ORCHESTRATOR_DEFINITION } from "@/agents/orchestrator";
 import { scannerAgent } from "@/agents/scanner-agent";
 import { ok, withApi } from "@/lib/api";
 import { getLlmInfo } from "@/services/llm";
@@ -15,13 +15,10 @@ export const GET = withApi(async () => {
     timeoutMs: d.timeoutMs,
     hasFallback: typeof d.fallback === "function",
   }));
+  const { pipeline, ...orchestrator } = ORCHESTRATOR_DEFINITION;
   return ok({
-    agents: defs,
-    orchestrator: {
-      name: "orchestrator",
-      pipeline: ["market-agent", "technical-analysis-agent", "trend-agent", "risk-agent", "sentiment-agent"],
-      purpose: "Consolidar evidências, detectar conflitos e dados ausentes, calcular métricas derivadas.",
-    },
+    agents: [...defs, { ...orchestrator, inputs: [...orchestrator.inputs], outputs: [...orchestrator.outputs], allowedTools: [...orchestrator.allowedTools], rules: [...orchestrator.rules] }],
+    orchestrator: { name: ORCHESTRATOR_DEFINITION.name, pipeline: [...pipeline], purpose: ORCHESTRATOR_DEFINITION.purpose },
     llm: getLlmInfo(),
   });
 });

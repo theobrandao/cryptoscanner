@@ -66,7 +66,7 @@ describe("rotas da API", () => {
     const { GET } = await import("@/app/api/market/assets/route");
     const body = await json(await GET(new Request("http://localhost/api/market/assets"), { params: Promise.resolve({}) }));
     expect((body.data!.assets as unknown[]).length).toBe(ASSETS.length);
-    expect((body.data!.patterns as unknown[]).length).toBe(16);
+    expect((body.data!.patterns as unknown[]).length).toBe(17);
   });
 
   it("GET /api/market/candles valida parâmetros e retorna indicadores", async () => {
@@ -170,7 +170,7 @@ describe("rotas da API", () => {
     const { GET } = await import("@/app/api/agents/definitions/route");
     const body = await json(await GET(new Request("http://localhost/api/agents/definitions"), { params: Promise.resolve({}) }));
     const agents = body.data!.agents as Array<{ name: string; allowedTools: string[]; timeoutMs: number }>;
-    expect(agents.map((a) => a.name)).toEqual(["scanner-agent", "market-agent", "technical-analysis-agent", "trend-agent", "risk-agent", "sentiment-agent"]);
+    expect(agents.map((a) => a.name)).toEqual(["scanner-agent", "market-agent", "technical-analysis-agent", "trend-agent", "risk-agent", "sentiment-agent", "orchestrator-agent"]);
     for (const a of agents) expect(a.timeoutMs).toBeGreaterThan(0);
   });
 

@@ -345,3 +345,26 @@ function ptDir(d: Direction) {
 }
 
 export const AGENT_DEFINITIONS = [marketAgent, technicalAnalysisAgent, trendAgent, riskAgent, sentimentAgent] as const;
+
+/**
+ * Definição documental do orquestrador (mesmo contrato descritivo dos agentes) para a
+ * documentação viva em GET /api/agents/definitions. Não é um `defineAgent`: o orquestrador
+ * é o pipeline que executa os demais.
+ */
+export const ORCHESTRATOR_DEFINITION = {
+  name: "orchestrator-agent",
+  purpose: "Executar o pipeline market → (technical-analysis, trend, risk, sentiment), consolidar evidências ponderadas, detectar conflitos e dados ausentes e calcular métricas derivadas (score, risco ajustado, veredito).",
+  inputs: ["symbol", "timeframe", "includeSentiment", "useLlm", "minPatternConfidence"],
+  outputs: ["verdict", "score", "confidence", "evidence[]", "conflicts[]", "missingData[]", "riskAdjustedScore", "agents{}", "narrative?"],
+  allowedTools: ["(delega aos agentes: market, indicators, patterns, sentiment, llm)"],
+  rules: [
+    "Pesos das evidências: análise técnica 0,45 + padrão dominante 0,15; tendência 0,30; sentimento 0,15.",
+    "Um agente que falha ou estoura o timeout entra como dado ausente (missingData), nunca como evidência inventada.",
+    "Conflito TA × tendência é registrado com severidade e reduz a confiança final.",
+    "A narrativa em linguagem natural (LLM) é opcional e nunca altera score, veredito ou níveis.",
+    "Saída sempre acompanhada do aviso de que não constitui recomendação de investimento.",
+  ],
+  timeoutMs: 45_000,
+  pipeline: ["market-agent", "technical-analysis-agent", "trend-agent", "risk-agent", "sentiment-agent"],
+  hasFallback: true,
+} as const;

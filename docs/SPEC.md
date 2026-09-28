@@ -61,7 +61,9 @@ Não há sidebar persistente. Em mobile o menu recolhe (botão ×). O projeto us
 
 ### 4.4 Lista de padrões suportados (17) [OBS]
 Alta (▲): Fundo Duplo, C&O Invertido, Triângulo Ascendente, Bandeira de Alta, Cunha de Baixa, Pivot de Alta (HH+HL), Toque no Suporte, Bear Trap (Compra).
-Baixa (▼): Topo Duplo, Cabeça & Ombros, Triângulo Descendente, Bandeira de Baixa, Pivot de Baixa (LH+LL), Toque na Resistência, Bull Trap (Venda).
+Baixa (▼): Topo Duplo, Cabeça & Ombros, Triângulo Descendente, Bandeira de Baixa, Cunha de Alta, Pivot de Baixa (LH+LL), Toque na Resistência, Bull Trap (Venda).
+
+> A referência anuncia 17 padrões; a lista pública observada tinha 16 nomes. O 17º implementado é a Cunha de Alta (rising wedge, viés de baixa), par natural da Cunha de Baixa — escolha própria desta implementação [REIMPL].
 Neutro (↔): Consolidação Lateral.
 Algoritmos de detecção [N/OBS] → [REIMPL] com detecção por pivôs (ZigZag) e regras geométricas próprias (`lib/patterns`).
 

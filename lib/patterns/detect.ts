@@ -77,6 +77,7 @@ export function detectPatterns(input: readonly Candle[], options: DetectOptions 
     detectBullFlag,
     detectBearFlag,
     detectFallingWedge,
+    detectRisingWedge,
     detectPivotBullish,
     detectPivotBearish,
     detectSupportTouch,
@@ -120,6 +121,13 @@ function atrDist(ctx: Ctx, a: number, b: number) {
 }
 
 /** recência: 1 quando o último pivô está próximo do final da série */
+/** Projeta a reta que passa por dois pivôs até o índice `at` (inclinação em preço por barra). */
+function projectLine(a: Pivot, b: Pivot, at: number): number {
+  if (b.index === a.index) return b.price;
+  const slope = (b.price - a.price) / (b.index - a.index);
+  return b.price + slope * (at - b.index);
+}
+
 function recency(ctx: Ctx, index: number) {
   return clamp(1 - (ctx.n - 1 - index) / 40, 0, 1);
 }
@@ -430,19 +438,62 @@ function detectFallingWedge(ctx: Ctx): PatternMatch | null {
   const widthStart = firstHigh.price - firstLow.price;
   const widthEnd = lastHigh.price - lastLow.price;
   if (widthStart <= 0 || widthEnd <= 0 || widthEnd / widthStart > 0.85) return null;
-  if (ctx.price < lastLow.price - ctx.atr * 0.5) return null;
   if (ctx.n - 1 - Math.max(lastHigh.index, lastLow.index) > 30) return null;
-  const brokeUp = ctx.price > lastHigh.price;
+  // linhas projetadas até o candle atual (inclinação por barra entre o primeiro e o último pivô)
+  const upperNow = projectLine(firstHigh, lastHigh, ctx.n - 1);
+  const lowerNow = projectLine(firstLow, lastLow, ctx.n - 1);
+  if (ctx.price < lowerNow - ctx.atr * 0.5) return null; // rompeu para baixo: padrão invalidado
+  const brokeUp = ctx.price > upperNow;
   const conf = 50 + (1 - widthEnd / widthStart) * 20 + (brokeUp ? 10 : 0) + recency(ctx, Math.max(lastHigh.index, lastLow.index)) * 8;
   return make(ctx, "falling_wedge", conf, {
-    target: round(firstHigh.price, 8),
-    stop: round(lastLow.price - ctx.atr * 0.5, 8),
+    // alvo = movimento medido (largura máxima da cunha) projetado acima da linha superior
+    target: round(upperNow + widthStart, 8),
+    stop: round(lowerNow - ctx.atr * 0.5, 8),
     points: [...highs.map((h) => pt(ctx, h, "topo desc.")), ...lows.map((l) => pt(ctx, l, "fundo desc."))],
     levels: [
-      { price: lastHigh.price, role: "linha superior" },
-      { price: lastLow.price, role: "linha inferior" },
+      { price: round(upperNow, 8), role: "linha superior" },
+      { price: round(lowerNow, 8), role: "linha inferior" },
     ],
     summary: brokeUp ? "Cunha descendente rompida para cima." : "Cunha descendente em compressão; viés de alta ao romper a linha superior.",
+  });
+}
+
+// ---------------------------------------------------------------- Cunha de alta (viés de baixa)
+
+function detectRisingWedge(ctx: Ctx): PatternMatch | null {
+  const highs = ctx.highs.slice(-3);
+  const lows = ctx.lows.slice(-3);
+  if (highs.length < 2 || lows.length < 2) return null;
+  const hReg = linearRegression(highs.map((h) => h.price));
+  const lReg = linearRegression(lows.map((l) => l.price));
+  if (hReg.slope <= 0 || lReg.slope <= 0) return null;
+  // convergência: fundos sobem mais rápido que topos (em preço por pivô)
+  if (lReg.slope <= hReg.slope * 1.15) return null;
+  const firstHigh = highs[0];
+  const lastHigh = highs[highs.length - 1];
+  const firstLow = lows[0];
+  const lastLow = lows[lows.length - 1];
+  if (!firstHigh || !lastHigh || !firstLow || !lastLow) return null;
+  const widthStart = firstHigh.price - firstLow.price;
+  const widthEnd = lastHigh.price - lastLow.price;
+  if (widthStart <= 0 || widthEnd <= 0 || widthEnd / widthStart > 0.85) return null;
+  if (ctx.n - 1 - Math.max(lastHigh.index, lastLow.index) > 30) return null;
+  // linhas projetadas até o candle atual (inclinação por barra entre o primeiro e o último pivô)
+  const upperNow = projectLine(firstHigh, lastHigh, ctx.n - 1);
+  const lowerNow = projectLine(firstLow, lastLow, ctx.n - 1);
+  if (ctx.price > upperNow + ctx.atr * 0.5) return null; // rompeu para cima: padrão invalidado
+  const brokeDown = ctx.price < lowerNow;
+  const conf = 50 + (1 - widthEnd / widthStart) * 20 + (brokeDown ? 10 : 0) + recency(ctx, Math.max(lastHigh.index, lastLow.index)) * 8;
+  return make(ctx, "rising_wedge", conf, {
+    // alvo = movimento medido (largura máxima da cunha) projetado abaixo da linha inferior
+    target: round(lowerNow - widthStart, 8),
+    stop: round(upperNow + ctx.atr * 0.5, 8),
+    points: [...highs.map((h) => pt(ctx, h, "topo asc.")), ...lows.map((l) => pt(ctx, l, "fundo asc."))],
+    levels: [
+      { price: round(upperNow, 8), role: "linha superior" },
+      { price: round(lowerNow, 8), role: "linha inferior" },
+    ],
+    summary: brokeDown ? "Cunha ascendente rompida para baixo." : "Cunha ascendente em compressão; viés de baixa ao romper a linha inferior.",
   });
 }
 

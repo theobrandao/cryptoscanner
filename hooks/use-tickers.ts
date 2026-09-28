@@ -16,7 +16,7 @@ export interface TickersPayload {
  * Tickers em tempo real: tenta SSE (/api/stream/tickers) e cai para polling SWR a cada 10 s.
  */
 export function useTickers(enabled = true) {
-  const { data: polled, mutate } = useSWR<TickersPayload>(enabled ? "/api/market/tickers?currency=BRL" : null, { refreshInterval: 10_000 });
+  const { data: polled, mutate } = useSWR<TickersPayload>(enabled ? "/api/market/tickers?fx=1" : null, { refreshInterval: 10_000 });
   const [live, setLive] = React.useState<TickersPayload | null>(null);
   const [connected, setConnected] = React.useState(false);
 
