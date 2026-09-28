@@ -192,8 +192,9 @@ export interface MarketBubble {
 /** Top 100 por volume com variação 1h/24h/7d/30d (CoinGecko; cache 60 s; stale até 24 h). */
 export async function getBubbles(limit = 100): Promise<{ bubbles: MarketBubble[]; stale: boolean; fetchedAt: number } | null> {
   try {
-    const res = await cached<{ items: MarketBubbleRaw[]; at: number }>(CACHE_KEYS.bubbles, 60, async () => ({ items: await getMarketBubbles(limit), at: Date.now() }), { staleTtlSeconds: 24 * 3600 });
-    const bubbles = res.value.items.map<MarketBubble>((c) => ({
+    // sempre busca/cacheia 100 e fatia por `limit` (uma única entrada de cache para todos os limites)
+    const res = await cached<{ items: MarketBubbleRaw[]; at: number }>(CACHE_KEYS.bubbles, 60, async () => ({ items: await getMarketBubbles(100), at: Date.now() }), { staleTtlSeconds: 24 * 3600 });
+    const bubbles = res.value.items.slice(0, limit).map<MarketBubble>((c) => ({
       id: c.id,
       symbol: c.symbol.toUpperCase(),
       name: c.name,

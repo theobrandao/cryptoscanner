@@ -15,6 +15,8 @@ export interface CacheBackend {
   set<T>(key: string, value: T, ttlSeconds: number): Promise<void>;
   del(key: string): Promise<void>;
   keys(prefix: string): Promise<string[]>;
+  /** Incremento atômico com TTL definido na criação da chave; devolve o valor após incrementar. */
+  incr(key: string, ttlSeconds: number): Promise<number>;
   kind(): "redis" | "memory";
 }
 
@@ -57,6 +59,18 @@ class MemoryCache implements CacheBackend {
     this.store.delete(key);
   }
 
+  async incr(key: string, ttlSeconds: number): Promise<number> {
+    const e = this.store.get(key);
+    const now = Date.now();
+    if (!e || e.expiresAt <= now) {
+      this.store.set(key, { value: 1, expiresAt: now + ttlSeconds * 1000 });
+      return 1;
+    }
+    const next = (typeof e.value === "number" ? e.value : 0) + 1;
+    e.value = next;
+    return next;
+  }
+
   async keys(prefix: string): Promise<string[]> {
     const now = Date.now();
     return [...this.store.entries()].filter(([k, e]) => k.startsWith(prefix) && e.expiresAt > now).map(([k]) => k);
@@ -90,6 +104,12 @@ class RedisCache implements CacheBackend {
 
   async del(key: string): Promise<void> {
     await this.client.del(key);
+  }
+
+  async incr(key: string, ttlSeconds: number): Promise<number> {
+    const next = await this.client.incr(key);
+    if (next === 1) await this.client.expire(key, Math.max(1, Math.ceil(ttlSeconds)));
+    return next;
   }
 
   async keys(prefix: string): Promise<string[]> {
@@ -202,6 +222,13 @@ class ResilientCache implements CacheBackend {
     return this.withBackend(
       (b) => b.keys(prefix),
       () => this.memory.keys(prefix),
+    );
+  }
+
+  incr(key: string, ttlSeconds: number) {
+    return this.withBackend(
+      (b) => b.incr(key, ttlSeconds),
+      () => this.memory.incr(key, ttlSeconds),
     );
   }
 

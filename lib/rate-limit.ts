@@ -12,17 +12,15 @@ export interface RateLimitResult {
 }
 
 export async function rateLimit(bucket: string, key: string, limitPerMinute: number): Promise<RateLimitResult> {
+  // Janela de 60 s iniciada no primeiro acesso (INCR atômico com TTL), sem depender do limite do minuto do relógio.
   const cache = getCache();
-  const windowStart = Math.floor(Date.now() / 60_000) * 60_000;
-  const cacheKey = `ratelimit:${bucket}:${key}:${windowStart}`;
-  const current = (await cache.get<number>(cacheKey)) ?? 0;
-  const next = current + 1;
-  await cache.set(cacheKey, next, 61);
+  const cacheKey = `ratelimit:${bucket}:${key}`;
+  const next = await cache.incr(cacheKey, 60);
   return {
     allowed: next <= limitPerMinute,
     remaining: Math.max(0, limitPerMinute - next),
     limit: limitPerMinute,
-    resetAt: windowStart + 60_000,
+    resetAt: Date.now() + 60_000,
   };
 }
 
