@@ -107,6 +107,8 @@ Teste de integração contra um ambiente real (todas as rotas, fluxos positivos/
 BASE_URL=https://seu-app.vercel.app CRON_SECRET=<segredo> npm run smoke      # SKIP_RATE_LIMIT=1 para não bloquear o login por 60 s
 ```
 
+E2E de interface (Playwright): `BASE_URL=https://seu-app.vercel.app CHROMIUM_PATH=<chromium> node tools/e2e-ui.mjs` (23 passos, screenshots em `e2e-out/`).
+
 Validação visual: `CHROMIUM_PATH=<chromium> node tools/screenshot.mjs http://localhost:3000/scanner out.png` (Playwright; `tools/screenshot-auth.mjs` faz login antes, `tools/screenshot-light.mjs` usa o tema claro).
 
 ## 9. Deploy
