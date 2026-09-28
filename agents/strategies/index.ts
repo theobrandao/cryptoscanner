@@ -22,12 +22,30 @@ export interface StrategyContext {
   sentiment(): Promise<SentimentOutput | null>;
 }
 
+export interface TradePlan {
+  entry: number;
+  target: number | null;
+  stop: number | null;
+  /** potencial (%), risco (%) e relação risco/retorno */
+  potentialPct: number | null;
+  riskPct: number | null;
+  riskReward: number | null;
+}
+
 export interface StrategySignal {
   strategy: string;
   side: "buy" | "sell";
   confidence: number;
   reason: string;
   timeframe: Timeframe;
+  /** plano de trade derivado do padrão (Sentinela / padrões com alvo e stop) */
+  plan?: TradePlan;
+  /** estratégias/indicadores que concordam e que discordam do sinal */
+  confluence?: { agree: string[]; disagree: string[] };
+  /** padrão que originou o sinal */
+  pattern?: { key: string; label: string; confidence: number; direction: "bullish" | "bearish" | "neutral" };
+  /** contexto de mercado anexado (ex.: tendência do BTC) */
+  context?: string[];
 }
 
 export interface StrategyDefinition {
@@ -297,6 +315,54 @@ export const STRATEGIES: StrategyDefinition[] = [
       if (w.trend === "bearish" && d.trend === "bearish" && Number.isFinite(dist) && Math.abs(dist) <= 1.5)
         return sig(this.key, "sell", 62 + (w.trendStrength + d.trendStrength) / 8, `1W e 1D de baixa; preço a ${dist.toFixed(2)}% da EMA25 4H`, "4h");
       return null;
+    },
+  },
+  {
+    key: "sentinel_patterns",
+    name: "Sentinela multipadrão (todos os padrões + confluência)",
+    category: "hybrid",
+    description: "Vigia os 17 padrões gráficos ao mesmo tempo; para o melhor padrão calcula plano de trade (entrada, alvo, stop, risco/retorno) e confluência com EMAs, RSI, StochRSI, MACD e tendência do timeframe superior.",
+    timeframes: [],
+    async evaluate(ctx) {
+      const [patterns, s, h] = await Promise.all([ctx.patterns(ctx.timeframe), ctx.snapshot(ctx.timeframe), ctx.snapshot(higherOf(ctx.timeframe))]);
+      const best = patterns.filter((p) => p.direction !== "neutral").sort((a, b) => b.confidence - a.confidence)[0];
+      if (!best) return null;
+      const side: "buy" | "sell" = best.direction === "bullish" ? "buy" : "sell";
+      const agree: string[] = [];
+      const disagree: string[] = [];
+      const vote = (name: string, dir: "bullish" | "bearish" | "neutral") => {
+        if (dir === "neutral") return;
+        (dir === best.direction ? agree : disagree).push(name);
+      };
+      vote(`tendência ${ctx.timeframe} (${s.trendStrength})`, s.trend);
+      vote(`tendência ${higherOf(ctx.timeframe)} (${h.trendStrength})`, h.trend);
+      if (Number.isFinite(s.ema8) && Number.isFinite(s.ema25)) vote("EMA 8 × 25", s.ema8 > s.ema25 ? "bullish" : "bearish");
+      if (Number.isFinite(s.ema100)) vote("preço × EMA 100", s.price > s.ema100 ? "bullish" : "bearish");
+      if (Number.isFinite(s.rsi14)) vote(`RSI ${s.rsi14.toFixed(0)}`, s.rsi14 >= 55 ? "bullish" : s.rsi14 <= 45 ? "bearish" : "neutral");
+      if (Number.isFinite(s.stochRsi.k)) vote(`StochRSI ${s.stochRsi.k.toFixed(0)}`, s.stochRsi.k <= 20 ? "bullish" : s.stochRsi.k >= 80 ? "bearish" : "neutral");
+      if (Number.isFinite(s.macd.histogram)) vote("histograma MACD", s.macd.histogram > 0 ? "bullish" : "bearish");
+      if (Number.isFinite(s.relativeVolume) && s.relativeVolume >= 1.5) agree.push(`volume relativo ${s.relativeVolume.toFixed(1)}×`);
+      const confidence = best.confidence + Math.min(12, agree.length * 3) - disagree.length * 4;
+      const entry = best.price;
+      const potentialPct = best.target ? (Math.abs(best.target - entry) / entry) * 100 : null;
+      const riskPct = best.stop ? (Math.abs(entry - best.stop) / entry) * 100 : null;
+      const plan: TradePlan = {
+        entry,
+        target: best.target,
+        stop: best.stop,
+        potentialPct: potentialPct === null ? null : Math.round(potentialPct * 100) / 100,
+        riskPct: riskPct === null ? null : Math.round(riskPct * 100) / 100,
+        riskReward: potentialPct !== null && riskPct ? Math.round((potentialPct / riskPct) * 100) / 100 : null,
+      };
+      const others = patterns.filter((p) => p !== best).map((p) => `${p.label} (${p.confidence})`);
+      const context = [...(best.context ? [best.context.note] : []), ...(others.length ? [`Outros padrões ativos: ${others.join(", ")}`] : [])];
+      return {
+        ...sig(this.key, side, confidence, `${best.label} (${best.confidence}) · ${best.summary} Confluência: ${agree.length} a favor, ${disagree.length} contra.`, ctx.timeframe),
+        plan,
+        confluence: { agree, disagree },
+        pattern: { key: best.key, label: best.label, confidence: best.confidence, direction: best.direction },
+        context,
+      };
     },
   },
   {

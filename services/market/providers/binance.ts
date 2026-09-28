@@ -128,3 +128,23 @@ export const binanceProvider: MarketProvider = {
     return out;
   },
 };
+
+/**
+ * Histórico diário longo (paginado, até `days` candles) para simulações/backtests.
+ * Aceita qualquer par spot da Binance (ex.: BTCUSDT, USDTBRL). Usa as mesmas bases com fallback regional.
+ */
+export async function getDailyHistory(pair: string, days: number): Promise<Candle[]> {
+  const out: Candle[] = [];
+  const dayMs = 24 * 3600_000;
+  let start = Date.now() - days * dayMs;
+  const end = Date.now();
+  while (start < end && out.length < days + 5) {
+    const raw = await withBase((base) => fetchJson<Kline[]>(`${base}/api/v3/klines?symbol=${pair}&interval=1d&startTime=${start}&limit=1000`, { retries: 1, timeoutMs: 10_000 }));
+    if (raw.length === 0) break;
+    out.push(...parseKlines(raw));
+    const lastOpen = raw[raw.length - 1]?.[0] ?? end;
+    if (raw.length < 1000) break;
+    start = lastOpen + dayMs;
+  }
+  return out.slice(-days);
+}

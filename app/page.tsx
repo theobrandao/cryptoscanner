@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { PageShell } from "@/components/layout/page-shell";
 import { HomeMarket } from "@/components/market/home-market";
+import { TopVolume } from "@/components/market/top-volume";
 import { Card, CardContent } from "@/components/ui/card";
 import { DISCLAIMER_TEXT } from "@/components/layout/nav-config";
 
@@ -14,6 +15,9 @@ const FEATURES = [
   { icon: "📈", title: "Gráficos com indicadores", text: "Candles com EMA 8/25/100/200, Bollinger, StochRSI, MACD, suportes/resistências e Fibonacci.", href: "/graficos" },
   { icon: "🧠", title: "Análise consolidada", text: "Orquestrador que cruza técnica, tendência, risco e sentimento, aponta conflitos e dados ausentes.", href: "/graficos" },
   { icon: "💼", title: "Carteira e watchlist", text: "Favoritos, posições simuladas com P&L e análises de gráfico salvas.", href: "/carteira" },
+  { icon: "🛰️", title: "Agente Sentinela", text: "Um vigia por moeda, 24/7 no servidor: 17 padrões ao mesmo tempo, plano de trade e confluência técnica.", href: "/sentinela" },
+  { icon: "📜", title: "Simulador de aportes", text: "Backtest de DCA e aporte único com preços diários reais, em BRL ou USD, com queda máxima e mês a mês.", href: "/simulador" },
+  { icon: "🌐", title: "Panorama diário", text: "Resumo executivo por regras: BTC, ciclo, Medo & Ganância, derivativos (funding, OI, long/short) e manchetes.", href: "/panorama" },
 ];
 
 export default function HomePage() {
@@ -57,6 +61,10 @@ export default function HomePage() {
             </Link>
           ))}
         </div>
+      </section>
+
+      <section className="py-6">
+        <TopVolume />
       </section>
 
       <section className="py-6">

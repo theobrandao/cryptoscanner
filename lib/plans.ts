@@ -10,6 +10,8 @@ export interface PlanDefinition {
   /** análises de imagem por dia (Infinity = ilimitado) */
   imageAnalysesPerDay: number;
   maxAgents: number;
+  /** vigias multipadrão (Sentinela) — slots separados dos agentes */
+  maxSentinels: number;
   telegramAlerts: boolean;
   benefits: string[];
 }
@@ -26,8 +28,9 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     timeframes: ["4h", "1d", "1w"],
     imageAnalysesPerDay: 3,
     maxAgents: 2,
+    maxSentinels: 1,
     telegramAlerts: false,
-    benefits: ["Scanner em 4H, 1D e 7D", "3 análises de gráfico por IA por dia", "Até 2 agentes", "Alertas no painel"],
+    benefits: ["Scanner em 4H, 1D e 7D", "3 análises de gráfico por IA por dia", "Até 2 agentes + 1 Sentinela", "Alertas no painel"],
   },
   PRO: {
     key: "PRO",
@@ -35,8 +38,9 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     timeframes: ["4h", "1d", "1w"],
     imageAnalysesPerDay: 30,
     maxAgents: 5,
+    maxSentinels: 3,
     telegramAlerts: true,
-    benefits: ["Scanner em 4H, 1D e 7D", "30 análises de gráfico por IA por dia", "Até 5 agentes", "Alertas no Telegram"],
+    benefits: ["Scanner em 4H, 1D e 7D", "30 análises de gráfico por IA por dia", "Até 5 agentes + 3 Sentinelas", "Alertas no Telegram"],
   },
   PLATINUM: {
     key: "PLATINUM",
@@ -44,8 +48,9 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"],
     imageAnalysesPerDay: Number.POSITIVE_INFINITY,
     maxAgents: 15,
+    maxSentinels: 10,
     telegramAlerts: true,
-    benefits: ["⚡ Análises ilimitadas de IA", "⏱️ Timeframes até 15M", "🤖 Até 15 agentes simultâneos", "🔔 Alertas no Telegram"],
+    benefits: ["⚡ Análises ilimitadas de IA", "⏱️ Timeframes até 15M", "🤖 Até 15 agentes + 10 Sentinelas", "🔔 Alertas no Telegram"],
   },
 };
 

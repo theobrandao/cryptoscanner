@@ -3,6 +3,8 @@
 import Link from "next/link";
 import useSWR from "swr";
 import type { CoinMarket, GlobalData } from "@/services/market/providers/coingecko";
+import type { PanoramaReport } from "@/services/panorama-service";
+import { Badge } from "@/components/ui/badge";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, Skeleton, Stat } from "@/components/ui/misc";
@@ -62,6 +64,8 @@ export function PanoramaView() {
           </>
         )}
       </div>
+
+      <ExecutiveReport />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_320px]">
         <Card>
@@ -180,6 +184,133 @@ export function PanoramaView() {
         </div>
       </div>
     </PageShell>
+  );
+}
+
+const BIAS_LABEL = { bullish: "Alta", bearish: "Baixa", neutral: "Neutro" } as const;
+const BIAS_VARIANT = { bullish: "success", bearish: "danger", neutral: "muted" } as const;
+
+/** Resumo executivo determinístico + fatores + ciclo + derivativos + manchetes (GET /api/market/panorama). */
+function ExecutiveReport() {
+  const { data, error, isLoading } = useSWR<PanoramaReport & { stale: boolean }>("/api/market/panorama", { refreshInterval: 300_000 });
+  if (error) return <Alert variant="danger" className="mt-4">Relatório executivo indisponível no momento.</Alert>;
+  if (isLoading && !data) return <Skeleton className="mt-4 h-48" />;
+  if (!data) return null;
+  const d = data;
+  return (
+    <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_360px]">
+      <div className="flex flex-col gap-4">
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle>⚡ Resumo executivo do dia</CardTitle>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant={BIAS_VARIANT[d.bias]}>viés: {BIAS_LABEL[d.bias]}</Badge>
+                <span>gerado {formatDateTime(d.generatedAt)}{d.stale ? " · cache" : ""}</span>
+              </div>
+            </div>
+            <CardDescription>
+              Síntese por regras sobre dados públicos (sem modelo de linguagem): cada frase deriva de um número abaixo. Ciclo inferido: <span className="font-semibold text-foreground">{d.cycle.label}</span> — {d.cycle.detail}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm leading-relaxed">
+            {d.summary.map((line, i) => (
+              <p key={i} className={cn(i === d.summary.length - 1 && "text-xs text-muted-foreground")}>
+                {line}
+              </p>
+            ))}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>📌 Principais fatores</CardTitle>
+            <CardDescription>Rótulo de viés por fator, com a fonte do dado.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {d.factors.map((f) => (
+              <div key={f.title} className="rounded-md border border-border p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-sm font-semibold">{f.title}</div>
+                  <Badge variant={BIAS_VARIANT[f.bias]}>{BIAS_LABEL[f.bias]}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{f.detail}</p>
+                <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">fonte: {f.source}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+        {d.news ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>📰 Manchetes</CardTitle>
+              <CardDescription>
+                {d.news.positive} positivas · {d.news.negative} negativas · {d.news.neutral} neutras (léxico determinístico; sinal fraco).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1 text-sm">
+              {d.news.top.map((n) => (
+                <a key={n.link} href={n.link} target="_blank" rel="noopener noreferrer" className="flex items-start justify-between gap-3 rounded px-2 py-1 hover:bg-muted">
+                  <span className="min-w-0 truncate">{n.title}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {n.source} · {n.score === null ? "—" : n.score > 0.1 ? "▲" : n.score < -0.1 ? "▼" : "•"}
+                  </span>
+                </a>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
+      <div className="flex flex-col gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>🧮 Derivativos (Binance Futures)</CardTitle>
+            <CardDescription>Funding, open interest, contas long/short e agressão taker (1 h). Dados públicos, sem chave.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 text-sm">
+            {d.derivatives.items.length === 0 ? (
+              <Alert variant="warning">Derivativos indisponíveis: {d.derivatives.error ?? "sem resposta"}.</Alert>
+            ) : (
+              d.derivatives.items.map((x) => {
+                const fr = x.fundingRate * 100;
+                return (
+                  <div key={x.symbol} className="rounded-md border border-border p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">{x.symbol}USDT perp.</span>
+                      <span className="tabular text-xs text-muted-foreground">mark {formatPrice(x.markPrice)}</span>
+                    </div>
+                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                      <dt className="text-muted-foreground">Funding</dt>
+                      <dd className={cn("tabular text-right", fr > 0.03 ? "text-danger" : fr < 0 ? "text-success" : "")}>{fr.toFixed(4)}%</dd>
+                      <dt className="text-muted-foreground">Open interest</dt>
+                      <dd className="tabular text-right">
+                        {x.openInterestUsd ? formatCompact(x.openInterestUsd) : `${x.openInterest.toFixed(0)} ${x.symbol}`}
+                        {x.openInterestChange24hPct !== null ? <span className={cn("ml-1", x.openInterestChange24hPct >= 0 ? "text-success" : "text-danger")}>{formatPct(x.openInterestChange24hPct)}</span> : null}
+                      </dd>
+                      <dt className="text-muted-foreground">Contas long</dt>
+                      <dd className="tabular text-right">{x.longAccountPct !== null ? `${x.longAccountPct.toFixed(1)}% (L/S ${x.longShortRatio?.toFixed(2)})` : "—"}</dd>
+                      <dt className="text-muted-foreground">Taker compra/venda</dt>
+                      <dd className={cn("tabular text-right", (x.takerBuySellRatio ?? 1) > 1.05 ? "text-success" : (x.takerBuySellRatio ?? 1) < 0.95 ? "text-danger" : "")}>{x.takerBuySellRatio?.toFixed(2) ?? "—"}</dd>
+                    </dl>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+        {d.notAvailable.length ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Fora do escopo desta implementação</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1 text-xs text-muted-foreground">
+              {d.notAvailable.map((n) => (
+                <p key={n}>• {n}</p>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

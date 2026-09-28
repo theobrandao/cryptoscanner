@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Bot, Pause, Play, Plus, Radar, Send, Square, Trash2, Pencil, ExternalLink } from "lucide-react";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
@@ -86,6 +87,26 @@ const PRESETS: Array<{ key: string; title: string; desc: string; draft: Partial<
   },
 ];
 
+const TIMEFRAMES_OK = new Set(["15m", "30m", "1h", "4h", "1d", "1w"]);
+
+/** Atalho vindo do scanner: /agentes?novo=1&symbol=BTC&timeframe=4h&strategy=pattern_breakout abre o wizard pré-preenchido. */
+function draftFromQuery(q: URLSearchParams): { open: boolean; draft: AgentDraft } {
+  if (q.get("novo") !== "1") return { open: false, draft: EMPTY_DRAFT };
+  const symbol = (q.get("symbol") ?? "BTC").toUpperCase();
+  const tf = q.get("timeframe") ?? "4h";
+  const strategy = q.get("strategy") ?? "pattern_breakout";
+  return {
+    open: true,
+    draft: {
+      ...EMPTY_DRAFT,
+      name: `Padrões ${symbol} ${tf.toUpperCase()}`,
+      symbols: [symbol],
+      timeframe: (TIMEFRAMES_OK.has(tf) ? tf : "4h") as AgentDraft["timeframe"],
+      strategies: [strategy] as AgentDraft["strategies"],
+    },
+  };
+}
+
 export function AgentsView() {
   const { user, telegramConnected, loading: sessionLoading, refresh: refreshSession } = useSession();
   const plan = PLANS[user?.plan ?? "FREE"];
@@ -94,7 +115,8 @@ export function AgentsView() {
   const { data, error, isLoading, mutate } = useSWR<AgentsPayload>(user ? `/api/agents?status=${status}` : null, { refreshInterval: 30_000 });
   const { data: strategies } = useSWR<{ strategies: StrategyInfo[] }>("/api/agents/strategies");
   const { data: logs, mutate: refreshLogs } = useSWR<{ items: LogItem[] }>(user ? "/api/agents/logs?limit=60" : null, { refreshInterval: 10_000 });
-  const [wizard, setWizard] = React.useState<{ open: boolean; draft: AgentDraft }>({ open: false, draft: EMPTY_DRAFT });
+  const searchParams = useSearchParams();
+  const [wizard, setWizard] = React.useState<{ open: boolean; draft: AgentDraft }>(() => draftFromQuery(searchParams));
   const [presetsOpen, setPresetsOpen] = React.useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = React.useState(false);
   const [busy, setBusy] = React.useState<string | null>(null);

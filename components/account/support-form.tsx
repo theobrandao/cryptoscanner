@@ -1,21 +1,139 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input, Label, Textarea } from "@/components/ui/input";
-import { Alert } from "@/components/ui/misc";
+import { Alert, EmptyState } from "@/components/ui/misc";
 import { useSession } from "@/hooks/use-session";
-import { ApiClientError, postJson } from "@/lib/client-api";
+import { ApiClientError, apiFetch, postJson } from "@/lib/client-api";
+import { formatDateTime } from "@/lib/format";
+import { PLANS } from "@/lib/plans";
+
+/** Perguntas frequentes — conteúdo próprio sobre esta implementação. */
+const FAQ: Array<{ q: string; a: string }> = [
+  { q: "De onde vêm os dados de preço e candles?", a: "Da API pública da Binance Spot (primária) com fallback automático para a base oficial data-api.binance.vision e, por último, Kraken. Câmbio, capitalização e dados globais vêm da CoinGecko; o Índice de Medo e Ganância da alternative.me. Nenhum dado é inventado: quando uma fonte falha, a interface indica “dados com defasagem”." },
+  { q: "O que significa a “confiança” de um padrão?", a: "É o grau de aderência geométrica da formação (0–100) calculado por regras determinísticas sobre pivôs fractais, ATR e regressão linear. Não é probabilidade de lucro. Padrões de altcoins contra a tendência do BTC recebem rebaixamento explícito." },
+  { q: "Quais timeframes cada plano libera no scanner?", a: "FREE e PRO: 4H, 1D e 7D. PLATINUM: também 1H, 30M e 15M. A verificação é feita no servidor, não só na interface." },
+  { q: "Com que frequência os agentes verificam o mercado?", a: "A cada 5 minutos, no servidor (independente do navegador), com cooldown mínimo de 30 minutos entre alertas do mesmo agente. O horário da última verificação aparece no cartão do agente." },
+  { q: "Como recebo alertas no Telegram?", a: "Informe seu Chat ID em Preferências (envie /start ao bot e use um bot como @userinfobot para descobrir o ID), teste com “Enviar alerta de teste” e configure o agente com notificação “Telegram” ou “Log + Telegram”. Alertas no Telegram exigem plano PRO ou PLATINUM." },
+  { q: "A análise de gráfico por IA funciona sem chave de LLM?", a: "Não. O upload é validado (JPG/PNG/WebP até 5 MB), mas a interpretação da imagem depende de um provedor com visão configurado no servidor (LLM_PROVIDER). Sem ele, a página avisa claramente em vez de simular um resultado." },
+  { q: "Os sinais são recomendação de investimento?", a: "Não. Todo conteúdo é informativo e educacional, gerado por algoritmos a partir de dados públicos. Criptoativos envolvem risco elevado, inclusive perda total do capital. A decisão é sempre sua." },
+  { q: "Posso trocar de plano?", a: "Neste ambiente não há cobrança integrada: a troca em /planos é liberada para testes (ALLOW_SELF_PLAN_CHANGE). Em produção comercial o operador desativa essa opção e integra um meio de pagamento." },
+  { q: "Meus dados ficam salvos onde?", a: "Conta, preferências, watchlist, agentes, alertas, análises e histórico ficam em banco PostgreSQL do operador. Senhas são armazenadas com bcrypt; a sessão usa cookie httpOnly. Não compartilhamos dados com terceiros." },
+  { q: "Como excluo minha conta?", a: "Nesta página, em “Exclusão de conta e dados”: confirme a senha e digite EXCLUIR. A remoção é imediata e irreversível (LGPD, art. 18). Chamados de suporte ficam anonimizados para auditoria do atendimento." },
+];
+
+interface Ticket {
+  id: string;
+  subject: string;
+  message: string;
+  status: string;
+  createdAt: string;
+}
 
 export function SupportForm() {
   const { user, loading } = useSession();
+  const plan = PLANS[user?.plan ?? "FREE"];
   return (
     <PageShell>
-      <PageTitle icon="🆘" title="Suporte" description="Dúvidas sobre o scanner, agentes, planos ou dados? Abra um chamado." />
-      {loading ? null : <SupportFormBody key={user?.email ?? "anon"} initialEmail={user?.email ?? ""} />}
+      <PageTitle icon="🆘" title="Central de Atendimento" description="Dúvidas sobre o scanner, agentes, planos ou dados? Consulte a FAQ, abra um chamado ou gerencie sua conta." />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-6">
+          {loading ? null : <SupportFormBody key={user?.email ?? "anon"} initialEmail={user?.email ?? ""} />}
+          {user ? <MyTickets /> : null}
+          <Card>
+            <CardHeader>
+              <CardTitle>📚 Perguntas frequentes</CardTitle>
+              <CardDescription>As 10 dúvidas mais comuns sobre plataforma, planos e funcionalidades.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y divide-border">
+                {FAQ.map((f) => (
+                  <details key={f.q} className="group py-2">
+                    <summary className="cursor-pointer list-none text-sm font-semibold marker:content-none">
+                      <span className="mr-2 text-primary group-open:hidden">+</span>
+                      <span className="mr-2 hidden text-primary group-open:inline">−</span>
+                      {f.q}
+                    </summary>
+                    <p className="mt-1 pl-5 text-sm text-muted-foreground">{f.a}</p>
+                  </details>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Canais por plano</CardTitle>
+              <CardDescription>
+                Seu plano: <Badge variant={plan.key === "PLATINUM" ? "accent" : plan.key === "PRO" ? "default" : "muted"}>{plan.name}</Badge>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 text-sm">
+              <Channel icon="📚" title="Central de FAQ" desc="Disponível 24/7 para todos os planos." available />
+              <Channel icon="🎫" title="Chamado por e-mail" desc="Formulário desta página; resposta pelo e-mail informado." available />
+              <Channel icon="⚡" title="Chamado prioritário" desc="Fila prioritária de atendimento." available={plan.key !== "FREE"} lockedText="Disponível nos planos PRO e PLATINUM" />
+              <Channel icon="✈️" title="Suporte VIP no Telegram" desc="Canal direto com a equipe." available={plan.key === "PLATINUM"} lockedText="Disponível no plano PLATINUM" />
+            </CardContent>
+          </Card>
+          {user ? <DeleteAccountCard /> : null}
+        </div>
+      </div>
     </PageShell>
+  );
+}
+
+function Channel({ icon, title, desc, available, lockedText }: { icon: string; title: string; desc: string; available: boolean; lockedText?: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-md border border-border p-3">
+      <span className="text-xl">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-semibold">{title}</span>
+          {available ? <Badge variant="success">disponível</Badge> : <Badge variant="muted">🔒 bloqueado</Badge>}
+        </div>
+        <p className="text-xs text-muted-foreground">{available ? desc : lockedText}</p>
+      </div>
+    </div>
+  );
+}
+
+function MyTickets() {
+  const { data, error } = useSWR<{ items: Ticket[] }>("/api/support", { refreshInterval: 60_000 });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>📋 Meus chamados</CardTitle>
+        <CardDescription>Chamados abertos com esta conta.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {error ? <Alert variant="danger">Não foi possível carregar seus chamados.</Alert> : null}
+        {data && data.items.length === 0 ? <EmptyState icon="📭" title="Nenhum chamado" description="Quando você abrir um chamado ele aparece aqui com o status." /> : null}
+        {data && data.items.length > 0 ? (
+          <ul className="divide-y divide-border text-sm">
+            {data.items.map((t) => (
+              <li key={t.id} className="flex items-start justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <div className="font-semibold">{t.subject}</div>
+                  <div className="truncate text-xs text-muted-foreground">{t.message}</div>
+                </div>
+                <div className="shrink-0 text-right text-xs text-muted-foreground">
+                  <Badge variant={t.status === "open" ? "warning" : t.status === "closed" ? "muted" : "default"}>{t.status === "open" ? "aberto" : t.status === "closed" ? "encerrado" : t.status}</Badge>
+                  <div>{formatDateTime(t.createdAt)}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -41,10 +159,10 @@ function SupportFormBody({ initialEmail }: { initialEmail: string }) {
     }
   };
   return (
-    <Card className="max-w-2xl">
+    <Card>
       <CardHeader>
-        <CardTitle>Abrir chamado</CardTitle>
-        <CardDescription>Os chamados são gravados no banco de dados (tabela SupportTicket) para triagem.</CardDescription>
+        <CardTitle>🎫 Abrir chamado</CardTitle>
+        <CardDescription>Os chamados são gravados no banco de dados para triagem e aparecem em “Meus chamados” quando você está logado.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3">
@@ -58,7 +176,7 @@ function SupportFormBody({ initialEmail }: { initialEmail: string }) {
           </div>
           <div className="flex flex-col gap-1">
             <Label htmlFor="s-msg">Mensagem</Label>
-            <Textarea id="s-msg" value={message} onChange={(e) => setMessage(e.target.value)} required minLength={10} maxLength={4000} rows={6} />
+            <Textarea id="s-msg" value={message} onChange={(e) => setMessage(e.target.value)} required minLength={10} maxLength={4000} rows={5} />
           </div>
           {state.ok ? <Alert variant="success">{state.ok}</Alert> : null}
           {state.error ? <Alert variant="danger">{state.error}</Alert> : null}
@@ -67,6 +185,73 @@ function SupportFormBody({ initialEmail }: { initialEmail: string }) {
           </Button>
         </form>
       </CardContent>
+    </Card>
+  );
+}
+
+function DeleteAccountCard() {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [confirm, setConfirm] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const submit = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await apiFetch("/api/auth/account", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm, password }) });
+      setOpen(false);
+      router.push("/?conta=excluida");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : "Falha ao excluir a conta.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <Card className="border-danger/40">
+      <CardHeader>
+        <CardTitle>🗑️ Exclusão de conta e dados</CardTitle>
+        <CardDescription>Direito à exclusão conforme a LGPD (Lei 13.709/2018, art. 18).</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 text-sm">
+        <p className="text-muted-foreground">
+          Serão apagados de forma imediata e irreversível: perfil e dados cadastrais, preferências, watchlist e posições simuladas, agentes e seus logs, alertas, análises salvas e histórico de scans. Chamados de suporte ficam
+          anonimizados (sem vínculo com a conta) para auditoria do atendimento.
+        </p>
+        <Button variant="danger" onClick={() => setOpen(true)} className="self-start">
+          Solicitar exclusão da conta
+        </Button>
+      </CardContent>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir conta permanentemente</DialogTitle>
+            <DialogDescription>Confirme sua senha e digite EXCLUIR. Esta ação não pode ser desfeita.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="del-pass">Senha</Label>
+              <Input id="del-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="del-confirm">Digite EXCLUIR para confirmar</Label>
+              <Input id="del-confirm" value={confirm} onChange={(e) => setConfirm(e.target.value.toUpperCase())} placeholder="EXCLUIR" />
+            </div>
+            {error ? <Alert variant="danger">{error}</Alert> : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="danger" disabled={confirm !== "EXCLUIR" || !password} loading={loading} onClick={() => void submit()}>
+              Excluir definitivamente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

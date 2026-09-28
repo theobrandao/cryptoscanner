@@ -16,6 +16,8 @@ export interface PatternMatch {
   points: Array<{ index: number; price: number; time: number; role: string }>;
   levels: Array<{ price: number; role: string }>;
   summary: string;
+  /** ajuste de contexto aplicado a posteriori (ex.: altcoin contra a tendência do BTC) */
+  context?: { btcTrend: Direction; adjustment: number; note: string };
 }
 
 export interface DetectOptions {

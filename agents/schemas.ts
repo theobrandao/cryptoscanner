@@ -85,6 +85,14 @@ export const patternMatchSchema = z.object({
   points: z.array(z.object({ index: z.number(), price: z.number(), time: z.number(), role: z.string() })),
   levels: z.array(z.object({ price: z.number(), role: z.string() })),
   summary: z.string(),
+  /** Ajuste de contexto aplicado pelo scanner (ex.: altcoin contra a tendência do BTC). */
+  context: z
+    .object({
+      btcTrend: directionSchema,
+      adjustment: z.number(),
+      note: z.string(),
+    })
+    .optional(),
 });
 
 export const volumeAnomalySchema = z.object({

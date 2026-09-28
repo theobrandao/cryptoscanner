@@ -52,6 +52,8 @@ export const scannerRowSchema = z.object({
   signalScore: z.number(),
   signalConfidence: z.number(),
   patterns: z.array(patternMatchSchema),
+  /** últimos fechamentos (para sparkline nos cartões) */
+  sparkline: z.array(z.number()),
   source: z.string(),
   stale: z.boolean(),
   candleTime: z.number(),
@@ -149,6 +151,7 @@ export const scannerAgent = defineAgent<ScannerInput, ScannerOutput>({
               signalScore: agg.score,
               signalConfidence: agg.confidence,
               patterns,
+              sparkline: series.candles.slice(-40).map((c) => c.close),
               source: series.source,
               stale: series.stale,
               candleTime: lastCandle?.openTime ?? 0,
@@ -171,6 +174,26 @@ export const scannerAgent = defineAgent<ScannerInput, ScannerOutput>({
         }),
       ),
     );
+
+    // Contexto BTC: padrão de altcoin contra a tendência do BTC recebe rebaixamento de confiança e nota explícita.
+    const btc = rows.find((r) => r.symbol === "BTC");
+    if (btc && btc.trend !== "neutral") {
+      for (const r of rows) {
+        if (r.symbol === "BTC") continue;
+        for (const p of r.patterns) {
+          if (p.direction !== "neutral" && p.direction !== btc.trend) {
+            const adjustment = -8;
+            p.confidence = Math.max(0, Math.round(p.confidence + adjustment));
+            p.context = {
+              btcTrend: btc.trend,
+              adjustment,
+              note: `Cautela — BTC em tendência ${btc.trend === "bearish" ? "de baixa" : "de alta"}; padrão ${p.direction === "bullish" ? "de alta" : "de baixa"} em altcoin contra o mercado. Confiança rebaixada em ${Math.abs(adjustment)} pontos.`,
+            };
+          }
+        }
+        r.patterns = r.patterns.filter((p) => p.confidence >= input.minPatternConfidence);
+      }
+    }
 
     rows.sort((a, b) => (b.quoteVolume24h ?? 0) - (a.quoteVolume24h ?? 0) || a.symbol.localeCompare(b.symbol));
     volumeAlerts.sort((a, b) => b.increasePct - a.increasePct);

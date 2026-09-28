@@ -250,6 +250,71 @@ await test("Fibonacci", "GET /api/fibonacci manual high=100 low=50 direction=up"
   return `0.618 → ${l618.price}`;
 });
 
+await test("Bubbles", "GET /api/market/bubbles (100 ativos, 4 períodos)", async () => {
+  const r = await call("GET", "/api/market/bubbles", { auth: false });
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(d.bubbles.length >= 80, `${d.bubbles.length} bolhas`);
+  expect(!d.bubbles.some((b) => ["USDT", "USDC", "WBTC"].includes(b.symbol)), "stablecoin/wrapped na lista");
+  const btc = d.bubbles.find((b) => b.symbol === "BTC");
+  expect(btc && typeof btc.change["24h"] === "number" && typeof btc.change["7d"] === "number", "variações ausentes");
+  return `${d.bubbles.length} ativos, BTC 24h ${btc.change["24h"].toFixed(2)}% 7d ${btc.change["7d"].toFixed(2)}% 30d ${btc.change["30d"]?.toFixed(2)}%`;
+});
+
+await test("Bubbles", "GET /api/market/bubbles?limit=20&currency=BRL", async () => {
+  const r = await call("GET", "/api/market/bubbles?limit=20&currency=BRL", { auth: false });
+  expectStatus(r, 200);
+  expect(r.json.data.bubbles.length === 20, `${r.json.data.bubbles.length}`);
+  const btc = r.json.data.bubbles.find((b) => b.symbol === "BTC");
+  expect(btc.price > state.btcUsd * 3, "não converteu para BRL");
+  return `20 ativos, BTC R$ ${btc.price.toFixed(0)}`;
+});
+
+await test("Panorama", "GET /api/market/panorama (resumo executivo)", async () => {
+  const r = await call("GET", "/api/market/panorama", { auth: false });
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(Array.isArray(d.summary) && d.summary.length >= 3, "resumo curto");
+  expect(d.factors.length >= 3, `${d.factors.length} fatores`);
+  expect(d.btc && d.btc.price > 1000, "BTC ausente");
+  expect(["bullish", "bearish", "neutral"].includes(d.bias), "viés inválido");
+  return `viés ${d.bias}, ciclo "${d.cycle.label}", ${d.factors.length} fatores, derivativos ${d.derivatives.items.length} (${d.derivatives.error ?? "ok"})`;
+});
+
+await test("Panorama", "GET /api/market/derivatives (Binance Futures público)", async () => {
+  const r = await call("GET", "/api/market/derivatives?symbols=BTC,ETH", { auth: false });
+  expectStatus(r, 200);
+  const d = r.json.data;
+  const btc = d.items.find((x) => x.symbol === "BTC");
+  if (!btc) return `indisponível na região do servidor: ${JSON.stringify(d.errors)}`;
+  expect(Number.isFinite(btc.fundingRate) && btc.openInterest > 0, "campos inválidos");
+  return `BTC funding ${(btc.fundingRate * 100).toFixed(4)}% OI ${btc.openInterest.toFixed(0)} L/S ${btc.longShortRatio?.toFixed(2)} taker ${btc.takerBuySellRatio?.toFixed(2)}`;
+});
+
+await test("Simulador", "POST /api/simulations/run DCA BTC BRL 12 meses", async () => {
+  const r = await call("POST", "/api/simulations/run", { auth: false, body: { symbol: "BTC", strategy: "dca", currency: "BRL", initialCapital: 1000, monthlyContribution: 500, months: 12, riskProfile: "moderado" } });
+  expectStatus(r, 200);
+  const d = r.json.data.result;
+  expect(d.contributions >= 12 && d.totalInvested === 1000 + 500 * (d.contributions - 1), `aportes ${d.contributions} investido ${d.totalInvested}`);
+  expect(d.curve.length > 20 && d.monthly.length >= 11, "curva/meses insuficientes");
+  expect(d.fx.applied === true, "câmbio BRL não aplicado");
+  return `${d.contributions} aportes, investido R$ ${d.totalInvested}, final R$ ${d.finalValue} (${d.profitPct}%), DD ${d.maxDrawdownPct}%`;
+});
+
+await test("Simulador", "POST /api/simulations/run aporte único ETH USD 6 meses", async () => {
+  const r = await call("POST", "/api/simulations/run", { auth: false, body: { symbol: "ETH", strategy: "lump_sum", currency: "USD", initialCapital: 5000, months: 6, riskProfile: "arrojado" } });
+  expectStatus(r, 200);
+  const d = r.json.data.result;
+  expect(d.contributions === 1 && Math.abs(d.profitPct - d.benchmarkHoldPct) < 0.01, "aporte único 100% deveria igualar HODL");
+  return `final $ ${d.finalValue} (${d.profitPct}%)`;
+});
+
+await test("Simulador", "POST /api/simulations/run sem capital → 400", async () => {
+  const r = await call("POST", "/api/simulations/run", { auth: false, body: { symbol: "BTC", strategy: "lump_sum", currency: "USD", initialCapital: 0, months: 6 } });
+  expectStatus(r, 400, "validation");
+  return "400";
+});
+
 await test("Análise", "GET /api/analysis BTC 4h (orquestrador)", async () => {
   const r = await call("GET", "/api/analysis?symbol=BTC&timeframe=4h", { auth: false });
   expectStatus(r, 200);
@@ -273,12 +338,13 @@ await test("Agentes", "GET /api/agents/definitions", async () => {
   return names.join(", ");
 });
 
-await test("Agentes", "GET /api/agents/strategies (15 estratégias)", async () => {
+await test("Agentes", "GET /api/agents/strategies (16 estratégias)", async () => {
   const r = await call("GET", "/api/agents/strategies", { auth: false });
   expectStatus(r, 200);
-  expect(r.json.data.strategies.length === 15, `${r.json.data.strategies.length}`);
+  expect(r.json.data.strategies.length >= 16, `${r.json.data.strategies.length}`);
   state.strategies = r.json.data.strategies.map((s) => s.key);
-  return `15: ${state.strategies.slice(0, 5).join(",")}…`;
+  expect(state.strategies.includes("sentinel_patterns"), "sentinel_patterns ausente");
+  return `${state.strategies.length}: ${state.strategies.slice(0, 5).join(",")}…`;
 });
 
 await test("Planos", "GET /api/plans (FREE/PRO/PLATINUM)", async () => {
@@ -624,6 +690,81 @@ await test("Agentes", "DELETE /api/agents/:id (1º)", async () => {
   return "excluído";
 });
 
+// ------------------------------------------------------------------ sentinela
+await test("Sentinela", "POST /api/sentinels BTC 4h (1º slot FREE) → 201", async () => {
+  const r = await call("POST", "/api/sentinels", { body: { symbol: "BTC", timeframe: "4h", minConfidence: 60, notification: "log" } });
+  expectStatus(r, 201);
+  state.sentinelId = r.json.data.sentinel.id;
+  expect(r.json.data.sentinel.kind === "sentinel" && r.json.data.sentinel.strategies.includes("sentinel_patterns"), "sentinela mal configurado");
+  return `sentinela ${state.sentinelId}`;
+});
+
+await test("Sentinela", "POST /api/sentinels BTC repetido → 409", async () => {
+  const r = await call("POST", "/api/sentinels", { body: { symbol: "BTC", timeframe: "4h" } });
+  expectStatus(r, 409, "duplicate");
+  return "409";
+});
+
+await test("Sentinela", "POST /api/sentinels ETH (2º) no FREE → 403 sentinel_limit", async () => {
+  const r = await call("POST", "/api/sentinels", { body: { symbol: "ETH", timeframe: "4h" } });
+  expectStatus(r, 403, "sentinel_limit");
+  return "403";
+});
+
+await test("Sentinela", "GET /api/agents não lista sentinelas", async () => {
+  const r = await call("GET", "/api/agents");
+  expectStatus(r, 200);
+  expect(!r.json.data.items.some((a) => a.id === state.sentinelId), "sentinela apareceu como agente");
+  return "isolado";
+});
+
+await test("Sentinela", "POST /api/agents/:id/run (varredura) + GET reports", async () => {
+  const run = await call("POST", `/api/agents/${state.sentinelId}/run`);
+  expectStatus(run, 200);
+  const rep = await call("GET", `/api/sentinels/${state.sentinelId}/reports`);
+  expectStatus(rep, 200);
+  return `${run.json.data.signals.length} sinal(is) qualificado(s), ${rep.json.data.items.length} relatório(s)`;
+});
+
+await test("Sentinela", "PATCH status=PAUSED + GET /api/sentinels", async () => {
+  const p = await call("PATCH", `/api/sentinels/${state.sentinelId}`, { body: { status: "PAUSED", minConfidence: 75 } });
+  expectStatus(p, 200);
+  const g = await call("GET", "/api/sentinels");
+  expectStatus(g, 200);
+  const it = g.json.data.items.find((x) => x.id === state.sentinelId);
+  expect(it && it.status === "PAUSED" && it.minConfidence === 75, "não atualizou");
+  return `pausado, limite ${g.json.data.limit}`;
+});
+
+await test("Sentinela", "DELETE /api/sentinels/:id", async () => {
+  const d = await call("DELETE", `/api/sentinels/${state.sentinelId}`);
+  expectStatus(d, 200);
+  const g = await call("GET", `/api/sentinels/${state.sentinelId}`);
+  expectStatus(g, 404, "not_found");
+  return "excluído";
+});
+
+// ------------------------------------------------------------------ simulações salvas
+await test("Simulador", "POST /api/simulations (salvar) + GET + DELETE", async () => {
+  const c = await call("POST", "/api/simulations", { body: { symbol: "SOL", strategy: "dca", currency: "USD", initialCapital: 100, monthlyContribution: 100, months: 6, riskProfile: "conservador" } });
+  expectStatus(c, 201);
+  const id = c.json.data.simulation.id;
+  const g = await call("GET", "/api/simulations");
+  expectStatus(g, 200);
+  expect(g.json.data.items.some((x) => x.id === id), "não listou");
+  const d = await call("DELETE", `/api/simulations/${id}`);
+  expectStatus(d, 200);
+  return `salva ${id}, lucro ${c.json.data.simulation.profitPct}%, excluída`;
+});
+
+await test("Suporte", "GET /api/support (meus chamados)", async () => {
+  await call("POST", "/api/support", { body: { email: EMAIL, subject: "Chamado do usuário", message: "Mensagem de teste vinculada à conta de teste." } });
+  const r = await call("GET", "/api/support");
+  expectStatus(r, 200);
+  expect(r.json.data.items.length >= 1, "sem chamados");
+  return `${r.json.data.items.length} chamado(s)`;
+});
+
 // ------------------------------------------------------------------ planos (ambiente de teste)
 await test("Planos", "POST /api/plans/change PLATINUM", async () => {
   const r = await call("POST", "/api/plans/change", { body: { plan: "PLATINUM" } });
@@ -738,6 +879,24 @@ await test("Limpeza", "DELETE /api/agents (todos) + alertas + watchlist", async 
   const g = await call("GET", "/api/agents");
   expect(g.json.data.items.length === 0, "agentes restantes");
   return "agentes, alertas e watchlist do usuário de teste removidos";
+});
+
+await test("LGPD", "DELETE /api/auth/account senha errada → 401; confirmação errada → 400", async () => {
+  const a = await call("DELETE", "/api/auth/account", { body: { confirm: "EXCLUIR", password: "Errada12345" } });
+  expectStatus(a, 401, "invalid_credentials");
+  const b = await call("DELETE", "/api/auth/account", { body: { confirm: "excluir", password: PASSWORD } });
+  expectStatus(b, 400, "validation");
+  return "401 + 400";
+});
+
+await test("LGPD", "DELETE /api/auth/account (exclusão definitiva da conta de teste)", async () => {
+  const r = await call("DELETE", "/api/auth/account", { body: { confirm: "EXCLUIR", password: PASSWORD } });
+  expectStatus(r, 200);
+  cookie = "";
+  const login = await call("POST", "/api/auth/login", { auth: false, body: { email: EMAIL, password: PASSWORD } });
+  expectStatus(login, 401, "invalid_credentials");
+  cookie = "";
+  return "conta apagada; login passa a falhar";
 });
 
 // ------------------------------------------------------------------ rate limit (por último: bloqueia auth por 60 s)

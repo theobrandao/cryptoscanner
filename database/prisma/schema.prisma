@@ -45,6 +45,7 @@ model User {
   chartAnalyses  ChartAnalysis[]
   scanHistory    ScanHistoryEntry[]
   supportTickets SupportTicket[]
+  simulations    Simulation[]
   agentExecutions AgentExecution[]
 }
 
@@ -233,6 +234,7 @@ model Agent {
   strategies     String[]    // chaves de agents/strategies
   minConfidence  Int         @default(70)
   notification   String      @default("log") // log | telegram | both
+  kind           String      @default("agent") // agent | sentinel (vigia multipadrão por moeda)
   status         AgentStatus @default(ACTIVE)
   lastRunAt      DateTime?
   lastAlertAt    DateTime?
@@ -244,6 +246,7 @@ model Agent {
   logs       AgentLog[]
 
   @@index([userId, status])
+  @@index([userId, kind])
 }
 
 // Uma execução do pipeline multiagente (por ativo/timeframe), disparada pelo worker, pela API ou por um Agent.
@@ -345,6 +348,29 @@ model ChartAnalysis {
 // ------------------------------------------------------------------
 // Suporte
 // ------------------------------------------------------------------
+
+// Simulação histórica salva pelo usuário (parâmetros + resultado resumido).
+model Simulation {
+  id                  String   @id @default(cuid())
+  userId              String
+  symbol              String
+  strategy            String   // dca | lump_sum
+  currency            String   // USD | BRL
+  initialCapital      Float
+  monthlyContribution Float
+  months              Int
+  riskProfile         String   // conservador | moderado | arrojado
+  totalInvested       Float
+  finalValue          Float
+  profitPct           Float
+  maxDrawdownPct      Float
+  result              Json     // SimulationResult sem a curva completa
+  createdAt           DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+}
 
 model SupportTicket {
   id        String   @id @default(cuid())

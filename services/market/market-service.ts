@@ -5,7 +5,7 @@ import { getMarketProviderOrder } from "@/lib/env";
 import { createLogger } from "@/lib/logger";
 import { TIMEFRAME_MS } from "@/lib/timeframes";
 import { binanceProvider } from "@/services/market/providers/binance";
-import { getCoinMarkets, getGlobal, getUsdBrlRate, type CoinMarket, type GlobalData } from "@/services/market/providers/coingecko";
+import { getCoinMarkets, getGlobal, getMarketBubbles, getUsdBrlRate, type CoinMarket, type GlobalData, type MarketBubbleRaw } from "@/services/market/providers/coingecko";
 import { krakenProvider } from "@/services/market/providers/kraken";
 import { ProviderError, type MarketProvider } from "@/services/market/providers/types";
 
@@ -41,6 +41,7 @@ export const CACHE_KEYS = {
   brl: "fx:usdbrl",
   markets: "coingecko:markets",
   global: "coingecko:global",
+  bubbles: "coingecko:bubbles",
 } as const;
 
 /** TTL de candles em função do timeframe (nunca menos de 20 s nem mais de 5 min). */
@@ -172,6 +173,45 @@ export async function getGlobalMarket(): Promise<{ data: GlobalData; stale: bool
     return { data: res.value, stale: res.stale };
   } catch (err) {
     log.warn("coingecko global indisponível", { error: (err as Error).message });
+    return null;
+  }
+}
+
+export interface MarketBubble {
+  id: string;
+  symbol: string;
+  name: string;
+  image: string;
+  price: number;
+  marketCap: number;
+  rank: number | null;
+  volume24h: number;
+  change: { "1h": number | null; "24h": number | null; "7d": number | null; "30d": number | null };
+}
+
+/** Top 100 por volume com variação 1h/24h/7d/30d (CoinGecko; cache 60 s; stale até 24 h). */
+export async function getBubbles(limit = 100): Promise<{ bubbles: MarketBubble[]; stale: boolean; fetchedAt: number } | null> {
+  try {
+    const res = await cached<{ items: MarketBubbleRaw[]; at: number }>(CACHE_KEYS.bubbles, 60, async () => ({ items: await getMarketBubbles(limit), at: Date.now() }), { staleTtlSeconds: 24 * 3600 });
+    const bubbles = res.value.items.map<MarketBubble>((c) => ({
+      id: c.id,
+      symbol: c.symbol.toUpperCase(),
+      name: c.name,
+      image: c.image,
+      price: c.current_price,
+      marketCap: c.market_cap,
+      rank: c.market_cap_rank,
+      volume24h: c.total_volume,
+      change: {
+        "1h": c.price_change_percentage_1h_in_currency ?? null,
+        "24h": c.price_change_percentage_24h_in_currency ?? null,
+        "7d": c.price_change_percentage_7d_in_currency ?? null,
+        "30d": c.price_change_percentage_30d_in_currency ?? null,
+      },
+    }));
+    return { bubbles, stale: res.stale, fetchedAt: res.value.at };
+  } catch (err) {
+    log.warn("coingecko bubbles indisponível", { error: (err as Error).message });
     return null;
   }
 }

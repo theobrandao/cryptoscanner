@@ -20,6 +20,8 @@ const schema = z.object({
   BINANCE_REST_FALLBACK_URLS: z.string().default("https://data-api.binance.vision"),
   BINANCE_WS_URL: z.string().default("wss://stream.binance.com:9443/stream"),
   BINANCE_WS_FALLBACK_URL: z.string().default("wss://data-stream.binance.vision:9443/stream"),
+  /** Futures USDⓈ-M (derivativos públicos: funding, open interest, long/short) */
+  BINANCE_FUTURES_REST_URL: z.string().default("https://fapi.binance.com"),
   KRAKEN_REST_URL: z.string().default("https://api.kraken.com"),
   COINGECKO_REST_URL: z.string().default("https://api.coingecko.com/api/v3"),
   COINGECKO_API_KEY: z.string().optional(),

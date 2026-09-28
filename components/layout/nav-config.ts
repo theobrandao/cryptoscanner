@@ -11,9 +11,11 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/bubbles", label: "Bubbles", icon: "🫧" },
   { href: "/scanner", label: "Scanner", icon: "📊" },
   { href: "/agentes", label: "Agentes IA", icon: "🤖", badge: "Novo" },
+  { href: "/sentinela", label: "Sentinela", icon: "🛰️", badge: "Novo" },
   { href: "/graficos", label: "Gráficos", icon: "📈" },
   { href: "/fibonacci", label: "Fibonacci", icon: "📐" },
   { href: "/carteira", label: "Carteira", icon: "💼", badge: "Novo" },
+  { href: "/simulador", label: "Simulações", icon: "📜" },
   { href: "/planos", label: "Planos", icon: "💳" },
   { href: "/suporte", label: "Suporte", icon: "🆘" },
 ];
