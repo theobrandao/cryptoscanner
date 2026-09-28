@@ -79,7 +79,7 @@ async function buildReport(): Promise<PanoramaReport> {
   const derivatives = derivativeResults.flatMap((r) => (r.ok ? [r.value] : []));
   const derivativesError = derivatives.length === 0 ? (derivativeResults.find((r) => !r.ok)?.error ?? "indisponível") : null;
   if (derivativesError) notAvailable.push(`Derivativos (Binance Futures): ${derivativesError}`);
-  notAvailable.push("Transferências de baleias e reservas em corretoras: sem fonte pública gratuita com rotulagem de carteiras — REIMPLEMENTAÇÃO NECESSÁRIA (Whale Alert/Coinglass exigem chave paga).");
+  notAvailable.push("Rotulagem de carteiras de corretoras (entradas/saídas de exchange) e reservas em custódia: só em serviços pagos (Coinglass/Whale Alert). As grandes transações on-chain são mostradas sem rótulo.");
 
   const btcTicker = tickersRes?.tickers.find((t) => t.symbol === "BTC") ?? null;
   const snap = candles1d && candles1d.candles.length >= 30 ? computeSnapshot(candles1d.candles) : null;

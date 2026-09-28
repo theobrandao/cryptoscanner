@@ -7,6 +7,7 @@ export interface NavItem {
 
 /** Navegação principal (rótulos equivalentes aos observados na referência, ícones em Unicode). */
 export const NAV_ITEMS: NavItem[] = [
+  { href: "/jornada", label: "Jornada Trader", icon: "🧭", badge: "12 aulas" },
   { href: "/panorama", label: "Panorama Diário", icon: "🌐" },
   { href: "/bubbles", label: "Bubbles", icon: "🫧" },
   { href: "/scanner", label: "Scanner", icon: "📊" },
@@ -16,6 +17,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/fibonacci", label: "Fibonacci", icon: "📐" },
   { href: "/carteira", label: "Carteira", icon: "💼", badge: "Novo" },
   { href: "/simulador", label: "Simulações", icon: "📜" },
+  { href: "/mentor", label: "Mentor", icon: "🎓" },
   { href: "/planos", label: "Planos", icon: "💳" },
   { href: "/suporte", label: "Suporte", icon: "🆘" },
 ];

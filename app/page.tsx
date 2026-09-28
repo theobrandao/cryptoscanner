@@ -17,6 +17,8 @@ const FEATURES = [
   { icon: "💼", title: "Carteira e watchlist", text: "Favoritos, posições simuladas com P&L e análises de gráfico salvas.", href: "/carteira" },
   { icon: "🛰️", title: "Agente Sentinela", text: "Um vigia por moeda, 24/7 no servidor: 17 padrões ao mesmo tempo, plano de trade e confluência técnica.", href: "/sentinela" },
   { icon: "📜", title: "Simulador de aportes", text: "Backtest de DCA e aporte único com preços diários reais, em BRL ou USD, com queda máxima e mês a mês.", href: "/simulador" },
+  { icon: "🧭", title: "Jornada Trader", text: "12 aulas autorais com teste rápido e prática direta no app; progresso salvo na conta.", href: "/jornada" },
+  { icon: "🎓", title: "Mentor", text: "Responde com dados reais do orquestrador, explica padrões e indicadores e aplica protocolos de mindset.", href: "/mentor" },
   { icon: "🌐", title: "Panorama diário", text: "Resumo executivo por regras: BTC, ciclo, Medo & Ganância, derivativos (funding, OI, long/short) e manchetes.", href: "/panorama" },
 ];
 

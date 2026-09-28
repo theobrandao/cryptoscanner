@@ -1,5 +1,6 @@
 "use client";
 
+import { ASSETS } from "@/lib/assets";
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -75,7 +76,7 @@ export function ChartAnalysis() {
       const form = new FormData();
       form.append("file", file);
       if (symbol) form.append("symbol", symbol.toUpperCase());
-      if (timeframe) form.append("timeframe", timeframe);
+      if (timeframe) form.append("timeframe", timeframe.toLowerCase());
       const res = await apiFetch<ChartImageAnalysis>("/api/analysis/chart-image", { method: "POST", body: form });
       setResult(res);
       toast({ title: "Análise concluída", description: res.id ? "Salva automaticamente na sua conta." : "Banco indisponível: análise não persistida.", variant: "success" });
@@ -120,8 +121,8 @@ export function ChartAnalysis() {
           </Alert>
         ) : null}
         {user && health && !health.llm.configured ? (
-          <Alert variant="warning" title="Provedor de IA não configurado neste servidor">
-            Defina <code>LLM_PROVIDER=anthropic</code> e <code>ANTHROPIC_API_KEY</code> no ambiente para ativar a análise de imagem. Nenhum resultado é simulado sem provedor.
+          <Alert variant="info" title="Modo determinístico (sem provedor de visão)">
+            A imagem é registrada, mas não é interpretada: a leitura técnica é feita sobre os <strong>dados reais</strong> do ativo e timeframe informados (orquestrador multiagente). Informe o ativo abaixo. Para interpretar a própria imagem, configure <code>LLM_PROVIDER=anthropic</code> e <code>ANTHROPIC_API_KEY</code>.
           </Alert>
         ) : null}
 
@@ -173,18 +174,28 @@ export function ChartAnalysis() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1">
-                <Label>Ativo (opcional)</Label>
-                <Input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="BTC" maxLength={8} />
+                <Label>Ativo {health && !health.llm.configured ? "(obrigatório)" : "(opcional)"}</Label>
+                <Input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="BTC" maxLength={8} list="chart-assets" />
+                <datalist id="chart-assets">
+                  {ASSETS.map((a) => (
+                    <option key={a.symbol} value={a.symbol}>{a.name}</option>
+                  ))}
+                </datalist>
               </div>
               <div className="flex flex-col gap-1">
                 <Label>Timeframe (opcional)</Label>
-                <Input value={timeframe} onChange={(e) => setTimeframe(e.target.value)} placeholder="4H" maxLength={4} />
+                <Input value={timeframe} onChange={(e) => setTimeframe(e.target.value)} placeholder="4h" maxLength={4} list="chart-tfs" />
+                <datalist id="chart-tfs">
+                  {["15m", "30m", "1h", "4h", "1d", "1w"].map((t) => (
+                    <option key={t} value={t} />
+                  ))}
+                </datalist>
               </div>
             </div>
             {error ? <Alert variant="danger">{error}</Alert> : null}
             <div className="flex items-center gap-2">
-              <Button onClick={() => void analyze()} disabled={!file || !user} loading={loading}>
-                <Upload className="h-4 w-4" /> Analisar com IA
+              <Button onClick={() => void analyze()} disabled={!file || !user || (health ? !health.llm.configured && !symbol : false)} loading={loading}>
+                <Upload className="h-4 w-4" /> {health && !health.llm.configured ? "Analisar (dados reais)" : "Analisar com IA"}
               </Button>
               {plan ? (
                 <span className="text-xs text-muted-foreground">

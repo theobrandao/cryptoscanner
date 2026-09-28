@@ -158,6 +158,28 @@ await step("Simulador: DCA BTC BRL 12 meses (resultado e gráfico)", async () =>
   return `${/Resultado\s*\n\s*([^\n]+)/i.exec(t)?.[1] ?? ""} · ${await shot("simulador")}`;
 });
 
+await step("Jornada Trader: abrir aula, responder teste e concluir", async () => {
+  await goto("/jornada");
+  await page.waitForFunction(() => /12 aulas/i.test(document.body.innerText), null, { timeout: 20_000 });
+  await page.locator("button", { hasText: /O que é Bitcoin/ }).first().click();
+  await page.waitForFunction(() => /Teste rápido/i.test(document.body.innerText), null, { timeout: 10_000 });
+  await page.locator("button", { hasText: /A recompensa por bloco cai pela metade/ }).click();
+  await page.locator("button", { hasText: /A oferta e demanda em cada corretora/ }).click();
+  await page.getByRole("button", { name: /Corrigir e concluir aula/i }).click();
+  await page.waitForFunction(() => /2\/2 corretas/.test(document.body.innerText), null, { timeout: 10_000 });
+  return `aula concluída 2/2 · ${await shot("jornada")}`;
+});
+
+await step("Mentor: pergunta com dados reais e SOS mindset", async () => {
+  await goto("/mentor");
+  await page.getByLabel(/Mensagem para o mentor/i).fill("Como está o BTC em 4h?");
+  await page.getByRole("button", { name: /^Enviar$/ }).click();
+  await page.waitForFunction(() => /Bitcoin \(BTC\) em 4H/.test(document.body.innerText), null, { timeout: 60_000 });
+  await page.getByRole("button", { name: /Tomei stop/ }).click();
+  await page.waitForFunction(() => /anti-revenge/.test(document.body.innerText), null, { timeout: 20_000 });
+  return `dados reais + protocolo · ${await shot("mentor")}`;
+});
+
 await step("Planos: 3 planos e bloco PLATINUM", async () => {
   await goto("/planos");
   const t = await page.locator("body").innerText();
@@ -246,6 +268,17 @@ await step("Sentinela: criar BTC 4H, varrer agora, ver relatórios, pausar", asy
   await page.getByRole("button", { name: /Pausar/i }).first().click();
   await page.waitForFunction(() => /pausado/i.test(document.body.innerText), null, { timeout: 20_000 });
   return `sentinela criado/varrido/pausado · ${await shot("sentinela")}`;
+});
+
+await step("Scanner: análise de gráfico (upload PNG) em modo determinístico", async () => {
+  await goto("/scanner");
+  await page.waitForFunction(() => /Modo determinístico|Analisar/i.test(document.body.innerText), null, { timeout: 30_000 });
+  const input = page.locator("input[type='file']").first();
+  await input.setInputFiles({ name: "chart.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64") });
+  await page.getByPlaceholder("BTC").fill("BTC");
+  await page.getByRole("button", { name: /Analisar/ }).first().click();
+  await page.waitForFunction(() => /Confiança|Insights|Pontos Operacionais|Entrada/i.test(document.body.innerText) && /orchestrator|dados reais|deterministic/i.test(document.body.innerText), null, { timeout: 60_000 });
+  return `análise renderizada · ${await shot("analise-imagem")}`;
 });
 
 await step("Carteira: adicionar BTC com posição e ver P&L; criar alerta", async () => {

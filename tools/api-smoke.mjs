@@ -389,6 +389,39 @@ if (CRON_SECRET) {
   });
 }
 
+await test("Mentor", "POST /api/mentor — ativo, SOS, padrão, conceito, fora da base", async () => {
+  const out = [];
+  for (const [q, re] of [["Como está o SOL em 4h?", /Solana \(SOL\) em 4H: preço US\$/], ["Tomei stop agora, e agora?", /anti-revenge/], ["O que é fundo duplo?", /Fundo Duplo/], ["Como calcular o tamanho da posição?", /Tamanho da posição/], ["qual a capital da frança", /Não encontrei/]]) {
+    const r = await call("POST", "/api/mentor", { auth: false, body: { message: q } });
+    expectStatus(r, 200);
+    expect(re.test(r.json.data.answer), `resposta inesperada para "${q}": ${r.json.data.answer.slice(0, 80)}`);
+    out.push(r.json.data.mode);
+  }
+  return `5 respostas corretas (${out.join(",")})`;
+});
+
+await test("On-chain", "GET /api/market/whales (coleta do cron) e POST /api/cron/whales", async () => {
+  if (CRON_SECRET) {
+    const c = await call("POST", "/api/cron/whales", { auth: false, headers: { authorization: `Bearer ${CRON_SECRET}` } });
+    expectStatus(c, 200);
+  }
+  const r = await call("GET", "/api/market/whales", { auth: false });
+  expectStatus(r, 200);
+  const s = r.json.data.snapshot;
+  if (!s) return "sem coleta ainda";
+  return `bloco ${s.lastBlock?.height} · ${s.count24h} tx ≥ ${s.thresholdBtc} BTC · ${s.totalBtc24h} BTC`;
+});
+
+await test("PWA", "GET /manifest.webmanifest + /sw.js + ícones", async () => {
+  const m = await call("GET", "/manifest.webmanifest", { auth: false });
+  expect(m.res.status === 200 && m.json?.icons?.length === 2, `manifest ${m.res.status}`);
+  const sw = await call("GET", "/sw.js", { auth: false, raw: true });
+  expect(sw.res.status === 200, `sw ${sw.res.status}`);
+  const ic = await call("GET", "/icons/icon-512.png", { auth: false, raw: true });
+  expect(ic.res.status === 200, `ícone ${ic.res.status}`);
+  return `manifest "${m.json.name}" · sw ok · ícones ok`;
+});
+
 await test("Suporte", "POST /api/support (ticket)", async () => {
   const r = await call("POST", "/api/support", { auth: false, body: { email: EMAIL, subject: "Teste automático", message: "Mensagem de teste gerada pela suíte de integração." } });
   expectStatus(r, 200);
@@ -847,15 +880,37 @@ await test("Análise IA", "POST /api/analysis/chart-image arquivo .txt → 415",
   return "415";
 });
 
-await test("Análise IA", "POST /api/analysis/chart-image PNG válido (sem LLM → 503 llm_unavailable)", async () => {
+await test("Análise IA", "POST /api/analysis/chart-image PNG + ativo (modo determinístico sem LLM → 200)", async () => {
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
   const fd = new FormData();
   fd.append("file", new File([png], "chart.png", { type: "image/png" }));
   fd.append("symbol", "BTC");
   fd.append("timeframe", "4h");
   const r = await call("POST", "/api/analysis/chart-image", { form: fd });
-  expect([200, 503].includes(r.res.status), `HTTP ${r.res.status}: ${(r.text ?? "").slice(0, 120)}`);
-  return r.res.status === 200 ? "analisado" : `503 ${r.json.error.code} (esperado sem ANTHROPIC_API_KEY)`;
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(["bullish", "bearish", "neutral"].includes(d.trend) && d.insights.length >= 2 && d.points.entry > 0, "resultado incompleto");
+  const saved = await call("GET", "/api/analysis/saved");
+  expect(saved.json.data.items.length >= 1, "análise não salva");
+  return `${d.provider}/${d.model} · ${d.trend} ${d.confidence}% · entrada ${d.points.entry} · salva (${saved.json.data.items.length})`;
+});
+
+await test("Análise IA", "POST /api/analysis/chart-image sem ativo no modo determinístico → 503 com orientação", async () => {
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+  const fd = new FormData();
+  fd.append("file", new File([png], "chart.png", { type: "image/png" }));
+  const r = await call("POST", "/api/analysis/chart-image", { form: fd });
+  expect([200, 503].includes(r.res.status), `HTTP ${r.res.status}`);
+  return r.res.status === 200 ? "LLM configurado: analisado" : `503 ${r.json.error.code}`;
+});
+
+await test("Jornada", "GET/PATCH /api/learning (progresso)", async () => {
+  const p = await call("PATCH", "/api/learning", { body: { progress: { "o-que-e-bitcoin": { done: true, score: 2, at: new Date().toISOString() } } } });
+  expectStatus(p, 200);
+  const g = await call("GET", "/api/learning");
+  expectStatus(g, 200);
+  expect(g.json.data.progress["o-que-e-bitcoin"]?.done === true && g.json.data.total === 12, "progresso não persistiu");
+  return `1/${g.json.data.total} aulas concluídas`;
 });
 
 await test("Análise IA", "POST /api/analysis/chart-image > 5 MB → 413", async () => {

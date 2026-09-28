@@ -8,7 +8,11 @@ Scanner de padrões gráficos em Bitcoin e altcoins com sistema multiagente, dad
 - **Gráficos** (`/graficos`): candles (TradingView Lightweight Charts) com EMA 8/25/100/200, Bollinger, volume, StochRSI, MACD, suportes/resistências, Fibonacci automático, desenho de padrões detectados e painel de **análise consolidada** pelo orquestrador.
 - **Agentes de IA** (`/agentes`): wizard de 5 passos, 15 estratégias determinísticas em 4 categorias, verificação server-side a cada 5 min, cooldown de 30 min, log ao vivo, Telegram, presets "Scanner de IA", excluir todos.
 - **Carteira** (`/carteira`): watchlist com posições simuladas e P&L, alertas (preço, RSI, padrão, volume), análises salvas.
-- **Panorama** (`/panorama`), **Bubbles** (`/bubbles`), **Fibonacci** (`/fibonacci`), **Planos** (`/planos`, sem cobrança), **Suporte** (`/suporte`), login/registro, preferências, tema claro/escuro, USD/BRL, responsivo.
+- **Panorama** (`/panorama`): resumo executivo por regras, ciclo, Medo & Ganância, derivativos (Binance Futures público), manchetes e grandes transações on-chain (≥ 50 BTC, coletadas pelo cron).
+- **Bubbles** (`/bubbles`): 100 maiores por volume com 1h/24h/7d/30d. **Sentinela** (`/sentinela`): vigia multipadrão por moeda com plano de trade e confluência. **Simulador** (`/simulador`): backtest DCA/aporte único com preços diários reais (BRL via USDTBRL).
+- **Jornada Trader** (`/jornada`): 12 aulas autorais com teste e progresso na conta. **Mentor** (`/mentor`): assistente por regras com dados reais do orquestrador e protocolos de mindset (LLM opcional).
+- **Análise de gráfico**: com provedor de visão interpreta a imagem; sem ele, faz a leitura determinística sobre os dados reais do ativo informado (nunca simula).
+- **Fibonacci** (`/fibonacci`), **Planos** (`/planos`, sem cobrança), **Suporte** (`/suporte`: FAQ, chamados, exclusão LGPD), login/registro, preferências, tema claro/escuro, USD/BRL, PWA instalável, responsivo.
 
 ## Stack
 
@@ -127,7 +131,7 @@ docker compose up --build
 1. **Neon**: crie o projeto Postgres; copie a *pooled connection string* para `DATABASE_URL` (acrescente `&pgbouncer=true`) e a *direct connection string* para `DIRECT_URL`.
 2. **Upstash Redis**: crie o banco; copie a URL `rediss://…` para `REDIS_URL`.
 3. **Vercel**: importe o repositório do GitHub. `vercel.json` já define a região `gru1` (São Paulo — a Binance responde nessa região) e o build `prisma generate && prisma migrate deploy && next build` (as migrations rodam no build). Variáveis: `AUTH_SECRET`, `DATABASE_URL`, `DIRECT_URL`, `REDIS_URL`, `CRON_SECRET`, `NEXT_PUBLIC_APP_URL`, opcionais `TELEGRAM_BOT_TOKEN`, `ANTHROPIC_API_KEY`/`LLM_PROVIDER`, `COINGECKO_API_KEY`.
-4. **Ciclo dos agentes/alertas**: sem processo de longa duração, o ciclo roda por HTTP em `GET|POST /api/cron/cycle` (cabeçalho `Authorization: Bearer <CRON_SECRET>`). Agende a cada 5 min no **Upstash QStash** (Schedules → cron `*/5 * * * *`) ou no cron-job.org. O cron diário do `vercel.json` é apenas um reforço (plano Hobby limita a 1×/dia).
+4. **Ciclo dos agentes/alertas**: sem processo de longa duração, o ciclo roda por HTTP em `GET|POST /api/cron/cycle` (cabeçalho `Authorization: Bearer <CRON_SECRET>`). Agende a cada 5 min no **Upstash QStash** (Schedules → cron `*/5 * * * *`) ou no cron-job.org; e `GET|POST /api/cron/whales` a cada 10 min (`*/10 * * * *`) para as grandes transações on-chain. O cron diário do `vercel.json` é apenas um reforço (plano Hobby limita a 1×/dia).
 5. Seed (opcional): `DATABASE_URL=<direct> npm run db:seed` a partir da sua máquina.
 
 Limitações nesse modo: sem WebSocket da Binance (preços por REST a cada 3 s via SSE, que reconecta a cada 50 s); funções limitadas a 60 s por invocação.

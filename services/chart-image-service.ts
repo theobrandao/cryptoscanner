@@ -6,6 +6,9 @@ import { isLlmConfigured } from "@/lib/env";
 import { round } from "@/lib/indicators/core";
 import { PLANS, type PlanKey } from "@/lib/plans";
 import { completeJson, getLlmInfo } from "@/services/llm";
+import { analyzeAsset } from "@/services/analysis-service";
+import { getAsset } from "@/lib/assets";
+import type { Timeframe } from "@/types/market";
 
 /**
  * Análise de gráfico por IA a partir de imagem (JPG/PNG/WebP até 5 MB).
@@ -48,10 +51,47 @@ export interface ChartImageAnalysis {
 }
 
 export class ChartAnalysisUnavailableError extends Error {
-  constructor() {
-    super("Análise de imagem indisponível: nenhum provedor de IA com visão está configurado (LLM_PROVIDER/ANTHROPIC_API_KEY).");
+  constructor(message = "Análise de imagem indisponível: nenhum provedor de IA com visão está configurado (LLM_PROVIDER/ANTHROPIC_API_KEY).") {
+    super(message);
     this.name = "ChartAnalysisUnavailableError";
   }
+}
+
+const TIMEFRAMES: Timeframe[] = ["5m", "15m", "30m", "1h", "4h", "1d", "1w"];
+
+/**
+ * Modo determinístico (sem provedor de visão): a imagem é registrada (hash) e a leitura técnica é feita
+ * sobre os dados reais do ativo/timeframe informados pelo usuário, via orquestrador multiagente.
+ * A saída tem o mesmo formato da análise por imagem e declara explicitamente que a imagem não foi interpretada.
+ */
+async function analyzeDeterministic(symbol: string, timeframe: Timeframe): Promise<Omit<ChartImageAnalysis, "id" | "createdAt" | "disclaimer">> {
+  const r = await analyzeAsset({ symbol, timeframe, includeSentiment: true, useLlm: false, trigger: "api" });
+  const ta = r.outputs.technical;
+  const price = r.keyLevels.price;
+  const bullish = r.verdict === "bullish";
+  const bearish = r.verdict === "bearish";
+  const target = r.keyLevels.patternTarget ?? (bullish ? r.keyLevels.resistance : bearish ? r.keyLevels.support : null);
+  const stop = r.keyLevels.patternStop ?? (price && r.keyLevels.suggestedStopPct ? round(price * (1 - (bullish ? 1 : -1) * (r.keyLevels.suggestedStopPct / 100)), 8) : null);
+  const patterns = (ta?.patterns ?? []).slice(0, 4).map((p) => `${p.label} (${p.confidence}%)`);
+  const insights: string[] = [];
+  insights.push(`Leitura feita sobre os candles reais de ${symbol} em ${timeframe.toUpperCase()} (fonte ${r.outputs.market?.provenance?.source ?? "mercado"}), não sobre a imagem enviada — o servidor não tem provedor de visão configurado.`);
+  insights.push(r.narrative);
+  for (const e of r.evidence.slice(0, 4)) insights.push(`${e.agent.replace("-agent", "")}: ${e.detail}`);
+  for (const c of r.conflicts.slice(0, 2)) insights.push(`Conflito: ${c.description}`);
+  if (r.missingData.length) insights.push(`Dados ausentes: ${r.missingData.join(", ")}.`);
+  return {
+    provider: "deterministic",
+    model: "orchestrator",
+    asset: symbol,
+    timeframe,
+    trend: r.verdict,
+    patterns,
+    confidence: Math.round(r.confidence),
+    points: { entry: price, target, stopLoss: stop },
+    riskReward: computeRiskReward(price, target, stop),
+    insights: insights.slice(0, 8),
+    readability: "partial",
+  };
 }
 
 export class QuotaExceededError extends Error {
@@ -85,12 +125,28 @@ export async function analyzeChartImage(input: {
   hint?: { symbol?: string; timeframe?: string };
   signal?: AbortSignal;
 }): Promise<ChartImageAnalysis> {
-  if (!isLlmConfigured()) throw new ChartAnalysisUnavailableError();
   if (input.bytes.length > MAX_IMAGE_BYTES) throw new Error("Imagem acima de 5 MB");
   const limit = PLANS[input.plan].imageAnalysesPerDay;
   if (Number.isFinite(limit)) {
     const used = await countTodayAnalyses(input.userId);
     if (used >= limit) throw new QuotaExceededError(limit);
+  }
+
+  if (!isLlmConfigured()) {
+    const symbol = input.hint?.symbol?.toUpperCase();
+    const tf = (input.hint?.timeframe ?? "4h").toLowerCase() as Timeframe;
+    if (!symbol || !getAsset(symbol)) throw new ChartAnalysisUnavailableError("Sem provedor de visão neste servidor: informe o ativo (um dos 20 do scanner) para a leitura técnica ser feita sobre os dados reais.");
+    if (!TIMEFRAMES.includes(tf)) throw new ChartAnalysisUnavailableError("Timeframe inválido; use 15m, 30m, 1h, 4h, 1d ou 1w.");
+    const det = await analyzeDeterministic(symbol, tf);
+    const analysis: ChartImageAnalysis = { id: null, ...det, disclaimer: DISCLAIMER, createdAt: Date.now() };
+    const prisma = getPrisma();
+    if (prisma) {
+      const saved = await prisma.chartAnalysis.create({
+        data: { userId: input.userId, symbol, timeframe: tf, imageSha256: createHash("sha256").update(input.bytes).digest("hex"), imageMime: input.mime, provider: "deterministic", model: "orchestrator", result: JSON.parse(JSON.stringify(analysis)) },
+      });
+      analysis.id = saved.id;
+    }
+    return analysis;
   }
 
   const out = await completeJson({

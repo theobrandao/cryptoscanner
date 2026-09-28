@@ -4,6 +4,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import type { CoinMarket, GlobalData } from "@/services/market/providers/coingecko";
 import type { PanoramaReport } from "@/services/panorama-service";
+import type { WhaleSnapshot } from "@/services/onchain/whales";
 import { Badge } from "@/components/ui/badge";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -297,6 +298,7 @@ function ExecutiveReport() {
             )}
           </CardContent>
         </Card>
+        <WhalesCard />
         {d.notAvailable.length ? (
           <Card>
             <CardHeader>
@@ -311,6 +313,40 @@ function ExecutiveReport() {
         ) : null}
       </div>
     </div>
+  );
+}
+
+const KIND_LABEL = { consolidacao: "Consolidação (muitas entradas → 1 saída)", distribuicao: "Distribuição (1 entrada → muitas saídas)", transferencia: "Transferência" } as const;
+
+/** Grandes transações on-chain (≥ 50 BTC) coletadas pelo cron dos blocos mais recentes. */
+function WhalesCard() {
+  const { data } = useSWR<{ snapshot: WhaleSnapshot | null; available: boolean; note: string }>("/api/market/whales", { refreshInterval: 120_000 });
+  const snap = data?.snapshot ?? null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>🐋 Grandes transações on-chain (BTC)</CardTitle>
+        <CardDescription>
+          {snap ? `≥ ${snap.thresholdBtc} BTC · ${snap.count24h} tx em 24 h · ${formatCompact(snap.totalBtc24h, "")} BTC · último bloco ${snap.lastBlock?.height ?? "—"} (${snap.lastBlock ? formatDateTime(snap.lastBlock.time) : "—"})` : "Aguardando a primeira coleta do cron (a cada 10 min)."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex max-h-80 flex-col gap-1 overflow-auto text-sm">
+        {snap?.items.slice(0, 25).map((t) => (
+          <a key={t.hash} href={`https://mempool.space/tx/${t.hash}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-muted">
+            <span className="min-w-0">
+              <span className="font-mono text-xs text-muted-foreground">{t.hash.slice(0, 8)}…{t.hash.slice(-6)}</span>
+              <span className="ml-2 text-xs">{KIND_LABEL[t.kind]}</span>
+            </span>
+            <span className="shrink-0 text-right">
+              <span className="block font-semibold tabular">{t.btc.toLocaleString("pt-BR")} BTC</span>
+              <span className="block text-[11px] text-muted-foreground">{t.usd ? formatCompact(t.usd) : ""} · {formatDateTime(t.time)}</span>
+            </span>
+          </a>
+        ))}
+        {snap && snap.items.length === 0 ? <p className="text-xs text-muted-foreground">Nenhuma transação ≥ {snap.thresholdBtc} BTC nos blocos processados nas últimas 24 h.</p> : null}
+        <p className="mt-1 text-[11px] text-muted-foreground">{data?.note ?? ""}</p>
+      </CardContent>
+    </Card>
   );
 }
 

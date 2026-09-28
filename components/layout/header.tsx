@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Menu, Moon, Search, Sun, Star, LogIn, LogOut, User, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { InstallButton } from "@/components/providers/pwa-register";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -73,6 +74,7 @@ export function Header() {
           <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)} aria-label="Buscar ativo">
             <Search className="h-4 w-4" />
           </Button>
+          <InstallButton className="hidden lg:inline-flex h-8 items-center rounded-md border border-border px-2 text-xs font-semibold hover:bg-muted" />
           <Button variant="ghost" size="icon" onClick={toggle} aria-label="Alternar tema">
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
