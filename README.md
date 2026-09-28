@@ -114,6 +114,16 @@ docker compose up --build
 
 `web` usa a saída `standalone` do Next.js (imagem enxuta, usuário não-root); `migrate` aplica as migrations antes de `web`/`worker` subirem.
 
+### Vercel + Neon + Upstash (serverless, sem worker de longa duração)
+
+1. **Neon**: crie o projeto Postgres; copie a *pooled connection string* para `DATABASE_URL` (acrescente `&pgbouncer=true`) e a *direct connection string* para `DIRECT_URL`.
+2. **Upstash Redis**: crie o banco; copie a URL `rediss://…` para `REDIS_URL`.
+3. **Vercel**: importe o repositório do GitHub. `vercel.json` já define a região `gru1` (São Paulo — a Binance responde nessa região) e o build `prisma generate && prisma migrate deploy && next build` (as migrations rodam no build). Variáveis: `AUTH_SECRET`, `DATABASE_URL`, `DIRECT_URL`, `REDIS_URL`, `CRON_SECRET`, `NEXT_PUBLIC_APP_URL`, opcionais `TELEGRAM_BOT_TOKEN`, `ANTHROPIC_API_KEY`/`LLM_PROVIDER`, `COINGECKO_API_KEY`.
+4. **Ciclo dos agentes/alertas**: sem processo de longa duração, o ciclo roda por HTTP em `GET|POST /api/cron/cycle` (cabeçalho `Authorization: Bearer <CRON_SECRET>`). Agende a cada 5 min no **Upstash QStash** (Schedules → cron `*/5 * * * *`) ou no cron-job.org. O cron diário do `vercel.json` é apenas um reforço (plano Hobby limita a 1×/dia).
+5. Seed (opcional): `DATABASE_URL=<direct> npm run db:seed` a partir da sua máquina.
+
+Limitações nesse modo: sem WebSocket da Binance (preços por REST a cada 3 s via SSE, que reconecta a cada 50 s); funções limitadas a 60 s por invocação.
+
 ### Manual
 
 ```bash

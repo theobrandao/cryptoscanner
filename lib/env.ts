@@ -11,6 +11,8 @@ const schema = z.object({
   AUTH_SECRET: z.string().min(32).optional(),
   AUTH_SESSION_DAYS: z.coerce.number().int().min(1).max(90).default(7),
   DATABASE_URL: z.string().optional(),
+  DIRECT_URL: z.string().optional(),
+  CRON_SECRET: z.string().optional(),
   REDIS_URL: z.string().optional(),
   MARKET_PROVIDERS: z.string().default("binance,kraken"),
   BINANCE_REST_URL: z.string().default("https://api.binance.com"),

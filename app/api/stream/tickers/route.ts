@@ -1,9 +1,14 @@
 import { connection } from "next/server";
 import { getTickers, getUsdBrl } from "@/services/market/market-service";
 
+/** Limite por invocação em plataformas serverless; o cliente (EventSource) reconecta sozinho. */
+export const maxDuration = 60;
+const STREAM_MAX_MS = 50_000;
+
 /**
  * Server-Sent Events com os tickers dos 20 ativos. Fonte: cache alimentado pelo worker
- * (WebSocket Binance) ou REST com fallback; intervalo de 3 s; encerra quando o cliente desconecta.
+ * (WebSocket Binance) ou REST com fallback; intervalo de 3 s; encerra quando o cliente desconecta
+ * ou após STREAM_MAX_MS (o navegador reabre a conexão automaticamente).
  */
 export async function GET(req: Request) {
   await connection();
@@ -24,13 +29,16 @@ export async function GET(req: Request) {
           send("error", { message: (err as Error).message });
         }
       };
-      send("hello", { interval: 3000 });
+      if (!closed) controller.enqueue(encoder.encode("retry: 2000\n\n"));
+      send("hello", { interval: 3000, maxMs: STREAM_MAX_MS });
       await tick();
       timer = setInterval(() => void tick(), 3000);
+      let lifetime: NodeJS.Timeout | null = null;
       const close = () => {
         if (closed) return;
         closed = true;
         if (timer) clearInterval(timer);
+        if (lifetime) clearTimeout(lifetime);
         try {
           controller.close();
         } catch {
@@ -38,6 +46,7 @@ export async function GET(req: Request) {
         }
       };
       req.signal.addEventListener("abort", close);
+      lifetime = setTimeout(close, STREAM_MAX_MS);
     },
     cancel() {
       closed = true;
