@@ -46,7 +46,7 @@ async function handle(req: Request) {
     }
     return out;
   });
-  await step("market-snapshot", () => persistMarketSnapshot({ candlesPerAsset: 12, timeBudgetMs: 20_000 }));
+  await step("market-snapshot", () => persistMarketSnapshot({ candlesPerAsset: 50, timeBudgetMs: 25_000 }));
   await step("user-agents", async () => {
     const res = await runAllActiveAgents();
     return { agents: res.length, signals: res.reduce((s, r) => s + r.signals.length, 0), alertsSent: res.reduce((s, r) => s + r.alertsSent, 0) };
