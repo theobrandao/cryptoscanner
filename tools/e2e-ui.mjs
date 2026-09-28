@@ -166,7 +166,7 @@ await step("Jornada Trader: abrir aula, responder teste e concluir", async () =>
   await page.locator("button", { hasText: /A recompensa por bloco cai pela metade/ }).click();
   await page.locator("button", { hasText: /A oferta e demanda em cada corretora/ }).click();
   await page.getByRole("button", { name: /Corrigir e concluir aula/i }).click();
-  await page.waitForFunction(() => /2\/2 corretas/.test(document.body.innerText), null, { timeout: 10_000 });
+  await page.waitForFunction(() => /2\/2 corretas/i.test(document.body.innerText), null, { timeout: 10_000 });
   return `aula concluída 2/2 · ${await shot("jornada")}`;
 });
 
