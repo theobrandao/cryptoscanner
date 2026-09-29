@@ -55,6 +55,12 @@ async function goto(p) {
   await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
 }
 
+// Aquecimento: primeira carga de chunks recém-publicados pode falhar em proxies de saída (não na CDN).
+for (let i = 0; i < 2; i++) {
+  await page.goto(BASE + "/", { waitUntil: "networkidle", timeout: 45_000 }).catch(() => {});
+}
+consoleErrors.length = 0;
+
 // ------------------------------------------------------------ páginas públicas
 await step("Home carrega com tickers ao vivo e top 20 por volume", async () => {
   await goto("/");
