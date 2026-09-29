@@ -33,8 +33,42 @@ export interface Signal {
   index: number;
   direction: Exclude<Direction, "neutral">;
   stop: number;
+  /** NaN quando a saída é por trailing (sem alvo) */
   target: number;
   horizon: number;
+  /** saída por stop móvel: mínima (máxima, no short) dos últimos `trailN` candles, atualizada no fechamento */
+  trailN?: number;
+}
+
+/**
+ * Saída por trailing: stop inicial → a cada fechamento o stop sobe (long) para a mínima dos últimos `trailN`
+ * candles, valendo a partir do candle seguinte. Gap além do stop sai na abertura (pior preço). Horizonte = teto.
+ */
+export function resolveTrailing(candles: readonly Candle[], entryIndex: number, direction: Exclude<Direction, "neutral">, entry: number, stop0: number, trailN: number, horizon: number) {
+  const long = direction === "bullish";
+  const end = Math.min(candles.length - 1, entryIndex + horizon);
+  let stop = stop0;
+  let mfe = 0;
+  let mae = 0;
+  for (let j = entryIndex + 1; j <= end; j++) {
+    const c = candles[j] as Candle;
+    if (long ? c.low <= stop : c.high >= stop) {
+      const exit = long ? Math.min(stop, c.open) : Math.max(stop, c.open);
+      mae = Math.max(mae, long ? entry - exit : exit - entry);
+      const pnl = long ? exit - entry : entry - exit;
+      return { outcome: pnl > 0 ? ("win" as const) : ("loss" as const), bars: j - entryIndex, exit, mfe, mae: Math.max(0, mae) };
+    }
+    mfe = Math.max(mfe, long ? c.high - entry : entry - c.low);
+    mae = Math.max(mae, long ? entry - c.low : c.high - entry);
+    let ext = long ? Infinity : -Infinity;
+    for (let q = Math.max(0, j - trailN + 1); q <= j; q++) {
+      const x = candles[q] as Candle;
+      ext = long ? Math.min(ext, x.low) : Math.max(ext, x.high);
+    }
+    stop = long ? Math.max(stop, ext) : Math.min(stop, ext);
+  }
+  const last = candles[end] ?? candles[entryIndex];
+  return { outcome: "expired" as const, bars: end - entryIndex, exit: last?.close ?? entry, mfe, mae: Math.max(0, mae) };
 }
 
 export interface BtTrade {
@@ -94,11 +128,12 @@ export function runSignals(candles: readonly Candle[], signals: readonly Signal[
     if (ei <= busyUntil || ei >= candles.length - 1) continue;
     const long = s.direction === "bullish";
     const entry = (candles[ei] as Candle).close;
+    const trail = s.trailN != null && s.trailN > 0;
     // atraso pode levar o preço além do stop/alvo planejados: descarta (não entra em sinal vencido)
-    if (long ? !(s.stop < entry && s.target > entry) : !(s.stop > entry && s.target < entry)) continue;
+    if (long ? !(s.stop < entry && (trail || s.target > entry)) : !(s.stop > entry && (trail || s.target < entry))) continue;
     const risk = Math.abs(entry - s.stop);
     if (!(risk > 0)) continue;
-    const r = resolveTrade(candles, ei, s.direction, entry, s.target, s.stop, s.horizon);
+    const r = trail ? resolveTrailing(candles, ei, s.direction, entry, s.stop, s.trailN as number, s.horizon) : resolveTrade(candles, ei, s.direction, entry, s.target, s.stop, s.horizon);
     const sign = long ? 1 : -1;
     const gross = sign * (r.exit - entry);
     const entryFill = entry * (1 + sign * slip);
@@ -106,8 +141,9 @@ export function runSignals(candles: readonly Candle[], signals: readonly Signal[
     const feeCost = fee * (entryFill + exitFill);
     const fundingCost = costs.perp ? entry * (costs.fundingPct8h / 100) * ((r.bars * hoursPerBar) / 8) * sign : 0;
     const net = sign * (exitFill - entryFill) - feeCost - fundingCost;
-    let runR = 0;
-    for (let j = ei + 1; j <= Math.min(candles.length - 1, ei + s.horizon); j++) {
+    // trailing: a excursão até a saída já é o "run" (o stop móvel é a própria saída)
+    let runR = trail ? r.mfe / risk : 0;
+    for (let j = ei + 1; !trail && j <= Math.min(candles.length - 1, ei + s.horizon); j++) {
       const c = candles[j] as Candle;
       if (long ? c.low <= s.stop : c.high >= s.stop) break;
       runR = Math.max(runR, (long ? c.high - entry : entry - c.low) / risk);
@@ -146,7 +182,7 @@ export function runSignals(candles: readonly Candle[], signals: readonly Signal[
     bars: t.bars,
     returnPct: ((t.direction === "bullish" ? 1 : -1) * (t.exit - t.entry) * 100) / t.entry,
     r,
-    targetR: Math.abs(t.target - t.entry) / Math.abs(t.entry - t.stop),
+    targetR: Number.isFinite(t.target) ? Math.abs(t.target - t.entry) / Math.abs(t.entry - t.stop) : 0,
     mfeR: t.mfeR,
     maeR: t.maeR,
     hit1R: t.runR >= 1,
@@ -234,7 +270,8 @@ export function strategySignals(def: StrategyDefinition, exec: readonly Candle[]
       }
       if (Number.isFinite(stop)) {
         const risk = Math.abs(c.close - stop);
-        signals.push({ index: t, direction: dir, stop, target: c.close + (long ? 1 : -1) * def.exit.rr * risk, horizon: def.exit.horizon });
+        if (def.exit.mode === "trail") signals.push({ index: t, direction: dir, stop, target: NaN, horizon: def.exit.horizon, trailN: def.exit.trailN });
+        else signals.push({ index: t, direction: dir, stop, target: c.close + (long ? 1 : -1) * def.exit.rr * risk, horizon: def.exit.horizon });
       }
     }
     prev = pass;

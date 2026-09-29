@@ -48,6 +48,10 @@ export const FEATURES = [
   { key: "sweep", label: "Varredura de liquidez recente (5 candles)", kind: "enum", options: ["bullish", "bearish", "none"], hint: "varreu SSL e voltou = bullish; varreu BSL e voltou = bearish" },
   { key: "divergence", label: "Divergência de RSI (15 candles)", kind: "enum", options: ["regular_bullish", "regular_bearish", "hidden_bullish", "hidden_bearish", "none"], hint: "pivôs confirmados (k=3)" },
   { key: "change_pct", label: "Variação do candle (%)", kind: "number", min: -50, max: 50, unit: "%", hint: "fechamento vs. fechamento anterior" },
+  { key: "breakout_high_20", label: "Rompimento: fechou acima da máxima de 20 candles", kind: "boolean", hint: "canal Donchian 20 — máxima dos 20 candles anteriores ao último fechado" },
+  { key: "breakout_high_55", label: "Rompimento: fechou acima da máxima de 55 candles", kind: "boolean", hint: "canal Donchian 55 — máxima dos 55 candles anteriores ao último fechado" },
+  { key: "breakout_low_20", label: "Rompimento: fechou abaixo da mínima de 20 candles", kind: "boolean", hint: "canal Donchian 20 — mínima dos 20 candles anteriores ao último fechado" },
+  { key: "breakout_low_55", label: "Rompimento: fechou abaixo da mínima de 55 candles", kind: "boolean", hint: "canal Donchian 55 — mínima dos 55 candles anteriores ao último fechado" },
   { key: "confluence_score", label: "Confluence Score", kind: "number", min: 0, max: 100, hint: "nota R2 do contexto completo", liveOnly: true },
   { key: "setup_state", label: "Estado do setup", kind: "enum", options: ["DETECTED", "FORMING", "READY", "TRIGGERED", "ACTIVE", "TARGET_HIT", "INVALIDATED", "EXPIRED", "NONE"], hint: "máquina de estados do setup", liveOnly: true },
   { key: "funding_rate", label: "Funding rate (%)", kind: "number", min: -1, max: 1, unit: "%", hint: "perpétuo da exchange selecionada", liveOnly: true, perpOnly: true },
@@ -87,7 +91,10 @@ export const groupSchema = z.object({
 export const exitSchema = z.object({
   stop: z.enum(["structure", "atr"]).default("atr"),
   atrMult: z.number().min(0.3).max(10).default(1.5),
+  /** "target": alvo fixo em R · "trail": sem alvo, stop móvel pela mínima (máxima, no short) dos últimos `trailN` candles */
+  mode: z.enum(["target", "trail"]).default("target"),
   rr: z.number().min(0.5).max(10).default(2),
+  trailN: z.number().int().min(2).max(100).default(20),
   /** candles até encerrar pelo fechamento */
   horizon: z.number().int().min(5).max(300).default(60),
 });
@@ -97,7 +104,7 @@ export const definitionSchema = z.object({
   direction: z.enum(["long", "short"]),
   logic: z.enum(["AND", "OR"]).default("AND"),
   groups: z.array(groupSchema).min(1).max(6),
-  exit: exitSchema.default({ stop: "atr", atrMult: 1.5, rr: 2, horizon: 60 }),
+  exit: exitSchema.default({ stop: "atr", atrMult: 1.5, mode: "target", rr: 2, trailN: 20, horizon: 60 }),
 });
 
 export type StrategyDefinition = z.infer<typeof definitionSchema>;
@@ -116,8 +123,66 @@ export function executionTf(def: StrategyDefinition): StrategyTf {
 
 export const usesLiveOnly = (def: StrategyDefinition) => def.groups.flatMap((g) => g.conditions).filter((c) => featureSpec(c.feature)?.liveOnly).map((c) => c.feature);
 
+/** Resultado de validação fora da amostra publicado junto do modelo (docs/research/2026-09-validacao-setups.md). */
+export interface TemplateValidation {
+  /** rótulo curto do selo */
+  label: string;
+  /** período, universo, custos e números fora da amostra */
+  summary: string;
+  /** ressalvas que o usuário precisa ler antes de operar */
+  caveats: string;
+}
+
 /** Modelos iniciais (o usuário ajusta e salva). */
-export const STRATEGY_TEMPLATES: Array<{ name: string; description: string; definition: StrategyDefinition }> = [
+export const STRATEGY_TEMPLATES: Array<{ name: string; description: string; definition: StrategyDefinition; validation?: TemplateValidation }> = [
+  {
+    name: "Rompimento Donchian 55 + EMA 200 (4H)",
+    description: "Long quando o 4H fecha acima da máxima dos 55 candles anteriores e acima da EMA 200. Stop inicial 2 ATR; depois stop móvel na mínima dos últimos 20 candles.",
+    definition: {
+      version: 1,
+      direction: "long",
+      logic: "AND",
+      groups: [
+        {
+          logic: "AND",
+          conditions: [
+            { tf: "4h", feature: "breakout_high_55", op: "==", value: true },
+            { tf: "4h", feature: "above_ema200", op: "==", value: true },
+          ],
+        },
+      ],
+      exit: { stop: "atr", atrMult: 2, mode: "trail", rr: 2, trailN: 20, horizon: 300 },
+    },
+    validation: {
+      label: "Validado fora da amostra",
+      summary: "Motor do próprio app, 30 criptos (Binance spot), taxa 10 + slippage 5 bps por lado. Seleção em jun/2025–mar/2026 (290 trades, +0,37R). Fora da amostra, mar–set/2026: 312 trades, +0,30R por trade, PF 1,44, acerto 30%, 21 de 30 ativos positivos; entradas aleatórias com a mesma saída ficaram em +0,10R (p ≈ 0,04).",
+      caveats: "Acerto de 30%: sequências longas de perdas. Carteira com todos os sinais a 0,5% de risco por trade: +55% e drawdown de 38% fora da amostra; limitada a 5 posições: +19% e 18%. Universo só com ativos listados hoje (viés de sobrevivência). Resultado passado não garante resultado futuro.",
+    },
+  },
+  {
+    name: "Rompimento Donchian 55 + EMA 200 (1D)",
+    description: "Long quando o diário fecha acima da máxima dos 55 dias anteriores e acima da EMA 200. Stop inicial 3 ATR; depois stop móvel na mínima dos últimos 20 dias.",
+    definition: {
+      version: 1,
+      direction: "long",
+      logic: "AND",
+      groups: [
+        {
+          logic: "AND",
+          conditions: [
+            { tf: "1d", feature: "breakout_high_55", op: "==", value: true },
+            { tf: "1d", feature: "above_ema200", op: "==", value: true },
+          ],
+        },
+      ],
+      exit: { stop: "atr", atrMult: 3, mode: "trail", rr: 2, trailN: 20, horizon: 300 },
+    },
+    validation: {
+      label: "Validado com ressalva",
+      summary: "Motor do próprio app, 30 criptos (Binance spot), taxa 10 + slippage 5 bps por lado. Seleção em abr/2024–jul/2025 (86 trades, +0,92R). Fora da amostra, jul/2025–set/2026: 64 trades, +0,95R por trade, PF 3,16, acerto 38%.",
+      caveats: "Resultado fora da amostra concentrado: ZEC respondeu por 50R dos 61R; sem os 3 melhores ativos a soma é −0,3R (14 de 29 ativos positivos). Só funciona operando todos os sinais com risco pequeno por trade; amostra de 64 trades e viés de sobrevivência. Resultado passado não garante resultado futuro.",
+    },
+  },
   {
     name: "Pullback em tendência (MTF)",
     description: "1D em alta estrutural, 4H com RSI recuando para a zona de 40–55 e EMA score positivo.",
@@ -136,7 +201,7 @@ export const STRATEGY_TEMPLATES: Array<{ name: string; description: string; defi
           ],
         },
       ],
-      exit: { stop: "atr", atrMult: 1.5, rr: 2, horizon: 60 },
+      exit: { stop: "atr", atrMult: 1.5, mode: "target", rr: 2, trailN: 20, horizon: 60 },
     },
   },
   {
@@ -156,7 +221,7 @@ export const STRATEGY_TEMPLATES: Array<{ name: string; description: string; defi
           ],
         },
       ],
-      exit: { stop: "structure", atrMult: 1.5, rr: 2.5, horizon: 60 },
+      exit: { stop: "structure", atrMult: 1.5, mode: "target", rr: 2.5, trailN: 20, horizon: 60 },
     },
   },
   {
@@ -176,7 +241,7 @@ export const STRATEGY_TEMPLATES: Array<{ name: string; description: string; defi
           ],
         },
       ],
-      exit: { stop: "atr", atrMult: 1.2, rr: 2, horizon: 40 },
+      exit: { stop: "atr", atrMult: 1.2, mode: "target", rr: 2, trailN: 20, horizon: 40 },
     },
   },
   {
@@ -197,7 +262,7 @@ export const STRATEGY_TEMPLATES: Array<{ name: string; description: string; defi
           ],
         },
       ],
-      exit: { stop: "atr", atrMult: 1.5, rr: 2, horizon: 60 },
+      exit: { stop: "atr", atrMult: 1.5, mode: "target", rr: 2, trailN: 20, horizon: 60 },
     },
   },
 ];

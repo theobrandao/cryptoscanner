@@ -92,6 +92,6 @@ export async function runBacktest(req: BacktestRequest): Promise<BacktestRespons
     ...res,
     params: { symbol: asset.symbol, exchange: req.exchange, instrument: req.instrument, mode: "strategy", timeframe: et, strategyName: req.strategyName ?? "Estratégia", days: req.days, barsRequested: bars, costs },
     signals: signals.length,
-    method: `Condições avaliadas em cada candle ${et.toUpperCase()} com features de cada timeframe calculadas só sobre candles já fechados naquele instante. Sinal na transição falso → verdadeiro; stop ${def.exit.stop === "atr" ? `ATR × ${def.exit.atrMult}` : "estrutural"}; alvo ${def.exit.rr}R; horizonte ${def.exit.horizon} candles; uma posição por vez.`,
+    method: `Condições avaliadas em cada candle ${et.toUpperCase()} com features de cada timeframe calculadas só sobre candles já fechados naquele instante. Sinal na transição falso → verdadeiro; stop ${def.exit.stop === "atr" ? `ATR × ${def.exit.atrMult}` : "estrutural"}; ${def.exit.mode === "trail" ? `sem alvo — stop móvel na ${def.direction === "long" ? "mínima" : "máxima"} dos últimos ${def.exit.trailN} candles (gap sai na abertura)` : `alvo ${def.exit.rr}R`}; horizonte ${def.exit.horizon} candles; uma posição por vez.`,
   };
 }

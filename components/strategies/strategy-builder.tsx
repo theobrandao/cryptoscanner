@@ -13,7 +13,7 @@ import { ASSETS } from "@/lib/assets";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { INSTRUMENT_LABEL, INSTRUMENTS, VENUE_LABEL, VENUES, type Instrument, type Venue } from "@/lib/venues";
-import { describeCondition, featureSpec, type Condition, type FeatureSpec, type Op, type StrategyDefinition } from "@/lib/strategies/definition";
+import { describeCondition, featureSpec, type Condition, type FeatureSpec, type Op, type StrategyDefinition, type TemplateValidation } from "@/lib/strategies/definition";
 import type { LiveEvaluation, ScanRow, StrategyRecord } from "@/services/strategy-service";
 
 interface Catalog {
@@ -25,7 +25,7 @@ interface Payload {
   items: StrategyRecord[];
   limit: number;
   catalog: Catalog;
-  templates: Array<{ name: string; description: string; definition: StrategyDefinition }>;
+  templates: Array<{ name: string; description: string; definition: StrategyDefinition; validation?: TemplateValidation }>;
 }
 
 const EMPTY: StrategyDefinition = {
@@ -33,7 +33,7 @@ const EMPTY: StrategyDefinition = {
   direction: "long",
   logic: "AND",
   groups: [{ logic: "AND", conditions: [{ tf: "4h", feature: "trend", op: "==", value: "bullish" }] }],
-  exit: { stop: "atr", atrMult: 1.5, rr: 2, horizon: 60 },
+  exit: { stop: "atr", atrMult: 1.5, mode: "target", rr: 2, trailN: 20, horizon: 60 },
 };
 
 const selectCls = "h-8 rounded-md border border-input bg-background px-2 text-[12.5px] outline-none focus:ring-2 focus:ring-ring";
@@ -179,9 +179,23 @@ function Editor({ def, setDef, catalog }: { def: StrategyDefinition; setDef: (d:
             <input type="number" step="0.1" min={0.3} max={10} className={cn(selectCls, "w-20")} value={def.exit.atrMult} onChange={(e) => setDef({ ...def, exit: { ...def.exit, atrMult: Number(e.target.value) } })} />
           </label>
           <label className="flex items-center gap-1.5">
-            Alvo (R)
-            <input type="number" step="0.1" min={0.5} max={10} className={cn(selectCls, "w-20")} value={def.exit.rr} onChange={(e) => setDef({ ...def, exit: { ...def.exit, rr: Number(e.target.value) } })} />
+            Saída
+            <select className={selectCls} value={def.exit.mode ?? "target"} onChange={(e) => setDef({ ...def, exit: { ...def.exit, mode: e.target.value as "target" | "trail" } })}>
+              <option value="target">Alvo fixo (R)</option>
+              <option value="trail">Stop móvel (trailing)</option>
+            </select>
           </label>
+          {(def.exit.mode ?? "target") === "target" ? (
+            <label className="flex items-center gap-1.5">
+              Alvo (R)
+              <input type="number" step="0.1" min={0.5} max={10} className={cn(selectCls, "w-20")} value={def.exit.rr} onChange={(e) => setDef({ ...def, exit: { ...def.exit, rr: Number(e.target.value) } })} />
+            </label>
+          ) : (
+            <label className="flex items-center gap-1.5" title={def.direction === "long" ? "Stop sobe para a mínima dos últimos N candles" : "Stop desce para a máxima dos últimos N candles"}>
+              Trailing (candles)
+              <input type="number" step="1" min={2} max={100} className={cn(selectCls, "w-20")} value={def.exit.trailN ?? 20} onChange={(e) => setDef({ ...def, exit: { ...def.exit, trailN: Math.round(Number(e.target.value)) } })} />
+            </label>
+          )}
           <label className="flex items-center gap-1.5">
             Horizonte (candles)
             <input type="number" step="1" min={5} max={300} className={cn(selectCls, "w-20")} value={def.exit.horizon} onChange={(e) => setDef({ ...def, exit: { ...def.exit, horizon: Math.round(Number(e.target.value)) } })} />
@@ -326,13 +340,23 @@ function BuilderInner() {
           <div className="rounded-lg border border-border bg-card p-3">
             <div className="mb-2 text-[12.5px] font-semibold">Modelos</div>
             {(data?.templates ?? []).map((t) => (
-              <button key={t.name} onClick={() => load({ name: t.name, description: t.description, definition: t.definition })} className="mb-1 flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-[12px] hover:bg-muted">
-                <Copy className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span>
-                  {t.name}
-                  <span className="block text-[10.5px] text-muted-foreground">{t.description}</span>
-                </span>
-              </button>
+              <div key={t.name} className="mb-1">
+                <button onClick={() => load({ name: t.name, description: t.description, definition: t.definition })} className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-[12px] hover:bg-muted">
+                  <Copy className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span>
+                    {t.name}
+                    {t.validation ? <span className="ml-1.5 inline-block rounded bg-success/15 px-1.5 py-px text-[10px] font-semibold text-success">{t.validation.label}</span> : null}
+                    <span className="block text-[10.5px] text-muted-foreground">{t.description}</span>
+                  </span>
+                </button>
+                {t.validation ? (
+                  <details className="ml-7 mr-1 text-[10.5px] text-muted-foreground" data-testid="template-validation">
+                    <summary className="cursor-pointer select-none text-primary">Números fora da amostra</summary>
+                    <p className="mt-1">{t.validation.summary}</p>
+                    <p className="mt-1 text-warning">{t.validation.caveats}</p>
+                  </details>
+                ) : null}
+              </div>
             ))}
           </div>
         </aside>

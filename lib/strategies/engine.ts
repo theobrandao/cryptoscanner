@@ -46,7 +46,24 @@ export function computeFeatures(candles: readonly Candle[]): FeatureSet {
     sweep: sweep ? sweep.direction : "none",
     divergence: div ? div.type : "none",
     change_pct: prev ? ((last.close - prev.close) / prev.close) * 100 : null,
+    breakout_high_20: donchian(candles, 20, "high"),
+    breakout_high_55: donchian(candles, 55, "high"),
+    breakout_low_20: donchian(candles, 20, "low"),
+    breakout_low_55: donchian(candles, 55, "low"),
   };
+}
+
+/** Último fechamento além da máxima (mínima) dos `n` candles anteriores. null sem histórico suficiente. */
+export function donchian(candles: readonly Candle[], n: number, side: "high" | "low"): boolean | null {
+  const len = candles.length;
+  if (len < n + 1) return null;
+  const last = candles[len - 1] as Candle;
+  let ext = side === "high" ? -Infinity : Infinity;
+  for (let i = len - 1 - n; i < len - 1; i++) {
+    const c = candles[i] as Candle;
+    ext = side === "high" ? Math.max(ext, c.high) : Math.min(ext, c.low);
+  }
+  return side === "high" ? last.close > ext : last.close < ext;
 }
 
 export interface ConditionResult {

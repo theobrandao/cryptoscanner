@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { conditionSchema, definitionSchema, executionTf, timeframesOf, usesLiveOnly, type StrategyDefinition } from "@/lib/strategies/definition";
-import { compare, computeFeatures, evaluateStrategy, sliceUntil } from "@/lib/strategies/engine";
-import { runSignals, strategySignals, DEFAULT_COSTS } from "@/lib/backtest/engine";
+import { compare, computeFeatures, donchian, evaluateStrategy, sliceUntil } from "@/lib/strategies/engine";
+import { resolveTrailing, runSignals, strategySignals, DEFAULT_COSTS } from "@/lib/backtest/engine";
+import { STRATEGY_TEMPLATES } from "@/lib/strategies/definition";
 import { fingerprintOf, setupEventFor } from "@/services/monitor-service";
 import type { Candle } from "@/types/market";
 
@@ -96,6 +97,43 @@ describe("Backtest com custos", () => {
     const sigs = strategySignals(def, cs, {}, 200);
     expect(sigs.length).toBeGreaterThan(2);
     for (let i = 1; i < sigs.length; i++) expect(sigs[i]!.index - sigs[i - 1]!.index).toBeGreaterThan(1);
+  });
+});
+
+describe("Rompimento (Donchian) e saída por trailing", () => {
+  const bar = (i: number, o: number, h: number, l: number, c: number): Candle => ({ openTime: i * H4, closeTime: (i + 1) * H4 - 1, open: o, high: h, low: l, close: c, volume: 100 });
+  it("rompimento compara o último fechamento com a máxima/mínima dos N anteriores (sem incluir o último)", () => {
+    const flat = Array.from({ length: 20 }, (_, i) => bar(i, 100, 101, 99, 100));
+    expect(donchian([...flat, bar(20, 100, 103, 100, 101.5)], 20, "high")).toBe(true);
+    expect(donchian([...flat, bar(20, 100, 103, 100, 100.9)], 20, "high")).toBe(false);
+    expect(donchian([...flat, bar(20, 100, 100, 97, 98.5)], 20, "low")).toBe(true);
+    expect(donchian(flat, 20, "high")).toBeNull();
+  });
+  it("stop móvel sobe com a mínima dos últimos N candles e sai no stop; gap sai na abertura", () => {
+    // entrada 100 no candle 0, stop inicial 96; sobe até 120 e depois cai
+    const cs = [bar(0, 99, 100.5, 98.5, 100), bar(1, 100, 106, 99, 105), bar(2, 105, 111, 104, 110), bar(3, 110, 116, 109, 115), bar(4, 115, 121, 114, 120), bar(5, 120, 120.5, 108, 109)];
+    const r = resolveTrailing(cs, 0, "bullish", 100, 96, 2, 50);
+    // após o candle 4 o stop = min(low3, low4) = 109 → candle 5 (low 108) sai em 109
+    expect(r.exit).toBe(109);
+    expect(r.outcome).toBe("win");
+    expect(r.bars).toBe(5);
+    const gap = [...cs.slice(0, 5), bar(5, 100, 101, 95, 96)];
+    expect(resolveTrailing(gap, 0, "bullish", 100, 96, 2, 50).exit).toBe(100); // abriu abaixo do stop 109 → sai na abertura
+  });
+  it("modo trail no backtest: sem alvo, R pelo trailing; definição antiga ganha modo 'target'", () => {
+    const legacy = definitionSchema.parse({ direction: "long", groups: [{ conditions: [{ tf: "4h", feature: "rsi", op: "<", value: 45 }] }], exit: { stop: "atr", atrMult: 1.5, rr: 2, horizon: 20 } });
+    expect(legacy.exit.mode).toBe("target");
+    expect(legacy.exit.trailN).toBe(20);
+    const tpl = STRATEGY_TEMPLATES.find((t) => t.definition.exit.mode === "trail");
+    expect(tpl?.validation?.summary).toMatch(/Fora da amostra/);
+    expect(tpl?.validation?.summary).not.toMatch(/__/);
+    const cs = series(wave(700, 100, 10, 90, 0.08));
+    const sig = strategySignals(tpl!.definition, cs, {});
+    expect(sig.length).toBeGreaterThan(0);
+    expect(sig.every((x) => Number.isNaN(x.target) && x.trailN === 20)).toBe(true);
+    const res = runSignals(cs, sig, "4h", { ...DEFAULT_COSTS, feeBps: 0, slippageBps: 0 });
+    expect(res.trades.length).toBeGreaterThan(0);
+    for (const t of res.trades) expect(t.rNet).toBeCloseTo(t.rGross, 9);
   });
 });
 

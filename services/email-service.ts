@@ -1,4 +1,4 @@
-import { getEnv } from "@/lib/env";
+import { getEnv, legalDocKind } from "@/lib/env";
 import { fetchJson } from "@/lib/http";
 import { createLogger } from "@/lib/logger";
 
@@ -38,7 +38,8 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 
 function layout(title: string, paragraphs: string[], cta?: { label: string; url: string }) {
   const env = getEnv();
-  const foot = [env.LEGAL_ENTITY_NAME, env.LEGAL_ENTITY_DOC].filter(Boolean).join(" · ");
+  // CPF não vai no rodapé de e-mail (dado pessoal); CNPJ sim
+  const foot = [env.LEGAL_ENTITY_NAME, legalDocKind(env.LEGAL_ENTITY_DOC) === "CNPJ" ? env.LEGAL_ENTITY_DOC : undefined].filter(Boolean).join(" · ");
   const html = `<!doctype html><html><body style="margin:0;background:#07101a;font-family:Inter,Arial,sans-serif;color:#e6edf5">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#0b1420;border:1px solid #1b2733;border-radius:10px">

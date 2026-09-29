@@ -1,5 +1,5 @@
 import { requirePrisma } from "@/database/client";
-import { getEnv, legalStatus } from "@/lib/env";
+import { getEnv, isRegistrationOpen, legalStatus } from "@/lib/env";
 import { effectiveStatus } from "@/lib/entitlements";
 import { isBillingConfigured, priceFor } from "@/services/billing/mercadopago";
 import { isEmailConfigured } from "@/services/email-service";
@@ -56,7 +56,7 @@ export async function getAdminOverview() {
       { key: "webhook", label: "Mercado Pago: MERCADOPAGO_WEBHOOK_SECRET", ok: Boolean(env.MERCADOPAGO_WEBHOOK_SECRET) },
       { key: "legal_entity", label: `Fornecedor identificado (${legal.missing.length ? `faltam ${legal.missing.join(", ")}` : "completo"})`, ok: legal.missing.length === 0 },
       { key: "legal_approved", label: `Termos/Privacidade/Reembolso aprovados (LEGAL_TERMS_APPROVED, versão ${legal.version})`, ok: legal.approved },
-      { key: "registration", label: `Cadastro aberto (REGISTRATION_MODE=${env.REGISTRATION_MODE})`, ok: env.REGISTRATION_MODE === "open" },
+      { key: "registration", label: `Cadastro aberto (REGISTRATION_MODE=${env.REGISTRATION_MODE}${env.REGISTRATION_MODE === "open" && legal.missing.length ? " — aguardando fornecedor identificado" : ""})`, ok: isRegistrationOpen() },
       { key: "email", label: "E-mail transacional (RESEND_API_KEY + EMAIL_FROM)", ok: isEmailConfigured() },
       { key: "push", label: "Push (VAPID)", ok: await isPushConfigured() },
       { key: "app_url", label: `URL pública (NEXT_PUBLIC_APP_URL=${env.NEXT_PUBLIC_APP_URL})`, ok: env.NEXT_PUBLIC_APP_URL.startsWith("https://") },

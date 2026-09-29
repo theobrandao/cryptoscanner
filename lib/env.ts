@@ -139,11 +139,26 @@ export function isOwnerEmail(email: string): boolean {
     .includes(email.trim().toLowerCase());
 }
 
+/**
+ * Cadastro aberto ao público: REGISTRATION_MODE=open E fornecedor/controlador identificado (nome, CPF/CNPJ,
+ * endereço e e-mail). Sem a identificação, abrir o cadastro coletaria dados pessoais sem controlador
+ * identificado (LGPD art. 9º) — o cadastro segue por convite até os dados existirem.
+ */
+export function isRegistrationOpen(): boolean {
+  return getEnv().REGISTRATION_MODE === "open" && legalStatus().missing.length === 0;
+}
+
 /** Cadastro restrito (uso pessoal): há código de convite ou lista de e-mails do dono. */
 export function isInviteRequired(): boolean {
   const env = getEnv();
-  if (env.REGISTRATION_MODE === "open") return false;
+  if (isRegistrationOpen()) return false;
   return Boolean(env.REGISTRATION_INVITE_CODE) || env.OWNER_EMAILS.trim().length > 0;
+}
+
+/** Tipo do documento do fornecedor pelo número de dígitos (11 = CPF, 14 = CNPJ). */
+export function legalDocKind(doc: string | undefined): "CPF" | "CNPJ" | null {
+  const digits = (doc ?? "").replace(/\D/g, "");
+  return digits.length === 11 ? "CPF" : digits.length === 14 ? "CNPJ" : null;
 }
 
 /** Dados do fornecedor completos e termos aprovados: condição para ligar o checkout. */

@@ -1,6 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
-import { getEnv } from "@/lib/env";
+import { getEnv, legalDocKind } from "@/lib/env";
 
 /** Dados do fornecedor/controlador vindos do ambiente. Nada é inventado: campo ausente aparece como "não configurado". */
 export function legalEntity() {
@@ -9,6 +9,8 @@ export function legalEntity() {
   return {
     name: env.LEGAL_ENTITY_NAME ?? nc,
     doc: env.LEGAL_ENTITY_DOC ?? nc,
+    /** pessoa física (CPF) ou jurídica (CNPJ); sem documento, assume CNPJ no rótulo */
+    docKind: legalDocKind(env.LEGAL_ENTITY_DOC) ?? "CNPJ",
     address: env.LEGAL_ENTITY_ADDRESS ?? nc,
     email: env.SUPPORT_EMAIL ?? nc,
     dpo: env.DPO_EMAIL ?? env.SUPPORT_EMAIL ?? nc,
@@ -51,8 +53,12 @@ export function EntityBlock() {
   const e = legalEntity();
   return (
     <ul>
-      <li>Razão social: {e.name}</li>
-      <li>CNPJ: {e.doc}</li>
+      <li>
+        {e.docKind === "CPF" ? "Nome" : "Razão social"}: {e.name}
+      </li>
+      <li>
+        {e.docKind}: {e.doc}
+      </li>
       <li>Endereço: {e.address}</li>
       <li>Atendimento: {e.email}</li>
     </ul>
