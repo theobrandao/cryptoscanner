@@ -4,6 +4,7 @@
   "regions": ["gru1"],
   "buildCommand": "prisma generate && prisma migrate deploy && next build",
   "crons": [
-    { "path": "/api/cron/cycle", "schedule": "0 3 * * *" }
+    { "path": "/api/cron/cycle", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/backtest", "schedule": "30 3 * * *" }
   ]
 }
