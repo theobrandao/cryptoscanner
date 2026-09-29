@@ -108,26 +108,36 @@ export const cancelPreapproval = (id: string) => mp<Preapproval>("PUT", `/preapp
  * Valida x-signature ("ts=...,v1=...") com o manifesto `id:{data.id};request-id:{x-request-id};ts:{ts};`.
  * Sem MERCADOPAGO_WEBHOOK_SECRET o webhook é recusado (não processamos notificação não autenticada).
  */
-export function verifyWebhookSignature(headers: Headers, dataId: string | null, now = Date.now()): boolean {
-  const secret = getEnv().MERCADOPAGO_WEBHOOK_SECRET;
+export type SignatureCheck = { ok: true } | { ok: false; reason: "no_secret" | "no_signature" | "bad_format" | "stale_ts" | "mismatch"; detail?: Record<string, unknown> };
+
+export function checkWebhookSignature(headers: Headers, dataId: string | null, now = Date.now()): SignatureCheck {
+  // valor colado no painel pode trazer espaço/quebra de linha
+  const secret = getEnv().MERCADOPAGO_WEBHOOK_SECRET?.trim();
   const sig = headers.get("x-signature");
   const reqId = headers.get("x-request-id");
-  if (!secret || !sig) return false;
-  const parts = Object.fromEntries(sig.split(",").map((p) => p.trim().split("=", 2) as [string, string]));
+  if (!secret) return { ok: false, reason: "no_secret" };
+  if (!sig) return { ok: false, reason: "no_signature" };
+  const parts = Object.fromEntries(sig.split(",").map((p) => p.trim().split("=", 2).map((x) => x.trim()) as [string, string]));
   const ts = parts.ts;
   const v1 = parts.v1;
-  if (!ts || !v1) return false;
+  if (!ts || !v1) return { ok: false, reason: "bad_format" };
   // janela de 10 min contra replay
   const tsMs = Number(ts) < 1e12 ? Number(ts) * 1000 : Number(ts);
-  if (!Number.isFinite(tsMs) || Math.abs(now - tsMs) > 10 * 60_000) return false;
+  if (!Number.isFinite(tsMs) || Math.abs(now - tsMs) > 10 * 60_000) return { ok: false, reason: "stale_ts", detail: { skewS: Math.round((now - tsMs) / 1000) } };
   let manifest = "";
-  if (dataId) manifest += `id:${dataId.toLowerCase()};`;
+  if (dataId) manifest += `id:${/^[a-z0-9]+$/i.test(dataId) ? dataId.toLowerCase() : dataId};`;
   if (reqId) manifest += `request-id:${reqId};`;
   manifest += `ts:${ts};`;
   const expected = createHmac("sha256", secret).update(manifest).digest("hex");
   const a = Buffer.from(expected);
-  const b = Buffer.from(v1);
-  return a.length === b.length && timingSafeEqual(a, b);
+  const b = Buffer.from(v1.toLowerCase());
+  if (a.length === b.length && timingSafeEqual(a, b)) return { ok: true };
+  // diagnóstico sem expor o segredo: tamanho e impressão curta (sha256) do segredo configurado
+  return { ok: false, reason: "mismatch", detail: { hasRequestId: Boolean(reqId), dataId, secretLen: secret.length, secretFp: createHash("sha256").update(secret).digest("hex").slice(0, 8) } };
+}
+
+export function verifyWebhookSignature(headers: Headers, dataId: string | null, now = Date.now()): boolean {
+  return checkWebhookSignature(headers, dataId, now).ok;
 }
 
 /** Mapeia o status do preapproval para o status da assinatura. */

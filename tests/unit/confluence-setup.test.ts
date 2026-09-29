@@ -8,7 +8,7 @@ import { computeConfluence, DEFAULT_WEIGHTS } from "@/lib/engines/confluence";
 import { effectiveStatus, legacyPlanFor, tierFor } from "@/lib/entitlements";
 import { rsi } from "@/lib/indicators/core";
 import { resetEnvCache } from "@/lib/env";
-import { verifyWebhookSignature } from "@/services/billing/mercadopago";
+import { checkWebhookSignature, verifyWebhookSignature } from "@/services/billing/mercadopago";
 import type { Candle } from "@/types/market";
 
 const H4 = 4 * 3600_000;
@@ -164,6 +164,19 @@ describe("Mercado Pago webhook signature", () => {
     const old = new Headers({ "x-signature": `ts=${Number(ts) - 3_600_000},v1=${v1}`, "x-request-id": "req-1" });
     expect(verifyWebhookSignature(old, "abc123")).toBe(false);
     expect(verifyWebhookSignature(new Headers(), "abc123")).toBe(false);
+  });
+  it("segredo colado com espaço/quebra de linha continua válido; motivo da recusa é informado", () => {
+    process.env.MERCADOPAGO_WEBHOOK_SECRET = "  segredo-de-teste\n";
+    resetEnvCache();
+    const ts = String(Math.floor(Date.now() / 1000));
+    const v1 = createHmac("sha256", "segredo-de-teste").update(`id:123456;request-id:r2;ts:${ts};`).digest("hex");
+    expect(checkWebhookSignature(new Headers({ "x-signature": `ts=${ts}, v1=${v1}`, "x-request-id": "r2" }), "123456")).toEqual({ ok: true });
+    const bad = checkWebhookSignature(new Headers({ "x-signature": `ts=${ts},v1=${"0".repeat(64)}`, "x-request-id": "r2" }), "123456");
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) {
+      expect(bad.reason).toBe("mismatch");
+      expect(JSON.stringify(bad.detail)).not.toContain("segredo");
+    }
   });
 });
 

@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/database/client";
 import { ApiError, ok, withApi } from "@/lib/api";
 import { createLogger } from "@/lib/logger";
-import { getPreapproval, mapPreapprovalStatus, verifyWebhookSignature } from "@/services/billing/mercadopago";
+import { checkWebhookSignature, getPreapproval, mapPreapprovalStatus } from "@/services/billing/mercadopago";
 import { track } from "@/services/analytics-service";
 import { sendTemplate } from "@/services/email-service";
 
@@ -23,8 +23,13 @@ export const POST = withApi(async (req) => {
   } catch {
     throw new ApiError(400, "JSON inválido", "invalid_json");
   }
-  const dataId = body.data?.id ?? url.searchParams.get("data.id");
-  if (!verifyWebhookSignature(req.headers, dataId)) throw new ApiError(401, "Assinatura inválida", "invalid_signature");
+  // o manifesto da assinatura usa o data.id da query string (documentação do Mercado Pago); corpo como reserva
+  const dataId = url.searchParams.get("data.id") ?? (body.data?.id != null ? String(body.data.id) : null);
+  const sig = checkWebhookSignature(req.headers, dataId);
+  if (!sig.ok) {
+    log.warn("webhook recusado", { reason: sig.reason, ...(sig.detail ?? {}) });
+    throw new ApiError(401, "Assinatura inválida", "invalid_signature");
+  }
   const prisma = getPrisma();
   if (!prisma) throw new ApiError(503, "Banco indisponível", "db_unavailable");
   const type = body.type ?? url.searchParams.get("type") ?? "unknown";
