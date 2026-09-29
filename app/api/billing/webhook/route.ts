@@ -72,7 +72,14 @@ export const POST = withApi(async (req) => {
     log.info("preapproval processado", { id: pre.id, status: pre.status, userId });
     return ok({ processed: true });
   } catch (err) {
-    await prisma.billingEvent.update({ where: { eventKey }, data: { error: (err as Error).message.slice(0, 500) } });
+    const message = (err as Error).message;
+    // assinatura inexistente nesta conta (ex.: teste do painel): reenviar não resolve → 200 e registra
+    if (/HTTP 404/.test(message)) {
+      await prisma.billingEvent.update({ where: { eventKey }, data: { processed: true, error: message.slice(0, 500) } });
+      log.warn("preapproval não encontrado", { dataId });
+      return ok({ notFound: true });
+    }
+    await prisma.billingEvent.update({ where: { eventKey }, data: { error: message.slice(0, 500) } });
     // 500 faz o Mercado Pago reenviar (retry)
     throw err;
   }
