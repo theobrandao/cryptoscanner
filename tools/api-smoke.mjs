@@ -9,12 +9,21 @@
  * JSON em API_SMOKE_JSON (opcional). Sai com código 1 se algum teste falhar.
  */
 
-const BASE = (process.env.BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+// `||` (não `??`): no CI uma variável não definida chega como string vazia
+const BASE = (process.env.BASE_URL || "http://localhost:3000").replace(/\/$/, "");
+try {
+  const u = new URL(BASE);
+  if (!/^https?:$/.test(u.protocol)) throw new Error("protocolo");
+} catch {
+  console.error(`BASE_URL inválida: "${process.env.BASE_URL ?? ""}". Ex.: BASE_URL=https://cryptoscanner-five.vercel.app`);
+  process.exit(2);
+}
 const CRON_SECRET = process.env.CRON_SECRET ?? "";
 const INVITE = process.env.INVITE_CODE ?? "";
 const SKIP_RATE_LIMIT = process.env.SKIP_RATE_LIMIT === "1";
 
 const results = [];
+const state = {};
 let cookie = "";
 
 function jar(res) {
@@ -50,7 +59,17 @@ async function call(method, path, { body, form, headers = {}, auth = true, raw =
   return { res, ms, json, text };
 }
 
+/**
+ * Testes que dependem da conta descartável ficam entre `accountSection = true/false`. Se o cadastro exigir
+ * convite e INVITE_CODE não foi informado, eles são IGNORADOS (não falham) e o motivo aparece no relatório.
+ */
+let accountSection = false;
+
 async function test(group, name, fn) {
+  if (accountSection && state.noAccount) {
+    results.push({ group, name, ok: true, skipped: true, ms: 0, detail: state.noAccount });
+    return;
+  }
   const t0 = performance.now();
   try {
     const detail = await fn();
@@ -72,7 +91,6 @@ function expectStatus(r, status, code) {
 const stamp = Date.now();
 const EMAIL = `smoke+${stamp}@cryptoscanner.local`;
 const PASSWORD = "Smoke12345!";
-const state = {};
 
 // ------------------------------------------------------------------ públicas
 await test("Saúde", "GET /api/health", async () => {
@@ -131,14 +149,16 @@ await test("Mercado", "GET /api/market/tickers?currency=BRL (conversão)", async
   const btc = r.json.data.tickers.find((x) => x.symbol === "BTC");
   expect(btc.price > state.btcUsd * 3, `BRL ${btc.price} não parece convertido (USD ${state.btcUsd})`);
   expect(Math.abs(btc.price / state.btcUsd - r.json.data.usdBrl) < 0.05, "preço convertido não bate com usdBrl");
-  return `BTC R$ ${btc.price.toFixed(0)} (câmbio ${r.json.data.usdBrl.toFixed(4)})`;
+  expect(r.json.data.currency === "BRL", `currency ${r.json.data.currency}`);
+  return `BTC R$ ${btc.price.toFixed(0)} (câmbio ${r.json.data.usdBrl.toFixed(4)} · ${r.json.data.fxSource})`;
 });
 
 await test("Mercado", "GET /api/market/fx (USD→BRL)", async () => {
   const r = await call("GET", "/api/market/fx", { auth: false });
   expectStatus(r, 200);
   expect(r.json.data.rate > 3 && r.json.data.rate < 10, `rate=${r.json.data.rate}`);
-  return `rate ${r.json.data.rate.toFixed(4)} stale=${r.json.data.stale}`;
+  expect(typeof r.json.data.label === "string" && r.json.data.label.length > 0, "fonte do câmbio ausente");
+  return `rate ${r.json.data.rate.toFixed(4)} (${r.json.data.label}) stale=${r.json.data.stale}`;
 });
 
 await test("Mercado", "GET /api/market/global (CoinGecko)", async () => {
@@ -263,7 +283,7 @@ await test("Bubbles", "GET /api/market/bubbles (100 ativos, 4 períodos)", async
   expect(!d.bubbles.some((b) => ["USDT", "USDC", "WBTC"].includes(b.symbol)), "stablecoin/wrapped na lista");
   const btc = d.bubbles.find((b) => b.symbol === "BTC");
   expect(btc && typeof btc.change["24h"] === "number" && typeof btc.change["7d"] === "number", "variações ausentes");
-  return `${d.bubbles.length} ativos, BTC 24h ${btc.change["24h"].toFixed(2)}% 7d ${btc.change["7d"].toFixed(2)}% 30d ${btc.change["30d"]?.toFixed(2)}%`;
+  return `${d.bubbles.length} ativos (${d.source}), BTC 24h ${btc.change["24h"].toFixed(2)}% 7d ${btc.change["7d"].toFixed(2)}% 30d ${btc.change["30d"] != null ? btc.change["30d"].toFixed(2) + "%" : "n/d na fonte"}`;
 });
 
 await test("Bubbles", "GET /api/market/bubbles?limit=20&currency=BRL", async () => {
@@ -556,12 +576,24 @@ await test("Auth", "GET /api/auth/register (convite exigido?) + recusa sem convi
   const g = await call("GET", "/api/auth/register", { auth: false });
   if (g.res.status !== 200) throw new Error(`status ${g.res.status}`);
   const required = g.json?.data?.inviteRequired === true;
+  if (required && !INVITE) state.noAccount = "ignorado: cadastro exige convite e INVITE_CODE não foi informado (secret do GitHub)";
   if (!required) return "cadastro aberto (sem REGISTRATION_INVITE_CODE)";
   const r = await call("POST", "/api/auth/register", { auth: false, body: { name: "Intruso", email: `x${EMAIL}`, password: PASSWORD, invite: "codigo-errado" } });
   if (r.res.status !== 403) throw new Error(`esperado 403, veio ${r.res.status}`);
   return "convite exigido; código errado → 403";
 });
 
+await test("Comercial", "GET /api/markets/status (Market Data Status por exchange)", async () => {
+  const r = await call("GET", "/api/markets/status", { auth: false });
+  expectStatus(r, 200);
+  const v = r.json.data.venues;
+  expect(Array.isArray(v) && v.length === 3, "esperadas 3 exchanges");
+  expect(v.every((x) => ["LIVE", "DELAYED", "DEGRADED", "OFFLINE"].includes(x.status)), "status fora do contrato");
+  expect(v.some((x) => x.status !== "OFFLINE"), "todas as exchanges offline");
+  return v.map((x) => `${x.label} ${x.status}${x.latencyMs != null ? ` ${x.latencyMs}ms` : ""}`).join(" · ");
+});
+
+accountSection = true;
 await test("Auth", "POST /api/auth/register → 201 + cookie", async () => {
   const r = await call("POST", "/api/auth/register", { body: { name: "Smoke Test", email: EMAIL, password: PASSWORD, ...(INVITE ? { invite: INVITE } : {}) } });
   expectStatus(r, 201);
@@ -569,6 +601,85 @@ await test("Auth", "POST /api/auth/register → 201 + cookie", async () => {
   state.userId = r.json.data.user.id;
   return `user ${state.userId}, plano ${r.json.data.user.plan}`;
 });
+
+await test("Comercial", "Conta nova nasce em trial (sem plano FREE)", async () => {
+  const me = await call("GET", "/api/auth/me");
+  state.trialPlan = me.json?.data?.access?.tier === "TRIAL";
+  return `tier ${me.json?.data?.access?.tier} · plano ${me.json?.data?.user?.plan}`;
+});
+
+await test("Comercial", "GET /api/billing/subscription (trial de 7 dias com entitlements do servidor)", async () => {
+  const r = await call("GET", "/api/billing/subscription");
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(["TRIAL", "PRO", "ELITE", "ADMIN"].includes(d.tier), `tier ${d.tier}`);
+  expect(d.entitlements.core === true, "sem acesso core no trial");
+  if (d.tier === "TRIAL") expect(d.daysLeft >= 6 && d.daysLeft <= 7, `dias ${d.daysLeft}`);
+  return `${d.tier} · ${d.status} · ${d.daysLeft ?? "—"} dias · billing ${d.billing.configured ? "configurado" : "não configurado"}`;
+});
+
+await test("Comercial", "GET /api/markets/BTC/context (anônimo → 401; trial → contexto completo)", async () => {
+  const anon = await call("GET", "/api/markets/BTC/context?tf=4h&candles=0", { auth: false });
+  expectStatus(anon, 401);
+  const r = await call("GET", "/api/markets/BTCUSDT/context?tf=4h&candles=0");
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(d.symbol === "BTC" && d.timeframe === "4h", "contexto de outro ativo/timeframe");
+  expect(d.confluence.score >= 0 && d.confluence.score <= 100, "score fora de 0–100");
+  const maxAvail = d.confluence.components.filter((c) => c.available).reduce((a, c) => a + c.max, 0);
+  expect(maxAvail > 0, "sem componentes disponíveis");
+  if (d.setup) {
+    const long = d.setup.direction === "bullish";
+    expect(long ? d.setup.stop < d.setup.entryZone.low : d.setup.stop > d.setup.entryZone.high, "stop do lado errado da zona");
+    for (const t of d.setup.targets) expect(long ? t.price > d.setup.idealEntry : t.price < d.setup.idealEntry, "alvo do lado errado");
+  }
+  expect(d.ticker?.stamp?.class === "OBSERVED" && d.structure.stamp.class === "DERIVED", "classes de dado ausentes");
+  expect(d.derivatives !== null || typeof d.derivativesError === "string", "derivativos sem valor nem motivo");
+  // R2: a conta do Confluence Score fecha (final = clamp(raw + penalidades))
+  const c = d.confluence;
+  const raw = Math.round(c.components.reduce((a, x) => a + x.score, 0) * 10) / 10;
+  expect(Math.abs(c.raw - raw) < 0.05, `raw ${c.raw} ≠ Σ componentes ${raw}`);
+  expect(c.penaltyTotal === c.penalties.reduce((a, p) => a + p.points, 0), "penaltyTotal ≠ Σ penalidades");
+  expect(c.score === Math.round(Math.max(0, Math.min(100, c.raw + c.penaltyTotal))), `final ${c.score} ≠ raw ${c.raw} + penalidades ${c.penaltyTotal}`);
+  expect(c.components.reduce((a, x) => a + x.max, 0) === 100, "pesos não somam 100");
+  expect(["Low", "Moderate", "Good", "Strong", "Exceptional"].includes(c.label), `rótulo ${c.label}`);
+  expect(d.contextKey === "binance:spot:BTC:4h" && d.instrument === "spot", `contextKey ${d.contextKey}`);
+  expect(d.derivatives === null && /perp/i.test(d.derivativesError ?? ""), "spot não pode trazer funding/OI");
+  expect(typeof d.regime?.regime === "string" && d.levels && "nearestSupport" in d.levels, "regime/suporte-resistência ausentes");
+  return `score ${c.score} = ${c.raw} ${c.penaltyTotal} (${c.label}, ${c.verdict}) · setup ${d.setup?.state ?? "—"} · regime ${d.regime.regime} · histórico n=${d.historical?.samples ?? 0}`;
+});
+
+await test("Comercial", "Contexto global: exchange × instrumento (OKX perpétuo, parâmetro inválido → 400)", async () => {
+  const r = await call("GET", "/api/markets/ETH/context?tf=1h&candles=0&exchange=okx&instrument=perp");
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(d.exchange === "okx" && d.instrument === "perp" && d.timeframe === "1h" && d.symbol === "ETH", `contexto ${d.contextKey}`);
+  expect(d.contextKey === "okx:perp:ETH:1h", `contextKey ${d.contextKey}`);
+  expect(d.derivatives ? d.derivatives.exchange === "okx" && Number.isFinite(d.derivatives.nextFundingTime) : typeof d.derivativesError === "string", "derivativos de outra venue ou sem motivo");
+  expect(d.quality && typeof d.quality.status === "string", "sem status de qualidade");
+  const bad = await call("GET", "/api/markets/ETH/context?tf=1h&candles=0&exchange=kraken");
+  expectStatus(bad, 400);
+  return `dados ${d.dataVenue} ${d.instrument} (${d.quality.status}) · funding ${d.derivatives ? (d.derivatives.fundingRate * 100).toFixed(4) + "%" : "n/d"} · próximo ${d.derivatives ? new Date(d.derivatives.nextFundingTime).toISOString().slice(11, 16) + " UTC" : "—"}`;
+});
+
+await test("Comercial", "GET /api/markets/setups e /api/markets/overview", async () => {
+  const s = await call("GET", "/api/markets/setups?tf=4h");
+  expectStatus(s, 200);
+  expect(s.json.data.rows.length >= 25, `ranking com ${s.json.data.rows.length} ativos`);
+  for (let i = 1; i < s.json.data.rows.length; i++) expect(s.json.data.rows[i - 1].score >= s.json.data.rows[i].score, "ranking fora de ordem");
+  const o = await call("GET", "/api/markets/overview", { auth: false });
+  expectStatus(o, 200);
+  return `${s.json.data.rows.length} ativos ranqueados · F&G ${o.json.data.fearGreed?.value ?? "n/d"} · dominância ${o.json.data.global?.btcDominance?.toFixed?.(1) ?? "n/d"}%`;
+});
+
+await test("Comercial", "Webhook Mercado Pago sem assinatura → 401; checkout sem token → 503", async () => {
+  const w = await call("POST", "/api/billing/webhook", { auth: false, body: { type: "subscription_preapproval", data: { id: "x" } } });
+  expectStatus(w, 401);
+  const c = await call("POST", "/api/billing/checkout", { body: { plan: "PRO" } });
+  expect([200, 503].includes(c.res.status), `checkout ${c.res.status}`);
+  return `webhook 401 · checkout ${c.res.status}`;
+});
+
 
 await test("Auth", "POST /api/auth/register e-mail repetido → 409", async () => {
   const r = await call("POST", "/api/auth/register", { auth: false, body: { name: "Smoke Test", email: EMAIL, password: PASSWORD, ...(INVITE ? { invite: INVITE } : {}) } });
@@ -700,6 +811,7 @@ await test("Alertas", "POST /api/alerts pattern double_bottom 1d", async () => {
 });
 
 await test("Alertas", "POST /api/alerts channel=telegram no plano FREE → 403", async () => {
+  if (state.trialPlan) return "pulado: conta nova começa em trial (limites PRO), sem plano FREE";
   const r = await call("POST", "/api/alerts", { body: { symbol: "BTC", kind: "price_below", threshold: 1, channel: "telegram" } });
   expectStatus(r, 403, "plan_required");
   return "403 plan_required";
@@ -732,6 +844,7 @@ await test("Agentes", "POST /api/agents timeframe 1h no FREE → 403", async () 
 });
 
 await test("Agentes", "POST /api/agents notification=telegram no FREE → 403", async () => {
+  if (state.trialPlan) return "pulado: conta nova começa em trial (limites PRO), sem plano FREE";
   const r = await call("POST", "/api/agents", { body: agentBody({ notification: "telegram" }) });
   expectStatus(r, 403, "plan_required");
   return "403 plan_required";
@@ -752,12 +865,14 @@ await test("Agentes", "POST /api/agents (2º, todas as 15 estratégias em 2 lote
 });
 
 await test("Agentes", "POST /api/agents (3º) no FREE → 403 agent_limit", async () => {
+  if (state.trialPlan) return "pulado: conta nova começa em trial (limites PRO), sem plano FREE";
   const r = await call("POST", "/api/agents", { body: agentBody({ name: "Agente Smoke 3" }) });
   expectStatus(r, 403, "agent_limit");
   return "403 agent_limit (máx. 2)";
 });
 
 await test("Agentes", "GET /api/agents (lista + contagens)", async () => {
+  if (state.trialPlan) { const r0 = await call("GET", "/api/agents"); expectStatus(r0, 200); return `${r0.json.data.items.length} agentes (trial)`; }
   const r = await call("GET", "/api/agents");
   expectStatus(r, 200);
   expect(r.json.data.items.length === 2, `${r.json.data.items.length} agentes`);
@@ -841,6 +956,7 @@ await test("Sentinela", "POST /api/sentinels BTC repetido → 409", async () => 
 });
 
 await test("Sentinela", "POST /api/sentinels ETH (2º) no FREE → 403 sentinel_limit", async () => {
+  if (state.trialPlan) return "pulado: conta nova começa em trial (limites PRO), sem plano FREE";
   const r = await call("POST", "/api/sentinels", { body: { symbol: "ETH", timeframe: "4h" } });
   expectStatus(r, 403, "sentinel_limit");
   return "403";
@@ -1088,6 +1204,8 @@ await test("LGPD", "DELETE /api/auth/account (exclusão definitiva da conta de t
   return "conta apagada; login passa a falhar";
 });
 
+accountSection = false;
+
 // ------------------------------------------------------------------ rate limit (por último: bloqueia auth por 60 s)
 if (!SKIP_RATE_LIMIT) {
   await test("Rate limit", "POST /api/auth/login ×12 → 429 após o limite (10/min)", async () => {
@@ -1106,18 +1224,26 @@ if (!SKIP_RATE_LIMIT) {
 }
 
 // ------------------------------------------------------------------ relatório
-const okCount = results.filter((r) => r.ok).length;
+const skipped = results.filter((r) => r.skipped).length;
+const failed = results.filter((r) => !r.ok).length;
+const passed = results.length - failed - skipped;
 const lines = [];
 lines.push(`# Teste de integração — ${BASE}`);
 lines.push("");
-lines.push(`**${okCount}/${results.length} aprovados** · ${new Date().toISOString()}`);
+lines.push(`**${passed}/${results.length - skipped} aprovados**${skipped ? ` · ${skipped} ignorados` : ""}${failed ? ` · **${failed} falharam**` : ""} · ${new Date().toISOString()}`);
+if (state.noAccount) lines.push("", `> ${state.noAccount}`);
+if (!CRON_SECRET) lines.push("", "> CRON_SECRET não informado: rotas de cron testadas só no caminho 401.");
 lines.push("");
 lines.push("| # | Grupo | Teste | Resultado | ms | Detalhe |");
 lines.push("|---|---|---|---|---:|---|");
-results.forEach((r, i) => lines.push(`| ${i + 1} | ${r.group} | ${r.name} | ${r.ok ? "✅" : "❌"} | ${r.ms} | ${String(r.detail).replace(/\|/g, "\\|")} |`));
-console.log(lines.join("\n"));
-if (process.env.API_SMOKE_JSON) {
-  const fs = await import("node:fs");
-  fs.writeFileSync(process.env.API_SMOKE_JSON, JSON.stringify({ base: BASE, at: new Date().toISOString(), ok: okCount, total: results.length, results }, null, 2));
+results.forEach((r, i) => lines.push(`| ${i + 1} | ${r.group} | ${r.name} | ${r.skipped ? "⏭️" : r.ok ? "✅" : "❌"} | ${r.ms} | ${String(r.detail).replace(/\|/g, "\\|")} |`));
+const report = lines.join("\n");
+console.log(report);
+const fs = await import("node:fs");
+if (process.env.API_SMOKE_JSON) fs.writeFileSync(process.env.API_SMOKE_JSON, JSON.stringify({ base: BASE, at: new Date().toISOString(), passed, failed, skipped, total: results.length, results }, null, 2));
+if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${report}\n`);
+if (process.env.GITHUB_ACTIONS) {
+  if (state.noAccount) console.log(`::warning title=Smoke parcial::${state.noAccount}`);
+  for (const r of results.filter((x) => !x.ok)) console.log(`::error title=${r.group}: ${r.name}::${String(r.detail).slice(0, 300)}`);
 }
-process.exit(okCount === results.length ? 0 : 1);
+process.exit(failed === 0 ? 0 : 1);

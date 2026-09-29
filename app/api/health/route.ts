@@ -13,6 +13,8 @@ export const GET = withApi(async () => {
     status: "ok",
     time: new Date().toISOString(),
     version: process.env.npm_package_version ?? "0.1.0",
+    // commit em produção (Vercel) — o CI espera este valor igualar o commit testado antes do smoke
+    commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
     database: db,
     cache: getCache().kind(),
     providers,

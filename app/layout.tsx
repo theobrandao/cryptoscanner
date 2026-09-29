@@ -3,11 +3,10 @@ import "./globals.css";
 import { AppProviders } from "@/components/providers/app-providers";
 import { PwaRegister } from "@/components/providers/pwa-register";
 import { themeInitScript } from "@/components/providers/theme-provider";
-import { Header } from "@/components/layout/header";
-import { Footer } from "@/components/layout/footer";
+import { AppShell } from "@/components/layout/app-shell";
 
 export const metadata: Metadata = {
-  title: { default: "CryptoScanner — Scanner de Padrões com Agentes IA", template: "%s — CryptoScanner" },
+  title: { default: "CryptoScanner — Crypto Market Intelligence Terminal", template: "%s — CryptoScanner" },
   description: "Scanner de padrões gráficos em Bitcoin e altcoins com sistema multiagente, dados públicos de mercado e análise técnica programática.",
   applicationName: "CryptoScanner",
 };
@@ -16,7 +15,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0d0a1c" },
+    { media: "(prefers-color-scheme: dark)", color: "#07101a" },
     { media: "(prefers-color-scheme: light)", color: "#f6f5fb" },
   ],
 };
@@ -25,14 +24,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" className="dark h-full" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="flex min-h-full flex-col">
         <PwaRegister />
         <AppProviders>
-          <Header />
-          <div className="flex-1">{children}</div>
-          <Footer />
+          <AppShell>{children}</AppShell>
         </AppProviders>
       </body>
     </html>

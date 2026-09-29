@@ -3,6 +3,7 @@ import { getPrisma } from "@/database/client";
 import { ok, withApi } from "@/lib/api";
 import { getSessionFromRequest } from "@/lib/auth";
 import { PLANS } from "@/lib/plans";
+import { getAccess } from "@/services/subscription-service";
 
 /** Sessão atual + plano (relido do banco quando disponível para refletir mudanças de plano). */
 export const GET = withApi(async (req) => {
@@ -18,5 +19,7 @@ export const GET = withApi(async (req) => {
     user = { id: db.id, email: db.email, name: db.name, plan: db.plan, role: db.role };
     telegramChatId = db.telegramChatId;
   }
-  return ok({ user, plan: PLANS[user.plan], telegramConnected: Boolean(telegramChatId) });
+  const access = prisma ? await getAccess(user.id) : null;
+  if (access) user = { ...user, plan: (await prisma!.user.findUnique({ where: { id: user.id }, select: { plan: true } }))?.plan ?? user.plan };
+  return ok({ user, plan: PLANS[user.plan], access, telegramConnected: Boolean(telegramChatId) });
 });

@@ -6,6 +6,7 @@ import { ApiError, enforceRateLimit, parseBody, withApi } from "@/lib/api";
 import { createSessionToken, hashPassword, passwordPolicy, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 import { isInviteRequired, isOwnerEmail } from "@/lib/env";
 import { canRegister } from "@/lib/invite";
+import { startTrial } from "@/services/subscription-service";
 
 const bodySchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -39,7 +40,12 @@ export const POST = withApi(async (req) => {
       watchlists: { create: { name: "Favoritos", isDefault: true } },
     },
   });
-  const session = { id: user.id, email: user.email, name: user.name, plan: user.plan, role: user.role };
+  // trial de 7 dias (dono/admin não precisa)
+  if (!owner) {
+    await startTrial(user.id);
+    await prisma.user.update({ where: { id: user.id }, data: { plan: "PRO" } });
+  }
+  const session = { id: user.id, email: user.email, name: user.name, plan: owner ? user.plan : ("PRO" as const), role: user.role };
   const token = await createSessionToken(session);
   const res = NextResponse.json({ ok: true, data: { user: session } }, { status: 201 });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());

@@ -11,6 +11,7 @@ import type { Timeframe } from "@/types/market";
  * medindo alinhamento entre eles e a estrutura das médias (EMA 8/25/100/200).
  */
 const HIGHER: Record<Timeframe, Timeframe | null> = {
+  "1m": "15m",
   "5m": "1h",
   "15m": "1h",
   "30m": "4h",

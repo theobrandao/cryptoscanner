@@ -96,6 +96,14 @@ async function withBase<T>(fn: (base: string) => Promise<T>): Promise<T> {
   wrap(last);
 }
 
+/** Último preço de um par spot (ex.: USDTBRL), com as mesmas bases e fallback regional. */
+export async function getBinanceSpotPrice(pair: string): Promise<number> {
+  const r = await withBase((base) => fetchJson<{ symbol: string; price: string }>(`${base}/api/v3/ticker/price?symbol=${pair}`, { retries: 1, timeoutMs: 6000 }));
+  const v = Number(r.price);
+  if (!Number.isFinite(v) || v <= 0) throw new ProviderError("binance", `preço inválido para ${pair}`);
+  return v;
+}
+
 /** Usado em testes. */
 export function resetBinanceBases(): void {
   blockedUntil.clear();

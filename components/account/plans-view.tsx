@@ -3,94 +3,132 @@
 import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
+import { useSearchParams } from "next/navigation";
 import { Check } from "lucide-react";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/misc";
 import { useSession } from "@/hooks/use-session";
 import { useToast } from "@/components/providers/toast-provider";
 import { ApiClientError, postJson } from "@/lib/client-api";
-import type { PlanKey } from "@/lib/plans";
 import { cn } from "@/lib/utils";
+import type { AccessView } from "@/services/subscription-service";
 
-interface PlansPayload {
-  plans: Array<{ key: PlanKey; name: string; timeframes: string[]; imageAnalysesPerDay: number | null; maxAgents: number; telegramAlerts: boolean; benefits: string[] }>;
-  selfChangeAllowed: boolean;
-  billing: string;
+interface SubPayload extends AccessView {
+  billing: { provider: string; configured: boolean; prices: { PRO: number; ELITE: number }; currency: string };
 }
 
-/** REIMPLEMENTAÇÃO NECESSÁRIA: sem cobrança integrada. Em ambiente de teste o usuário troca o próprio plano. */
+const FEATURES: Record<"PRO" | "ELITE", string[]> = {
+  PRO: [
+    "Terminal completo: gráfico, estrutura, liquidez, Confluence Score",
+    "Market Scanner, Market Monitor e alertas (até 50)",
+    "Derivativos: open interest, funding, taker buy/sell",
+    "Histórico do setup (backtest) e gestão de risco",
+    "AI Analyst com contexto do ativo",
+    "Timeframes de 1m a 1W · Telegram e push",
+  ],
+  ELITE: [
+    "Tudo do PRO",
+    "Backtest avançado e multi-timeframe",
+    "Strategy Builder avançado e Setup Replay",
+    "Até 200 alertas e 20 monitores contínuos",
+    "Histórico de 3 anos e risco de carteira avançado",
+    "Recursos quantitativos avançados",
+  ],
+};
+
+const STATUS_PT: Record<string, string> = { TRIALING: "Em teste", ACTIVE: "Ativa", PAST_DUE: "Pagamento pendente", CANCELLED: "Cancelada (acesso até o fim do período)", EXPIRED: "Teste encerrado", NONE: "Sem assinatura" };
+
 export function PlansView() {
-  const { data } = useSWR<PlansPayload>("/api/plans");
-  const { user, refresh } = useSession();
+  const { user } = useSession();
+  const params = useSearchParams();
   const { toast } = useToast();
-  const [busy, setBusy] = React.useState<PlanKey | null>(null);
-  const change = async (plan: PlanKey) => {
+  const { data, mutate } = useSWR<SubPayload>(user ? "/api/billing/subscription" : null);
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const prices = data?.billing.prices ?? { PRO: 97, ELITE: 197 };
+
+  const checkout = async (plan: "PRO" | "ELITE") => {
     setBusy(plan);
     try {
-      await postJson("/api/plans/change", { plan });
-      await refresh();
-      toast({ title: `Plano alterado para ${plan}`, variant: "success" });
+      const r = await postJson<{ url: string }>("/api/billing/checkout", { plan });
+      window.location.href = r.url;
     } catch (err) {
-      toast({ title: "Não foi possível alterar", description: err instanceof ApiClientError ? err.message : String(err), variant: "danger" });
+      toast({ title: "Não foi possível iniciar o pagamento", description: err instanceof ApiClientError ? err.message : String(err), variant: "danger" });
+      setBusy(null);
+    }
+  };
+  const cancel = async () => {
+    setBusy("cancel");
+    try {
+      await postJson("/api/billing/cancel", {});
+      await mutate();
+      toast({ title: "Renovação cancelada. O acesso continua até o fim do período pago.", variant: "success" });
+    } catch (err) {
+      toast({ title: "Falha ao cancelar", description: err instanceof ApiClientError ? err.message : String(err), variant: "danger" });
     } finally {
       setBusy(null);
     }
   };
+
   return (
     <PageShell>
-      <PageTitle icon="💳" title="Planos" description="Limites por plano. Os valores de FREE e PRO são deste projeto; PLATINUM reproduz os benefícios públicos da referência." />
-      <Alert variant="info" title="Sem cobrança integrada">
-        Este projeto não processa pagamentos.{" "}
-        {data?.selfChangeAllowed ? "Neste ambiente você pode alternar o próprio plano para testar os recursos." : "A troca de plano está restrita ao administrador."} Integre um provedor de pagamento
-        (Stripe, Pagar.me…) e desative ALLOW_SELF_PLAN_CHANGE em produção.
-      </Alert>
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        {(data?.plans ?? []).map((p) => {
-          const current = user?.plan === p.key;
+      <PageTitle title="Plans" description="7 dias de teste completo. Depois, PRO ou ELITE. Sem plano gratuito; sua conta e configurações ficam salvas." />
+      {params.get("checkout") === "return" ? <Alert variant="info" className="mb-4" title="Pagamento em processamento">A confirmação do Mercado Pago pode levar alguns minutos. Esta página atualiza sozinha.</Alert> : null}
+      {data ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm">
+          <span className="font-semibold">Sua assinatura:</span>
+          <span>{data.tier === "ADMIN" ? "Administrador (acesso ELITE)" : `${data.plan} · ${STATUS_PT[data.status] ?? data.status}`}</span>
+          {data.daysLeft != null ? <span className="text-warning">{data.daysLeft} dia(s) de teste restante(s)</span> : null}
+          {data.currentPeriodEnd ? <span className="text-muted-foreground">período até {new Date(data.currentPeriodEnd).toLocaleDateString("pt-BR")}</span> : null}
+          {data.status === "ACTIVE" && !data.cancelAtPeriodEnd ? (
+            <button onClick={() => void cancel()} disabled={busy === "cancel"} className="ml-auto h-8 rounded-md border border-border px-3 text-xs hover:bg-muted">
+              Cancelar renovação
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {data && !data.billing.configured ? <Alert variant="warning" className="mb-4" title="Cobrança em configuração">O checkout do Mercado Pago ainda não foi ativado neste ambiente.</Alert> : null}
+      <div className="grid gap-4 md:grid-cols-2">
+        {(["PRO", "ELITE"] as const).map((p) => {
+          const current = data && data.plan === p && (data.status === "ACTIVE" || data.status === "CANCELLED");
           return (
-            <Card key={p.key} className={cn(p.key === "PLATINUM" && "border-accent/50", current && "ring-2 ring-primary")}>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  {p.key === "PLATINUM" ? "💎 " : ""}
-                  {p.name}
-                  {current ? <Badge>atual</Badge> : null}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                <ul className="flex flex-col gap-1 text-sm">
-                  {p.benefits.map((b) => (
-                    <li key={b} className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 text-success" /> {b}
-                    </li>
-                  ))}
-                  <li className="flex items-start gap-2 text-muted-foreground">
-                    <Check className="mt-0.5 h-4 w-4" /> Timeframes: {p.timeframes.map((t) => t.toUpperCase()).join(", ")}
+            <section key={p} className={cn("flex flex-col rounded-xl border bg-card p-5", p === "ELITE" ? "border-ai/50" : "border-border")}>
+              <div className="flex items-center justify-between">
+                <h2 className={cn("text-lg font-bold", p === "ELITE" && "bg-gradient-to-r from-ai to-primary bg-clip-text text-transparent")}>{p}</h2>
+                {p === "PRO" ? <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">Mais escolhido</span> : null}
+              </div>
+              <div className="mt-2">
+                <span className="tabular text-3xl font-bold">R$ {prices[p]}</span>
+                <span className="text-sm text-muted-foreground"> /mês</span>
+              </div>
+              <ul className="mt-4 flex flex-1 flex-col gap-2 text-sm">
+                {FEATURES[p].map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> {f}
                   </li>
-                  <li className="flex items-start gap-2 text-muted-foreground">
-                    <Check className="mt-0.5 h-4 w-4" /> Análises de imagem/dia: {p.imageAnalysesPerDay ?? "ilimitadas"}
-                  </li>
-                </ul>
-                {!user ? (
-                  <Link href="/registro" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
-                    Criar conta
-                  </Link>
-                ) : current ? (
-                  <Button variant="secondary" disabled>
-                    Plano atual
-                  </Button>
-                ) : (
-                  <Button onClick={() => void change(p.key)} loading={busy === p.key} disabled={!data?.selfChangeAllowed && user.role !== "ADMIN"}>
-                    Mudar para {p.name}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+                ))}
+              </ul>
+              {!user ? (
+                <Link href="/registro?next=/planos" className="mt-5 flex h-10 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+                  Começar teste de 7 dias
+                </Link>
+              ) : current ? (
+                <span className="mt-5 flex h-10 items-center justify-center rounded-md border border-border text-sm text-muted-foreground">Plano atual</span>
+              ) : (
+                <button
+                  onClick={() => void checkout(p)}
+                  disabled={!data?.billing.configured || busy !== null || data?.tier === "ADMIN"}
+                  className={cn("mt-5 h-10 rounded-md text-sm font-semibold disabled:opacity-50", p === "ELITE" ? "bg-gradient-to-r from-ai to-primary text-white" : "bg-primary text-primary-foreground")}
+                >
+                  {busy === p ? "Abrindo Mercado Pago…" : `Assinar ${p}`}
+                </button>
+              )}
+            </section>
           );
         })}
       </div>
+      <p className="mt-4 text-xs text-muted-foreground">
+        Pagamento recorrente mensal via Mercado Pago (cartão). Cancelamento a qualquer momento; o acesso segue até o fim do período pago. Conteúdo técnico e educacional; não é recomendação de investimento.
+      </p>
     </PageShell>
   );
 }

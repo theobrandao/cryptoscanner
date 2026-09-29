@@ -59,6 +59,11 @@ const schema = z.object({
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default("mailto:admin@example.com"),
+  /** Mercado Pago (assinaturas). Sem token, o checkout fica desativado e o app informa. */
+  MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),
+  MERCADOPAGO_WEBHOOK_SECRET: z.string().optional(),
+  PRICE_PRO_BRL: z.coerce.number().positive().default(97),
+  PRICE_ELITE_BRL: z.coerce.number().positive().default(197),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 

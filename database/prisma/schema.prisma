@@ -48,6 +48,7 @@ model User {
   simulations    Simulation[]
   agentExecutions AgentExecution[]
   pushSubscriptions PushSubscription[]
+  subscription      Subscription?
 }
 
 model UserPreference {
@@ -488,4 +489,47 @@ model BacktestStat {
 
   @@unique([timeframe, patternKey, symbol, regime])
   @@index([timeframe, symbol, regime])
+}
+
+// ------------------------------------------------------------------
+// Assinaturas (trial 7 dias → PRO | ELITE) — fonte de verdade do acesso
+// ------------------------------------------------------------------
+
+/// Estado da assinatura do usuário. User.plan é derivado daqui (FREE = sem acesso pago).
+model Subscription {
+  id                     String    @id @default(cuid())
+  userId                 String    @unique
+  /// PRO | ELITE (durante o trial: PRO)
+  plan                   String    @default("PRO")
+  /// TRIALING | ACTIVE | PAST_DUE | CANCELLED | EXPIRED
+  status                 String    @default("TRIALING")
+  trialStartedAt         DateTime?
+  trialEndsAt            DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean   @default(false)
+  provider               String?
+  providerSubscriptionId String?   @unique
+  lastPaymentStatus      String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, trialEndsAt])
+}
+
+/// Eventos de cobrança recebidos (idempotência de webhook e auditoria).
+model BillingEvent {
+  id         String   @id @default(cuid())
+  provider   String
+  /// chave de idempotência: provider + x-request-id (ou id do evento)
+  eventKey   String   @unique
+  type       String
+  resourceId String?
+  payload    Json
+  processed  Boolean  @default(false)
+  error      String?
+  createdAt  DateTime @default(now())
+
+  @@index([resourceId])
 }

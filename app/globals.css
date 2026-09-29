@@ -24,28 +24,35 @@
   --ring: #6d3df5;
   --chart-up: #12a66b;
   --chart-down: #e2445c;
-  --radius: 0.75rem;
+  --radius: 0.5rem;
+  --elevated: #ffffff;
+  --ai: #6d4aff;
+  --info: #1f6feb;
 }
 
 .dark {
-  --background: #0d0a1c;
-  --foreground: #ece9fb;
-  --card: #151130;
-  --card-foreground: #ece9fb;
-  --muted: #1e1a3d;
-  --muted-foreground: #9a94bf;
-  --border: #2a2550;
-  --input: #2a2550;
-  --primary: #8b5cf6;
+  /* Terminal V2 — referência visual aprovada: navy/grafite, bordas muito leves, azul elétrico controlado */
+  --background: #07101a;
+  --foreground: #e6edf5;
+  --card: #0b1420;
+  --card-foreground: #e6edf5;
+  --elevated: #0e1926;
+  --muted: #111d2b;
+  --muted-foreground: #8193a8;
+  --border: rgba(255, 255, 255, 0.07);
+  --input: rgba(255, 255, 255, 0.1);
+  --primary: #2f6bff;
   --primary-foreground: #ffffff;
-  --accent: #22d3ee;
-  --accent-foreground: #061418;
-  --success: #22c55e;
-  --danger: #f43f5e;
-  --warning: #f59e0b;
-  --ring: #8b5cf6;
-  --chart-up: #22c55e;
-  --chart-down: #f43f5e;
+  --accent: #3aa0ff;
+  --accent-foreground: #061018;
+  --ai: #7c5cff;
+  --success: #16c784;
+  --danger: #ea3943;
+  --warning: #f5a524;
+  --info: #3aa0ff;
+  --ring: #2f6bff;
+  --chart-up: #16c784;
+  --chart-down: #ea3943;
 }
 
 @theme inline {
@@ -67,10 +74,13 @@
   --color-ring: var(--ring);
   --color-chart-up: var(--chart-up);
   --color-chart-down: var(--chart-down);
+  --color-elevated: var(--elevated);
+  --color-ai: var(--ai);
+  --color-info: var(--info);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 
@@ -89,10 +99,7 @@ body {
 }
 
 .dark body {
-  background-image:
-    radial-gradient(1200px 500px at 10% -10%, rgba(139, 92, 246, 0.16), transparent 60%),
-    radial-gradient(900px 400px at 100% 0%, rgba(34, 211, 238, 0.08), transparent 60%);
-  background-attachment: fixed;
+  background-image: none;
 }
 
 * {

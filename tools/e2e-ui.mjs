@@ -412,6 +412,23 @@ await step("Risco: tamanho de posição 10.000 × 1% com stop de 5% = 20 unidade
   return `qty 20 e liquidação 90,45 exibidas · ${await shot("risco")}`;
 });
 
+await step("Charts BTC/USDT 4H: header, gráfico, estrutura, liquidez, confluência, setup, derivativos, histórico, watchlist, overview, scanner, risco", async () => {
+  await goto("/charts/BTC?tf=4h");
+  await page.waitForFunction(() => ["Market Structure", "Liquidity", "Confluence Score", "Setup Status", "Derivatives", "Historical Performance", "Watchlist", "Market Overview", "Market Scanner", "Risk Management"].every((t) => document.body.innerText.includes(t)), null, { timeout: 90_000 });
+  const canvases = await page.locator("canvas").count();
+  expect(canvases >= 3, `gráfico sem canvas (${canvases})`);
+  const header = await page.locator("h1").first().innerText();
+  expect(/BTC\/USDT/.test(header), `header ${header}`);
+  const shot1 = await shot("charts-btc");
+  // troca de timeframe atualiza todo o contexto
+  await page.getByRole("tab", { name: "1D", exact: true }).first().click();
+  await page.waitForFunction(() => location.search.includes("tf=1d") && /BTCUSDT · 1D/.test(document.body.innerText), null, { timeout: 90_000 });
+  // troca de ativo pela watchlist
+  await page.locator("tr", { hasText: "ETH/USDT" }).first().click();
+  await page.waitForFunction(() => location.pathname === "/charts/ETH" && /ETH\/USDT/.test(document.querySelector("h1")?.textContent ?? "") && /ETHUSDT · 1D/.test(document.body.innerText), null, { timeout: 90_000 });
+  return `${canvases} canvas · 4H→1D e BTC→ETH sincronizados · ${shot1}`;
+});
+
 await step("Suporte logado: Meus chamados + exclusão da conta (LGPD) pela interface", async () => {
   await goto("/suporte");
   await page.waitForFunction(() => /Meus chamados/i.test(document.body.innerText), null, { timeout: 20_000 });

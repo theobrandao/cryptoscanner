@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { PlansView } from "@/components/account/plans-view";
 
-export const metadata: Metadata = { title: "Planos" };
+export const metadata: Metadata = { title: "Plans" };
 export default function Page() {
-  return <PlansView />;
+  return (
+    <Suspense>
+      <PlansView />
+    </Suspense>
+  );
 }

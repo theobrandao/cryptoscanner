@@ -4,6 +4,7 @@ import { enforceRateLimit, ok, parseQuery, withApi } from "@/lib/api";
 import { ASSETS } from "@/lib/assets";
 import { cached } from "@/lib/cache";
 import { getDerivativesSnapshot, type DerivativesSnapshot } from "@/services/market/providers/binance-futures";
+import { getOkxDerivativesSnapshot } from "@/services/market/providers/okx-derivatives";
 
 const querySchema = z.object({ symbols: z.string().default("BTC,ETH,SOL") });
 
@@ -23,13 +24,19 @@ export const GET = withApi(async (req) => {
         return;
       }
       try {
-        const res = await cached<DerivativesSnapshot>(`derivatives:${symbol}`, 60, () => getDerivativesSnapshot(symbol, asset.binancePair), { staleTtlSeconds: 3600 });
-        items.push({ ...res.value });
+        const res = await cached<DerivativesSnapshot>(`derivatives:${symbol}`, 60, () => getDerivativesSnapshot(symbol, asset.binancePair), { staleTtlSeconds: 600 });
+        items.push({ ...res.value, exchange: "binance" } as DerivativesSnapshot);
       } catch (err) {
-        errors.push({ symbol, error: (err as Error).message });
+        // fallback OKX (instrumento identificado)
+        try {
+          const o = await cached(`derivatives:v2:okx:${symbol}`, 60, () => getOkxDerivativesSnapshot(symbol), { staleTtlSeconds: 600 });
+          items.push(o.value);
+        } catch (err2) {
+          errors.push({ symbol, error: `${(err as Error).message}; OKX: ${(err2 as Error).message}` });
+        }
       }
     }),
   );
   items.sort((a, b) => symbols.indexOf(a.symbol) - symbols.indexOf(b.symbol));
-  return ok({ items, errors, source: "binance-futures" });
+  return ok({ items, errors, source: "Binance USDⓈ-M (fallback OKX SWAP)" });
 });

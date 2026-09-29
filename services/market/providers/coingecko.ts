@@ -72,7 +72,7 @@ export interface MarketBubbleRaw {
 }
 
 /** Stablecoins e tokens "espelho" (wrapped/staked) excluídos do mapa de bolhas — não representam movimento de preço. */
-const EXCLUDED_SYMBOLS = new Set([
+export const EXCLUDED_SYMBOLS = new Set([
   "usdt", "usdc", "dai", "fdusd", "usde", "usds", "tusd", "usd1", "pyusd", "busd", "usdd", "frax", "eurc", "eurt", "usdtb", "rlusd", "gusd", "lusd", "crvusd", "susds", "susde", "usd0", "usdy", "buidl", "usdg", "ausd",
   "wbtc", "weth", "steth", "wsteth", "cbbtc", "weeth", "reth", "bnsol", "jitosol", "msol", "wbeth", "cbeth", "ezeth", "rseth", "tbtc", "lbtc", "sbtc", "wbnb", "solvbtc", "bsc-usd", "wtrx", "whype",
 ]);
@@ -81,5 +81,13 @@ const EXCLUDED_SYMBOLS = new Set([
 export async function getMarketBubbles(limit = 100, vs = "usd"): Promise<MarketBubbleRaw[]> {
   const url = `${getEnv().COINGECKO_REST_URL}/coins/markets?vs_currency=${vs}&order=volume_desc&per_page=${Math.min(250, limit + 60)}&page=1&sparkline=false&price_change_percentage=1h,24h,7d,30d`;
   const raw = await fetchJson<MarketBubbleRaw[]>(url, { headers: headers(), retries: 1 });
-  return raw.filter((c) => c.current_price > 0 && c.total_volume > 0 && !EXCLUDED_SYMBOLS.has(c.symbol.toLowerCase())).slice(0, limit);
+  return cleanBubbles(raw, limit);
+}
+
+/** Remove stablecoins/wrapped e itens sem preço/volume; ordena por volume 24h. */
+export function cleanBubbles(raw: readonly MarketBubbleRaw[], limit: number): MarketBubbleRaw[] {
+  return raw
+    .filter((c) => c.current_price > 0 && c.total_volume > 0 && !EXCLUDED_SYMBOLS.has(c.symbol.toLowerCase()))
+    .sort((a, b) => b.total_volume - a.total_volume)
+    .slice(0, limit);
 }

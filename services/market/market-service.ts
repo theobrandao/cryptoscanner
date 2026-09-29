@@ -6,7 +6,9 @@ import { createLogger } from "@/lib/logger";
 import { TIMEFRAME_MS } from "@/lib/timeframes";
 import { classifyStatus, DIVERGENCE_THRESHOLD_PCT, priceDivergencePct, validateCandles } from "@/lib/engines/quality";
 import { binanceProvider } from "@/services/market/providers/binance";
-import { getCoinMarkets, getGlobal, getMarketBubbles, getUsdBrlRate, type CoinMarket, type GlobalData, type MarketBubbleRaw } from "@/services/market/providers/coingecko";
+import { cleanBubbles, getCoinMarkets, getGlobal, getMarketBubbles, type CoinMarket, type GlobalData, type MarketBubbleRaw } from "@/services/market/providers/coingecko";
+import { getUsdBrlQuote, type FxQuote } from "@/services/market/providers/fx";
+import { getCoinLoreMarkets, getPaprikaGlobal, getPaprikaMarkets } from "@/services/market/providers/market-data-fallback";
 import { getKrakenSpotPrices, krakenProvider } from "@/services/market/providers/kraken";
 import { ProviderError, type MarketProvider } from "@/services/market/providers/types";
 
@@ -238,13 +240,14 @@ export async function getTicker(symbol: string): Promise<Ticker | undefined> {
   return tickers.find((t) => t.symbol === symbol.toUpperCase());
 }
 
-export async function getUsdBrl(): Promise<{ rate: number; stale: boolean }> {
+/** USD→BRL (Binance USDT/BRL → CoinGecko → PTAX/BCB). Cache 5 min; reserva de 24 h marcada como stale. */
+export async function getUsdBrl(): Promise<{ rate: number; stale: boolean; source: FxQuote["source"] | null; label: string | null; quotedAt: number | null }> {
   try {
-    const res = await cached<number>(CACHE_KEYS.brl, 300, getUsdBrlRate, { staleTtlSeconds: 24 * 3600 });
-    return { rate: res.value, stale: res.stale };
+    const res = await cached<FxQuote>(`${CACHE_KEYS.brl}:v2`, 300, getUsdBrlQuote, { staleTtlSeconds: 24 * 3600 });
+    return { rate: res.value.rate, stale: res.stale, source: res.value.source, label: res.value.label, quotedAt: res.value.quotedAt };
   } catch (err) {
     log.warn("câmbio BRL indisponível", { error: (err as Error).message });
-    return { rate: NaN, stale: true };
+    return { rate: NaN, stale: true, source: null, label: null, quotedAt: null };
   }
 }
 
@@ -260,7 +263,19 @@ export async function getMarketCaps(): Promise<{ markets: CoinMarket[]; stale: b
 
 export async function getGlobalMarket(): Promise<{ data: GlobalData; stale: boolean } | null> {
   try {
-    const res = await cached<GlobalData>(CACHE_KEYS.global, 300, getGlobal, { staleTtlSeconds: 24 * 3600 });
+    const res = await cached<GlobalData & { source?: string }>(
+      CACHE_KEYS.global,
+      300,
+      async () => {
+        try {
+          return { ...(await getGlobal()), source: "coingecko" };
+        } catch (err) {
+          log.warn("coingecko global falhou; usando CoinPaprika", { error: (err as Error).message });
+          return { ...(await getPaprikaGlobal()), source: "coinpaprika" };
+        }
+      },
+      { staleTtlSeconds: 24 * 3600 },
+    );
     return { data: res.value, stale: res.stale };
   } catch (err) {
     log.warn("coingecko global indisponível", { error: (err as Error).message });
@@ -280,11 +295,33 @@ export interface MarketBubble {
   change: { "1h": number | null; "24h": number | null; "7d": number | null; "30d": number | null };
 }
 
-/** Top 100 por volume com variação 1h/24h/7d/30d (CoinGecko; cache 60 s; stale até 24 h). */
-export async function getBubbles(limit = 100): Promise<{ bubbles: MarketBubble[]; stale: boolean; fetchedAt: number } | null> {
+/** Top 100 por volume com variação 1h/24h/7d/30d (CoinGecko → CoinPaprika → CoinLore; cache 120 s; stale até 24 h). */
+export async function getBubbles(limit = 100): Promise<{ bubbles: MarketBubble[]; stale: boolean; fetchedAt: number; source: string } | null> {
   try {
     // sempre busca/cacheia 100 e fatia por `limit` (uma única entrada de cache para todos os limites)
-    const res = await cached<{ items: MarketBubbleRaw[]; at: number }>(CACHE_KEYS.bubbles, 60, async () => ({ items: await getMarketBubbles(100), at: Date.now() }), { staleTtlSeconds: 24 * 3600 });
+    const res = await cached<{ items: MarketBubbleRaw[]; at: number; source: string }>(
+      CACHE_KEYS.bubbles,
+      120,
+      async () => {
+        const errors: string[] = [];
+        const sources: Array<[string, () => Promise<MarketBubbleRaw[]>]> = [
+          ["coingecko", () => getMarketBubbles(100)],
+          ["coinpaprika", async () => cleanBubbles(await getPaprikaMarkets(200), 100)],
+          ["coinlore", async () => cleanBubbles(await getCoinLoreMarkets(200), 100)],
+        ];
+        for (const [source, load] of sources) {
+          try {
+            const items = await load();
+            if (items.length >= 90) return { items, at: Date.now(), source };
+            errors.push(`${source}: ${items.length} itens`);
+          } catch (err) {
+            errors.push(`${source}: ${(err as Error).message}`);
+          }
+        }
+        throw new Error(errors.join(" · "));
+      },
+      { staleTtlSeconds: 24 * 3600 },
+    );
     const bubbles = res.value.items.slice(0, limit).map<MarketBubble>((c) => ({
       id: c.id,
       symbol: c.symbol.toUpperCase(),
@@ -301,7 +338,7 @@ export async function getBubbles(limit = 100): Promise<{ bubbles: MarketBubble[]
         "30d": c.price_change_percentage_30d_in_currency ?? null,
       },
     }));
-    return { bubbles, stale: res.stale, fetchedAt: res.value.at };
+    return { bubbles, stale: res.stale, fetchedAt: res.value.at, source: res.value.source ?? "coingecko" };
   } catch (err) {
     log.warn("coingecko bubbles indisponível", { error: (err as Error).message });
     return null;

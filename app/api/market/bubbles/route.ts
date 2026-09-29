@@ -8,7 +8,7 @@ const querySchema = z.object({
   currency: z.enum(["USD", "BRL"]).default("USD"),
 });
 
-/** Mapa de bolhas: os 100 maiores ativos por volume 24h com variação em 1h/24h/7d/30d (CoinGecko, sem stablecoins/wrapped). */
+/** Mapa de bolhas: os 100 maiores ativos por volume 24h com variação em 1h/24h/7d/30d (CoinGecko → CoinPaprika → CoinLore, sem stablecoins/wrapped). */
 export const GET = withApi(async (req) => {
   await connection();
   await enforceRateLimit(req, "public");
@@ -16,7 +16,19 @@ export const GET = withApi(async (req) => {
   const res = await getBubbles(q.limit);
   if (!res) throw new ApiError(503, "Dados de mercado indisponíveis no momento", "upstream_unavailable");
   const fx = q.currency === "BRL" ? await getUsdBrl() : null;
-  const rate = fx && Number.isFinite(fx.rate) ? fx.rate : 1;
+  // sem câmbio disponível, devolve USD e diz isso (nunca rotula USD como BRL)
+  const brl = fx != null && Number.isFinite(fx.rate);
+  const rate = brl ? fx.rate : 1;
   const bubbles = rate === 1 ? res.bubbles : res.bubbles.map((b) => ({ ...b, price: b.price * rate, marketCap: b.marketCap * rate, volume24h: b.volume24h * rate }));
-  return ok({ bubbles, count: bubbles.length, currency: q.currency, usdBrl: fx?.rate ?? null, stale: res.stale, fetchedAt: res.fetchedAt, source: "coingecko", periods: ["1h", "24h", "7d", "30d"] });
+  return ok({
+    bubbles,
+    count: bubbles.length,
+    currency: brl ? "BRL" : "USD",
+    usdBrl: brl ? fx.rate : null,
+    fxSource: brl ? fx.label : null,
+    stale: res.stale,
+    fetchedAt: res.fetchedAt,
+    source: res.source,
+    periods: ["1h", "24h", "7d", "30d"],
+  });
 });

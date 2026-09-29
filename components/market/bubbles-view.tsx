@@ -66,7 +66,7 @@ function bucketRgb(change: number): string {
 const OUR_SYMBOLS = new Set(ASSETS.map((a) => a.symbol));
 
 /**
- * Mapa de bolhas: 100 maiores ativos por volume (CoinGecko), tamanho ∝ volume 24h (escala log),
+ * Mapa de bolhas: 100 maiores ativos por volume (CoinGecko → CoinPaprika → CoinLore), tamanho ∝ volume 24h (escala log),
  * cor pela variação do período escolhido (1h/24h/7d/30d), simulação física simples em canvas.
  * Implementação própria.
  */
@@ -75,7 +75,10 @@ export function BubblesView() {
   const router = useRouter();
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const bubblesRef = React.useRef<Bubble[]>([]);
-  const [period, setPeriod] = React.useState<Period>("24h");
+  const [periodPref, setPeriod] = React.useState<Period>("24h");
+  // período só é selecionável quando a fonte atual traz a variação (ex.: CoinPaprika gratuito não tem 30d)
+  const availablePeriods = React.useMemo(() => (data ? PERIODS.filter((p) => data.bubbles.some((b) => b.change[p] != null)) : PERIODS), [data]);
+  const period: Period = availablePeriods.includes(periodPref) ? periodPref : "24h";
   const [sizeBy, setSizeBy] = React.useState<"volume" | "marketCap">("volume");
   const [hover, setHover] = React.useState<Bubble | null>(null);
 
@@ -217,7 +220,9 @@ export function BubblesView() {
                 <button
                   key={p}
                   onClick={() => setPeriod(p)}
-                  className={cn("rounded px-2.5 py-1 font-semibold cursor-pointer", period === p ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                  disabled={!availablePeriods.includes(p)}
+                  title={availablePeriods.includes(p) ? undefined : `Variação ${p} indisponível na fonte atual (${data?.source ?? "—"})`}
+                  className={cn("rounded px-2.5 py-1 font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-40", period === p ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
                   aria-pressed={period === p}
                 >
                   {p}
@@ -256,7 +261,7 @@ export function BubblesView() {
       <Card>
         <CardContent className="relative p-0">
           {isLoading && !data ? <Skeleton className="h-[640px] w-full" /> : null}
-          {error && !data ? <div className="p-6 text-sm text-danger">Não foi possível carregar o mapa de bolhas (CoinGecko indisponível). Tente novamente em instantes.</div> : null}
+          {error && !data ? <div className="p-6 text-sm text-danger">Não foi possível carregar o mapa de bolhas (fontes de mercado indisponíveis). Tente novamente em instantes.</div> : null}
           <canvas
             ref={canvasRef}
             className={cn("h-[640px] w-full cursor-pointer rounded-lg", !data && "hidden")}

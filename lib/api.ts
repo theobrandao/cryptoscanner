@@ -1,3 +1,4 @@
+import { getPrisma } from "@/database/client";
 import { NextResponse } from "next/server";
 import { ZodError, type ZodType } from "zod";
 import { getSessionFromRequest, type SessionUser } from "@/lib/auth";
@@ -73,6 +74,13 @@ export function parseQuery<T>(req: Request, schema: ZodType<T>): T {
 export async function requireUser(req: Request): Promise<SessionUser> {
   const user = await getSessionFromRequest(req);
   if (!user) throw new ApiError(401, "Faça login para usar este recurso", "unauthorized");
+  // plano e papel relidos do banco: o JWT vale 7 dias e não pode carregar acesso desatualizado
+  const prisma = getPrisma();
+  if (prisma) {
+    const db = await prisma.user.findUnique({ where: { id: user.id }, select: { plan: true, role: true, email: true, name: true } });
+    if (!db) throw new ApiError(401, "Sessão inválida", "unauthorized");
+    return { ...user, plan: db.plan, role: db.role, email: db.email, name: db.name };
+  }
   return user;
 }
 

@@ -67,7 +67,7 @@ const sig = (strategy: string, side: "buy" | "sell", confidence: number, reason:
 });
 
 function higherOf(tf: Timeframe): Timeframe {
-  const map: Record<Timeframe, Timeframe> = { "5m": "1h", "15m": "1h", "30m": "4h", "1h": "4h", "4h": "1d", "1d": "1w", "1w": "1w" };
+  const map: Record<Timeframe, Timeframe> = { "1m": "15m", "5m": "1h", "15m": "1h", "30m": "4h", "1h": "4h", "4h": "1d", "1d": "1w", "1w": "1w" };
   return map[tf];
 }
 

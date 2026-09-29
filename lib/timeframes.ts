@@ -1,6 +1,7 @@
 import { TIMEFRAMES, type Timeframe } from "@/types/market";
 
 export const TIMEFRAME_MS: Record<Timeframe, number> = {
+  "1m": 60_000,
   "5m": 5 * 60_000,
   "15m": 15 * 60_000,
   "30m": 30 * 60_000,
@@ -12,16 +13,18 @@ export const TIMEFRAME_MS: Record<Timeframe, number> = {
 
 /** Rótulo exibido na interface (a referência usa 7D para o semanal). */
 export const TIMEFRAME_LABEL: Record<Timeframe, string> = {
+  "1m": "1M",
   "5m": "5M",
   "15m": "15M",
   "30m": "30M",
   "1h": "1H",
   "4h": "4H",
   "1d": "1D",
-  "1w": "7D",
+  "1w": "1W",
 };
 
 export const KRAKEN_INTERVAL: Record<Timeframe, number> = {
+  "1m": 1,
   "5m": 5,
   "15m": 15,
   "30m": 30,
@@ -43,4 +46,4 @@ export function parseTimeframe(value: unknown, fallback: Timeframe = "4h"): Time
 }
 
 /** Timeframes de alta frequência, bloqueados fora do plano PLATINUM (comportamento observado). */
-export const HIGH_FREQUENCY_TIMEFRAMES: readonly Timeframe[] = ["5m", "15m", "30m", "1h"];
+export const HIGH_FREQUENCY_TIMEFRAMES: readonly Timeframe[] = ["1m", "5m", "15m", "30m", "1h"];

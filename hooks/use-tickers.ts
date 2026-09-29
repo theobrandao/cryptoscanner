@@ -13,34 +13,55 @@ export interface TickersPayload {
 }
 
 /**
- * Tickers em tempo real: tenta SSE (/api/stream/tickers) e cai para polling SWR a cada 10 s.
+ * Stream de tickers compartilhado: UMA conexão SSE por aba, com contagem de assinantes
+ * (antes cada componente abria a sua). Polling SWR de 10 s só enquanto o SSE não está conectado.
  */
-export function useTickers(enabled = true) {
-  const { data: polled, mutate } = useSWR<TickersPayload>(enabled ? "/api/market/tickers?fx=1" : null, { refreshInterval: 10_000 });
-  const [live, setLive] = React.useState<TickersPayload | null>(null);
-  const [connected, setConnected] = React.useState(false);
+type Snapshot = { payload: TickersPayload | null; connected: boolean };
+let snap: Snapshot = { payload: null, connected: false };
+const listeners = new Set<() => void>();
+let es: EventSource | null = null;
+let subscribers = 0;
 
-  React.useEffect(() => {
-    if (!enabled || typeof window === "undefined" || !("EventSource" in window)) return;
-    const es = new EventSource("/api/stream/tickers");
-    const onTickers = (ev: MessageEvent) => {
-      try {
-        const payload = JSON.parse(ev.data) as TickersPayload;
-        setLive(payload);
-        setConnected(true);
-      } catch {
-        /* ignora */
-      }
-    };
-    es.addEventListener("tickers", onTickers);
-    es.onerror = () => setConnected(false);
-    return () => {
-      es.removeEventListener("tickers", onTickers);
+function emit(next: Partial<Snapshot>) {
+  snap = { ...snap, ...next };
+  for (const l of listeners) l();
+}
+
+function open() {
+  if (es || typeof window === "undefined" || !("EventSource" in window)) return;
+  es = new EventSource("/api/stream/tickers");
+  es.addEventListener("tickers", (ev) => {
+    try {
+      emit({ payload: JSON.parse((ev as MessageEvent).data) as TickersPayload, connected: true });
+    } catch {
+      /* mensagem inválida: ignora */
+    }
+  });
+  es.onerror = () => emit({ connected: false });
+}
+
+function subscribe(cb: () => void) {
+  listeners.add(cb);
+  subscribers++;
+  open();
+  return () => {
+    listeners.delete(cb);
+    subscribers--;
+    if (subscribers <= 0 && es) {
       es.close();
-    };
-  }, [enabled]);
+      es = null;
+      snap = { ...snap, connected: false };
+    }
+  };
+}
 
-  const data = live ?? polled ?? null;
+const getSnap = () => snap;
+const getServerSnap = (): Snapshot => ({ payload: null, connected: false });
+
+export function useTickers(enabled = true) {
+  const s = React.useSyncExternalStore(enabled ? subscribe : () => () => undefined, getSnap, getServerSnap);
+  const { data: polled, mutate } = useSWR<TickersPayload>(enabled ? "/api/market/tickers?fx=1" : null, { refreshInterval: s.connected ? 0 : 10_000 });
+  const data = (s.connected ? s.payload : null) ?? polled ?? s.payload ?? null;
   const bySymbol = React.useMemo(() => new Map((data?.tickers ?? []).map((t) => [t.symbol, t])), [data]);
-  return { data, bySymbol, connected, refresh: mutate };
+  return { data, bySymbol, connected: s.connected, refresh: mutate };
 }

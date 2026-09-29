@@ -3,7 +3,7 @@
  * Nenhum tipo aqui depende de Prisma, Next.js ou provedores externos.
  */
 
-export const TIMEFRAMES = ["5m", "15m", "30m", "1h", "4h", "1d", "1w"] as const;
+export const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"] as const;
 export type Timeframe = (typeof TIMEFRAMES)[number];
 
 export const SCANNER_TIMEFRAMES = ["15m", "30m", "1h", "4h", "1d", "1w"] as const;
