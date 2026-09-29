@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { ok, withApi } from "@/lib/api";
-import { assertCronAuth, recordCronRun } from "@/lib/cron";
+import { assertCronAuth, recordCronRun, withCronLock } from "@/lib/cron";
 import { createLogger } from "@/lib/logger";
 import { evaluateAlerts } from "@/services/alert-service";
 import { runScan } from "@/services/scanner-service";
@@ -9,19 +9,23 @@ import { persistMarketSnapshot } from "@/worker/persist";
 
 const log = createLogger("cron");
 
-/** Limite de execução (segundos) para plataformas serverless (Vercel). */
-export const maxDuration = 60;
+/** Limite de execução (segundos) na Vercel (plano Pro). */
+export const maxDuration = 120;
 
 /**
  * Ciclo do worker exposto como endpoint HTTP — para hospedagens serverless (Vercel) sem processo
- * de longa duração. Deve ser chamado a cada 5 min por um agendador externo (QStash, cron-job.org,
- * Vercel Cron) com `Authorization: Bearer <CRON_SECRET>` (QStash: Upstash-Forward-Authorization).
+ * de longa duração. Agendado a cada 5 min pelo Vercel Cron (vercel.json); um agendador externo (QStash,
+ * cron-job.org) pode chamar também com `Authorization: Bearer <CRON_SECRET>` — a trava evita execução dupla.
  * Etapas: scan 4H/1D → snapshot de mercado → agentes do usuário → alertas → monitores → sinais de padrão ao vivo.
  */
 async function handle(req: Request) {
   await connection();
   assertCronAuth(req);
+  const res = await withCronLock("cycle", maxDuration, () => runCycle());
+  return res ?? ok({ skipped: "running" });
+}
 
+async function runCycle() {
   const t0 = Date.now();
   const steps: Record<string, unknown> = {};
   const step = async (name: string, fn: () => Promise<unknown>) => {
@@ -54,7 +58,7 @@ async function handle(req: Request) {
   // Market Monitor: usa o tempo que sobrar do ciclo (endpoint dedicado /api/cron/monitors cobre o restante)
   await step("monitors", async () => {
     const { evaluateMonitors } = await import("@/services/monitor-service");
-    return evaluateMonitors({ budgetMs: Math.max(5_000, 48_000 - (Date.now() - t0)) });
+    return evaluateMonitors({ budgetMs: Math.max(5_000, 95_000 - (Date.now() - t0)) });
   });
 
   await step("lifecycle", async () => {
