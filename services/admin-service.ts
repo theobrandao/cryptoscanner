@@ -1,7 +1,7 @@
 import { requirePrisma } from "@/database/client";
 import { getEnv, isRegistrationOpen, legalStatus } from "@/lib/env";
 import { effectiveStatus } from "@/lib/entitlements";
-import { isBillingConfigured, priceFor } from "@/services/billing/mercadopago";
+import { isBillingConfigured, priceFor, verifyBillingAccount } from "@/services/billing/mercadopago";
 import { isEmailConfigured } from "@/services/email-service";
 import { isPushConfigured } from "@/services/push-service";
 
@@ -31,6 +31,7 @@ export async function getAdminOverview() {
   const converted30 = paid.filter((s) => s.trialStartedAt && s.trialStartedAt >= d30).length;
   const env = getEnv();
   const legal = legalStatus();
+  const mpAccount = isBillingConfigured() ? await verifyBillingAccount() : null;
   return {
     generatedAt: now.getTime(),
     users: { total: users, signups7d: signups7, signups30d: signups30 },
@@ -52,7 +53,13 @@ export async function getAdminOverview() {
     recentBilling: billing,
     recentUsers: recentUsers.map((u) => ({ email: u.email, createdAt: u.createdAt, role: u.role, status: u.subscription?.status ?? "—", plan: u.subscription?.plan ?? "—" })),
     readiness: [
-      { key: "billing", label: "Mercado Pago: MERCADOPAGO_ACCESS_TOKEN", ok: isBillingConfigured() },
+      {
+        key: "billing",
+        label: mpAccount?.ok
+          ? `Mercado Pago: token ${mpAccount.tokenKind === "production" ? "de produção" : mpAccount.tokenKind} válido · titular ${mpAccount.name ?? mpAccount.nickname ?? "?"}${mpAccount.docType ? ` (${mpAccount.docType} final ${mpAccount.docLast2 ?? "?"})` : ""}${mpAccount.testUser ? " · CONTA DE TESTE" : ""}`
+          : `Mercado Pago: MERCADOPAGO_ACCESS_TOKEN ${mpAccount ? `recusado — ${mpAccount.error}` : "ausente"}`,
+        ok: Boolean(mpAccount?.ok && mpAccount.tokenKind === "production" && !mpAccount.testUser),
+      },
       { key: "webhook", label: "Mercado Pago: MERCADOPAGO_WEBHOOK_SECRET", ok: Boolean(env.MERCADOPAGO_WEBHOOK_SECRET) },
       { key: "legal_entity", label: `Fornecedor identificado (${legal.missing.length ? `faltam ${legal.missing.join(", ")}` : "completo"})`, ok: legal.missing.length === 0 },
       { key: "legal_approved", label: `Termos/Privacidade/Reembolso aprovados (LEGAL_TERMS_APPROVED, versão ${legal.version})`, ok: legal.approved },

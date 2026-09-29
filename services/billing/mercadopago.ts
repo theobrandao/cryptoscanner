@@ -1,4 +1,5 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { cached } from "@/lib/cache";
 import { getEnv } from "@/lib/env";
 
 /**
@@ -23,6 +24,50 @@ async function mp<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknow
   const text = await res.text();
   if (!res.ok) throw new Error(`Mercado Pago HTTP ${res.status}: ${text.slice(0, 300)}`);
   return JSON.parse(text) as T;
+}
+
+export interface BillingAccount {
+  ok: boolean;
+  error?: string;
+  /** APP_USR- = produção · TEST- = sandbox */
+  tokenKind: "production" | "test" | "unknown" | "missing";
+  nickname?: string;
+  name?: string;
+  siteId?: string;
+  /** CPF ou CNPJ do titular da conta (só o tipo e os 2 últimos dígitos) */
+  docType?: string;
+  docLast2?: string;
+  testUser?: boolean;
+}
+
+/**
+ * Confere o Access Token chamando GET /users/me (sem efeito colateral) e devolve o titular da conta,
+ * para confirmar que o dinheiro cai na conta certa. Cache de 10 min por token (hash).
+ */
+export async function verifyBillingAccount(): Promise<BillingAccount> {
+  const token = getEnv().MERCADOPAGO_ACCESS_TOKEN;
+  if (!token) return { ok: false, tokenKind: "missing", error: "MERCADOPAGO_ACCESS_TOKEN ausente" };
+  const tokenKind = token.startsWith("APP_USR-") ? "production" : token.startsWith("TEST-") ? "test" : "unknown";
+  const key = `mp:account:v1:${createHash("sha256").update(token).digest("hex").slice(0, 12)}`;
+  const res = await cached(key, 600, async (): Promise<BillingAccount> => {
+    try {
+      const me = await mp<{ nickname?: string; first_name?: string; last_name?: string; site_id?: string; identification?: { type?: string; number?: string }; tags?: string[] }>("GET", "/users/me");
+      const num = (me.identification?.number ?? "").replace(/\D/g, "");
+      return {
+        ok: true,
+        tokenKind,
+        nickname: me.nickname,
+        name: [me.first_name, me.last_name].filter(Boolean).join(" ") || undefined,
+        siteId: me.site_id,
+        docType: me.identification?.type,
+        docLast2: num ? num.slice(-2) : undefined,
+        testUser: (me.tags ?? []).includes("test_user") || /^TEST/i.test(me.nickname ?? ""),
+      };
+    } catch (err) {
+      return { ok: false, tokenKind, error: (err as Error).message.slice(0, 200) };
+    }
+  });
+  return res.value;
 }
 
 export interface Preapproval {
