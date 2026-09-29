@@ -1,5 +1,5 @@
 import { requirePrisma } from "@/database/client";
-import { getEnv, isRegistrationOpen, legalStatus } from "@/lib/env";
+import { getEnv, isGoogleLoginConfigured, isRegistrationOpen, legalStatus } from "@/lib/env";
 import { effectiveStatus } from "@/lib/entitlements";
 import { isBillingConfigured, priceFor, verifyBillingAccount } from "@/services/billing/mercadopago";
 import { isKiwifyApiConfigured, isKiwifyConfigured, kiwifyCheckoutUrl } from "@/services/billing/kiwify";
@@ -74,6 +74,7 @@ export async function getAdminOverview() {
       { key: "legal_approved", label: `Termos/Privacidade/Reembolso aprovados (LEGAL_TERMS_APPROVED, versão ${legal.version})`, ok: legal.approved },
       { key: "registration", label: `Cadastro aberto (REGISTRATION_MODE=${env.REGISTRATION_MODE}${env.REGISTRATION_MODE === "open" && legal.missing.length ? " — aguardando fornecedor identificado" : ""})`, ok: isRegistrationOpen() },
       { key: "email", label: "E-mail transacional (RESEND_API_KEY + EMAIL_FROM)", ok: isEmailConfigured() },
+      { key: "google", label: "Entrar com Google (GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET)", ok: isGoogleLoginConfigured() },
       { key: "push", label: "Push (VAPID)", ok: await isPushConfigured() },
       { key: "app_url", label: `URL pública (NEXT_PUBLIC_APP_URL=${env.NEXT_PUBLIC_APP_URL})`, ok: env.NEXT_PUBLIC_APP_URL.startsWith("https://") },
       { key: "self_plan", label: "Troca de plano sem pagamento desligada (ALLOW_SELF_PLAN_CHANGE=false)", ok: !env.ALLOW_SELF_PLAN_CHANGE },

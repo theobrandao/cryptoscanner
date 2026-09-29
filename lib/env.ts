@@ -98,6 +98,9 @@ const schema = z.object({
     .string()
     .default("false")
     .transform((v) => v === "true"),
+  /** Entrar/cadastrar com Google (OAuth 2.0, escopos openid email profile). Sem as duas, o botão não aparece. */
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
   /** E-mail transacional (Resend). Sem chave: reset de senha e avisos de trial ficam só no app. */
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
@@ -131,6 +134,11 @@ export function isDatabaseConfigured(): boolean {
 export function isLlmConfigured(): boolean {
   const env = getEnv();
   return env.LLM_PROVIDER === "anthropic" && Boolean(env.ANTHROPIC_API_KEY);
+}
+
+export function isGoogleLoginConfigured(): boolean {
+  const env = getEnv();
+  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 }
 
 export function isTelegramConfigured(): boolean {

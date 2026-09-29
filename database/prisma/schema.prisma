@@ -41,6 +41,8 @@ model User {
   onboardedAt     DateTime?
   /// sessões (JWT) emitidas antes desta data são recusadas (troca/redefinição de senha)
   passwordChangedAt DateTime?
+  /// id da conta Google (sub) quando a conta foi criada ou vinculada pelo login com Google
+  googleSub    String?  @unique
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

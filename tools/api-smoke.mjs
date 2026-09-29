@@ -798,6 +798,18 @@ await test("Comercial", "Webhooks sem assinatura → 401 (Mercado Pago) e 401/50
 });
 
 
+await test("Auth", "Login com Google: estado do botão; callback sem state → volta ao login com erro; início sem config → redireciona", async () => {
+  const st = await call("POST", "/api/auth/google", { auth: false, body: {} });
+  expectStatus(st, 200);
+  expect(typeof st.json.data.enabled === "boolean", "campo enabled ausente");
+  const cb = await fetch(`${BASE}/api/auth/google/callback?code=x&state=y`, { redirect: "manual" });
+  expect(cb.status === 307 && /\/login\?erro=google_estado/.test(cb.headers.get("location") ?? ""), `callback ${cb.status} ${cb.headers.get("location")}`);
+  const go = await fetch(`${BASE}/api/auth/google?next=%2F`, { redirect: "manual" });
+  const loc = go.headers.get("location") ?? "";
+  expect(go.status === 307 && (st.json.data.enabled ? /accounts\.google\.com/.test(loc) : /erro=google_indisponivel/.test(loc)), `início ${go.status} ${loc.slice(0, 60)}`);
+  return `google ${st.json.data.enabled ? "ativo" : "desligado"} · callback sem state → erro · início ${st.json.data.enabled ? "→ Google" : "→ aviso"}`;
+});
+
 await test("Auth", "POST /api/auth/register e-mail repetido → 409", async () => {
   const r = await call("POST", "/api/auth/register", { auth: false, body: { name: "Smoke Test", email: EMAIL, password: PASSWORD, acceptTerms: true, ...(INVITE ? { invite: INVITE } : {}) } });
   expectStatus(r, 409, "email_taken");

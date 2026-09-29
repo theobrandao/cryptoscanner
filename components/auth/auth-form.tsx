@@ -12,6 +12,18 @@ import { Alert } from "@/components/ui/misc";
 import { useSession } from "@/hooks/use-session";
 import { ApiClientError, apiFetch, postJson } from "@/lib/client-api";
 
+/** Marca do Google (quatro cores) para o botão de login. */
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 shrink-0" aria-hidden>
+      <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5c-.3 1.5-1.1 2.8-2.4 3.6v3h3.9c2.2-2.1 3.5-5.1 3.5-8.7z" />
+      <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.2v3.1C3.2 21.3 7.3 24 12 24z" />
+      <path fill="#FBBC05" d="M5.3 14.3c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3V6.6H1.2C.4 8.2 0 10 0 12s.4 3.8 1.2 5.4l4.1-3.1z" />
+      <path fill="#EA4335" d="M12 4.7c1.8 0 3.3.6 4.6 1.8l3.4-3.4C18 1.2 15.2 0 12 0 7.3 0 3.2 2.7 1.2 6.6l4.1 3.1c.9-2.9 3.6-5 6.7-5z" />
+    </svg>
+  );
+}
+
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -25,10 +37,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [invite, setInvite] = React.useState("");
   const [inviteRequired, setInviteRequired] = React.useState(false);
   const [accept, setAccept] = React.useState(false);
+  const [google, setGoogle] = React.useState(false);
+  const [termsHint, setTermsHint] = React.useState(false);
 
   React.useEffect(() => {
-    if (mode !== "register") return;
     let alive = true;
+    postJson<{ enabled: boolean }>("/api/auth/google", {})
+      .then((d) => {
+        if (alive) setGoogle(d.enabled);
+      })
+      .catch(() => undefined);
+    if (mode !== "register") return;
     apiFetch<{ inviteRequired: boolean }>("/api/auth/register")
       .then((d) => {
         if (alive) setInviteRequired(d.inviteRequired);
@@ -38,6 +57,24 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       alive = false;
     };
   }, [mode]);
+
+  const ERROS: Record<string, string> = {
+    google_cancelado: "Login com Google cancelado.",
+    google_estado: "A sessão do login com Google expirou. Tente de novo.",
+    google_falhou: "Não foi possível entrar com o Google. Tente de novo ou use e-mail e senha.",
+    google_termos: "Para criar a conta com o Google, marque o aceite dos Termos e clique de novo em Continuar com Google.",
+    google_indisponivel: "Login com Google indisponível no momento.",
+    cadastro_restrito: "Cadastro restrito nesta fase.",
+  };
+  const urlError = params.get("erro") ? (ERROS[params.get("erro")!] ?? "Falha no login.") : null;
+
+  const googleHref = `/api/auth/google?next=${encodeURIComponent(next)}${mode === "register" ? "&accept=1" : ""}`;
+  const onGoogle = (e: React.MouseEvent) => {
+    if (mode === "register" && !accept) {
+      e.preventDefault();
+      setTermsHint(true);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +111,30 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <Alert variant="success" className="mb-3">
             Senha redefinida. Entre com a nova senha.
           </Alert>
+        ) : null}
+        {urlError ? (
+          <Alert variant="danger" className="mb-3">
+            {urlError}
+          </Alert>
+        ) : null}
+        {google ? (
+          <div className="mb-4 flex flex-col gap-2">
+            <a
+              href={googleHref}
+              onClick={onGoogle}
+              data-testid="google-login"
+              className="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-md border border-border bg-card text-sm font-semibold hover:bg-muted"
+            >
+              <GoogleMark />
+              {mode === "login" ? "Entrar com Google" : "Continuar com Google"}
+            </a>
+            {termsHint && !accept ? <span className="text-xs text-warning">Marque o aceite dos Termos abaixo e clique de novo.</span> : null}
+            <div className="flex items-center gap-3 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              ou com e-mail
+              <span className="h-px flex-1 bg-border" />
+            </div>
+          </div>
         ) : null}
         <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3">
           {mode === "register" ? (
