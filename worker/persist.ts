@@ -107,8 +107,8 @@ export async function persistMarketSnapshot(options: PersistOptions = {}): Promi
   const started = Date.now();
 
   let assets = await prisma.asset.findMany({ where: { active: true } });
-  if (assets.length === 0) {
-    // garante o universo mesmo sem seed
+  if (ASSETS.some((a) => !assets.some((x) => x.symbol === a.symbol))) {
+    // sincroniza o universo (sem seed, ou ativo novo adicionado em lib/assets.ts)
     await prisma.asset.createMany({
       data: ASSETS.map((a) => ({ symbol: a.symbol, name: a.name, binancePair: a.binancePair, krakenPair: a.krakenPair, coingeckoId: a.coingeckoId, sortOrder: a.sortOrder })),
       skipDuplicates: true,

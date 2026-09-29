@@ -132,9 +132,9 @@ export const krakenProvider: MarketProvider = {
 /** XXBTZUSD → XBTUSD, XETHZUSD → ETHUSD, XDGUSD → XDGUSD, SOLUSD → SOLUSD */
 export function normalizeKrakenKey(key: string): string {
   let k = key.toUpperCase();
-  if (k.length === 8 && k.startsWith("X") && k.includes("Z")) {
-    // formato legado X<base>Z<quote>
-    k = k.slice(1).replace("Z", "");
+  if (k.length === 8 && k.startsWith("X") && k[4] === "Z") {
+    // formato legado X<base 3>Z<quote 3>: XXBTZUSD → XBTUSD, XZECZUSD → ZECUSD
+    k = k.slice(1, 4) + k.slice(5);
   }
   return k;
 }

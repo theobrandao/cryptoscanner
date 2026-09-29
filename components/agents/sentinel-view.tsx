@@ -220,7 +220,7 @@ function NewSentinelCard({ planName, activeCount, limit, telegramAllowed, telegr
       <CardContent>
         <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <Label>Moeda monitorada (20 do scanner)</Label>
+            <Label>Moeda monitorada (21 do scanner)</Label>
             <Select value={symbol} onValueChange={setSymbol}>
               <SelectTrigger aria-label="Moeda">
                 <SelectValue />

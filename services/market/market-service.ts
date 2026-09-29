@@ -120,7 +120,7 @@ export interface TickersResult {
 }
 
 /**
- * Tickers dos 20 ativos. Prioridade: snapshot ao vivo do worker (WebSocket) → REST com fallback → cache obsoleto.
+ * Tickers dos 21 ativos. Prioridade: snapshot ao vivo do worker (WebSocket) → REST com fallback → cache obsoleto.
  */
 export async function getTickers(options: { refresh?: boolean } = {}): Promise<TickersResult> {
   const cache = getCache();

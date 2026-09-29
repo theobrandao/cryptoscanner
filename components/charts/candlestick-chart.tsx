@@ -46,6 +46,16 @@ export interface ChartToggles {
   macd: boolean;
   levels: boolean;
   fibonacci: boolean;
+  /** linhas de tendência automáticas (LTA/LTB) */
+  trendlines?: boolean;
+}
+
+export interface ChartSegment {
+  from: { time: number; price: number };
+  to: { time: number; price: number };
+  color: string;
+  label: string;
+  dashed?: boolean;
 }
 
 export interface PriceLevel {
@@ -96,6 +106,7 @@ export function CandlestickChart({
   toggles,
   levels,
   markers,
+  segments = [],
   height = 520,
 }: {
   candles: readonly Candle[];
@@ -103,6 +114,7 @@ export function CandlestickChart({
   toggles: ChartToggles;
   levels: PriceLevel[];
   markers: ChartMarker[];
+  segments?: ChartSegment[];
   height?: number;
 }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -207,6 +219,16 @@ export function CandlestickChart({
       }),
     );
 
+    // Segmentos (linhas de tendência): série de linha com dois pontos no painel principal
+    for (const seg of segments) {
+      if (seg.to.time <= seg.from.time) continue;
+      const s = chart.addSeries(LineSeries, { color: seg.color, lineWidth: 2, lineStyle: seg.dashed ? LineStyle.Dashed : LineStyle.Solid, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, title: seg.label }, 0);
+      s.setData([
+        { time: toTime(seg.from.time), value: seg.from.price },
+        { time: toTime(seg.to.time), value: seg.to.price },
+      ]);
+    }
+
     // Marcadores
     if (markers.length) {
       const ms: SeriesMarker<Time>[] = markers
@@ -225,7 +247,7 @@ export function CandlestickChart({
       chartRef.current = null;
       candleRef.current = null;
     };
-  }, [candles, series, toggles, levels, markers, height, theme]);
+  }, [candles, series, toggles, levels, markers, segments, height, theme]);
 
   return <div ref={containerRef} className="w-full" style={{ height }} />;
 }

@@ -1,9 +1,9 @@
 import type { AssetDefinition } from "@/types/market";
 
 /**
- * Universo de 20 ativos monitorados pelo scanner.
- * A referência pública menciona "20 ativos" e lista 10 na home; os demais 10 foram
- * escolhidos entre os pares USDT de maior liquidez que também existem na Kraken (fallback).
+ * Universo de ativos monitorados pelo scanner (21).
+ * A referência pública menciona "20 ativos" e lista 10 na home; os demais foram escolhidos entre os
+ * pares USDT de maior liquidez que também existem na Kraken (fallback). ZEC adicionado a pedido (ZECUSDT / Kraken XZECZUSD).
  * Os glifos são caracteres Unicode próprios, não logotipos de terceiros.
  */
 export const ASSETS: readonly AssetDefinition[] = [
@@ -27,6 +27,7 @@ export const ASSETS: readonly AssetDefinition[] = [
   { symbol: "ARB", name: "Arbitrum", binancePair: "ARBUSDT", krakenPair: "ARBUSD", coingeckoId: "arbitrum", glyph: "◒", sortOrder: 18 },
   { symbol: "OP", name: "Optimism", binancePair: "OPUSDT", krakenPair: "OPUSD", coingeckoId: "optimism", glyph: "◓", sortOrder: 19 },
   { symbol: "SUI", name: "Sui", binancePair: "SUIUSDT", krakenPair: "SUIUSD", coingeckoId: "sui", glyph: "◔", sortOrder: 20 },
+  { symbol: "ZEC", name: "Zcash", binancePair: "ZECUSDT", krakenPair: "ZECUSD", coingeckoId: "zcash", glyph: "ⓩ", sortOrder: 21 },
 ] as const;
 
 const BY_SYMBOL = new Map(ASSETS.map((a) => [a.symbol, a]));

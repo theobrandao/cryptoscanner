@@ -14,7 +14,7 @@ import type { Candle } from "@/types/market";
 export const simulationInputSchema = z.object({
   symbol: symbolSchema,
   strategy: z.enum(["dca", "lump_sum"]),
-  currency: z.enum(["USD", "BRL"]).default("BRL"),
+  currency: z.enum(["USD", "BRL", "EUR"]).default("BRL"),
   initialCapital: z.number().min(0).max(1e9),
   monthlyContribution: z.number().min(0).max(1e8).default(0),
   months: z.union([z.literal(6), z.literal(12), z.literal(24), z.literal(36)]),
@@ -79,13 +79,16 @@ export async function runSimulation(input: SimulationInput): Promise<SimulationR
   const asset = ASSETS.find((a) => a.symbol === input.symbol);
   if (!asset) throw new Error(`Ativo desconhecido: ${input.symbol}`);
   const days = Math.round(input.months * 30.44) + 3;
-  const [assetCandles, fxCandles] = await Promise.all([history(asset.binancePair, days), input.currency === "BRL" ? history("USDTBRL", days) : Promise.resolve<Candle[]>([])]);
+  // BRL: USDTBRL (R$ por USDT) multiplica; EUR: EURUSDT (USDT por €) divide.
+  const fxPair = input.currency === "BRL" ? "USDTBRL" : input.currency === "EUR" ? "EURUSDT" : null;
+  const [assetCandles, fxCandles] = await Promise.all([history(asset.binancePair, days), fxPair ? history(fxPair, days) : Promise.resolve<Candle[]>([])]);
   if (assetCandles.length < 30) throw new Error("Histórico insuficiente para o período solicitado");
   const fxByDay = new Map(fxCandles.map((c) => [monthKey(c.openTime) + "-" + new Date(c.openTime).getUTCDate(), c.close]));
   const fxFor = (c: Candle): number => {
-    if (input.currency !== "BRL") return 1;
+    if (!fxPair) return 1;
     const key = monthKey(c.openTime) + "-" + new Date(c.openTime).getUTCDate();
-    return fxByDay.get(key) ?? fxCandles[fxCandles.length - 1]?.close ?? 1;
+    const raw = fxByDay.get(key) ?? fxCandles[fxCandles.length - 1]?.close ?? 1;
+    return input.currency === "EUR" ? 1 / raw : raw;
   };
   const priced = assetCandles.map((c) => ({ time: c.openTime, price: c.close * fxFor(c) }));
   const alloc = RISK_ALLOCATION[input.riskProfile];
@@ -163,7 +166,7 @@ export async function runSimulation(input: SimulationInput): Promise<SimulationR
     worstMonth: sortedMonths[sortedMonths.length - 1] ?? null,
     curve,
     monthly,
-    fx: { applied: input.currency === "BRL", source: input.currency === "BRL" ? "USDTBRL diário (Binance)" : "—" },
+    fx: { applied: fxPair !== null, source: fxPair ? `${fxPair} diário (Binance)` : "—" },
     source: "binance",
     disclaimer: "Simulação histórica com preços diários reais (fechamento) — não é projeção nem recomendação. Não considera taxas, spread, impostos ou rendimento da reserva.",
   };

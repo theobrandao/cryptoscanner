@@ -98,3 +98,34 @@ describe("snapshot", () => {
     expect(computeSnapshot(c).trend).toBe("bearish");
   });
 });
+
+describe("linhas de tendência (LTA/LTB)", () => {
+  it("encontra LTA em zigue-zague ascendente e LTB em descendente", async () => {
+    const { detectTrendLines } = await import("@/lib/indicators/trendlines");
+    const { candlesFromCloses } = await import("../helpers");
+    const up = Array.from({ length: 120 }, (_, i) => 100 + i * 0.4 + 3 * Math.sin(i / 3));
+    const lta = detectTrendLines(candlesFromCloses(up)).find((l) => l.kind === "LTA");
+    expect(lta).toBeDefined();
+    expect(lta!.slopePerBar).toBeGreaterThan(0);
+    expect(lta!.to.price).toBeGreaterThan(lta!.from.price);
+    const down = up.map((v) => 300 - v);
+    const ltb = detectTrendLines(candlesFromCloses(down)).find((l) => l.kind === "LTB");
+    expect(ltb).toBeDefined();
+    expect(ltb!.slopePerBar).toBeLessThan(0);
+  });
+
+  it("marca a LTA como rompida quando o preço fecha abaixo dela", async () => {
+    const { detectTrendLines } = await import("@/lib/indicators/trendlines");
+    const { candlesFromCloses } = await import("../helpers");
+    const up = Array.from({ length: 110 }, (_, i) => 100 + i * 0.4 + 3 * Math.sin(i / 3));
+    const crash = [...up, ...Array.from({ length: 6 }, (_, k) => up[up.length - 1]! - 15 - k * 3)];
+    const lta = detectTrendLines(candlesFromCloses(crash)).find((l) => l.kind === "LTA");
+    expect(lta?.broken).toBe(true);
+  });
+
+  it("retorna vazio com poucos candles", async () => {
+    const { detectTrendLines } = await import("@/lib/indicators/trendlines");
+    const { candlesFromCloses } = await import("../helpers");
+    expect(detectTrendLines(candlesFromCloses([1, 2, 3]))).toEqual([]);
+  });
+});

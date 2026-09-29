@@ -57,6 +57,8 @@ describe("parsers dos provedores", () => {
   it("normaliza chaves legadas da kraken", () => {
     expect(normalizeKrakenKey("XXBTZUSD")).toBe("XBTUSD");
     expect(normalizeKrakenKey("XETHZUSD")).toBe("ETHUSD");
+    expect(normalizeKrakenKey("XZECZUSD")).toBe("ZECUSD");
+    expect(normalizeKrakenKey("XXDGZUSD")).toBe("XDGUSD");
     expect(normalizeKrakenKey("SOLUSD")).toBe("SOLUSD");
     expect(normalizeKrakenKey("XDGUSD")).toBe("XDGUSD");
   });

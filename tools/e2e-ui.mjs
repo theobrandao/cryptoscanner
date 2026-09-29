@@ -62,10 +62,10 @@ await step("Home carrega com tickers ao vivo e top 20 por volume", async () => {
   return `${priceCells} preços · ${await shot("home")}`;
 });
 
-await step("Scanner: tabela em tempo real com 20 linhas e RSI", async () => {
+await step("Scanner: tabela em tempo real com 21 linhas (inclui ZEC) e RSI", async () => {
   await goto("/scanner");
   await page.waitForSelector("table tbody tr", { timeout: 30_000 });
-  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 20, null, { timeout: 30_000 });
+  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 21, null, { timeout: 30_000 });
   const rows = await page.locator("table tbody tr").count();
   const text = await page.locator("table").innerText();
   expect(/RSI/i.test(text), "coluna RSI ausente");
@@ -77,7 +77,7 @@ await step("Scanner: busca, ordenação, favoritos e filtro de tendência", asyn
   await search.fill("SOL");
   await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length === 1, null, { timeout: 10_000 });
   await search.fill("");
-  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 20, null, { timeout: 10_000 });
+  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 21, null, { timeout: 10_000 });
   await page.locator("th", { hasText: /Preço/ }).first().click();
   await page.waitForTimeout(400);
   const first = await page.locator("table tbody tr").first().innerText();
@@ -116,7 +116,10 @@ await step("Gráficos: candles, indicadores e análise consolidada", async () =>
     if (await btn.count()) await btn.click().catch(() => {});
   }
   await page.waitForTimeout(800);
-  return `${canvases} canvas · ${await shot("graficos")}`;
+  const lt = page.locator("button", { hasText: /^LT$/ }).first();
+  expect((await lt.count()) === 1, "botão LT ausente");
+  expect((await lt.getAttribute("aria-pressed")) === "true", "LT deveria vir ligado por padrão");
+  return `${canvases} canvas · LT ligado · ${await shot("graficos")}`;
 });
 
 await step("Panorama: resumo executivo, fatores, derivativos, manchetes", async () => {
@@ -324,7 +327,7 @@ await step("Planos: trocar para PLATINUM libera 15M no scanner; voltar para FREE
   await goto("/scanner?timeframe=15m");
   const tf = page.locator("button", { hasText: /15M/ }).first();
   await tf.click();
-  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 20, null, { timeout: 40_000 });
+  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 21, null, { timeout: 40_000 });
   const file = await shot("scanner-15m-platinum");
   await page.evaluate(async () => fetch("/api/plans/change", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan: "FREE" }) }));
   return `15M liberado (${await btn.count()} CTA) · ${file}`;

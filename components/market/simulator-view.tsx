@@ -25,7 +25,7 @@ interface SavedSimulation {
   id: string;
   symbol: string;
   strategy: "dca" | "lump_sum";
-  currency: "USD" | "BRL";
+  currency: "USD" | "BRL" | "EUR";
   initialCapital: number;
   monthlyContribution: number;
   months: number;
@@ -37,7 +37,7 @@ interface SavedSimulation {
   createdAt: string;
 }
 
-function money(v: number, currency: "USD" | "BRL"): string {
+function money(v: number, currency: "USD" | "BRL" | "EUR"): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency, maximumFractionDigits: 2 }).format(v);
 }
 
@@ -118,7 +118,7 @@ export function SimulatorView() {
       <PageTitle
         icon="📜"
         title="Simulador de Aportes"
-        description="Backtest com preços diários reais (Binance; câmbio USDTBRL diário para BRL): DCA mensal ou aporte único, com perfil de risco que define a fração no ativo — o restante fica em reserva sem rendimento. Simulação histórica, não projeção."
+        description="Backtest com preços diários reais (Binance; câmbio diário USDTBRL para BRL e EURUSDT para EUR): DCA mensal ou aporte único, com perfil de risco que define a fração no ativo — o restante fica em reserva sem rendimento. Simulação histórica, não projeção."
       />
       <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
         <Card>
@@ -157,13 +157,14 @@ export function SimulatorView() {
               </div>
               <div className="flex flex-col gap-1">
                 <Label>Moeda</Label>
-                <Select value={input.currency} onValueChange={(v) => setInput({ ...input, currency: v as "USD" | "BRL" })}>
+                <Select value={input.currency} onValueChange={(v) => setInput({ ...input, currency: v as "USD" | "BRL" | "EUR" })}>
                   <SelectTrigger aria-label="Moeda">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="BRL">🇧🇷 Real (BRL)</SelectItem>
                     <SelectItem value="USD">🇺🇸 Dólar (USD)</SelectItem>
+                    <SelectItem value="EUR">🇪🇺 Euro (EUR)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

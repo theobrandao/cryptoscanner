@@ -135,7 +135,7 @@ export async function analyzeChartImage(input: {
   if (!isLlmConfigured()) {
     const symbol = input.hint?.symbol?.toUpperCase();
     const tf = (input.hint?.timeframe ?? "4h").toLowerCase() as Timeframe;
-    if (!symbol || !getAsset(symbol)) throw new ChartAnalysisUnavailableError("Sem provedor de visão neste servidor: informe o ativo (um dos 20 do scanner) para a leitura técnica ser feita sobre os dados reais.");
+    if (!symbol || !getAsset(symbol)) throw new ChartAnalysisUnavailableError("Sem provedor de visão neste servidor: informe o ativo (um dos 21 do scanner) para a leitura técnica ser feita sobre os dados reais.");
     if (!TIMEFRAMES.includes(tf)) throw new ChartAnalysisUnavailableError("Timeframe inválido; use 15m, 30m, 1h, 4h, 1d ou 1w.");
     const det = await analyzeDeterministic(symbol, tf);
     const analysis: ChartImageAnalysis = { id: null, ...det, disclaimer: DISCLAIMER, createdAt: Date.now() };

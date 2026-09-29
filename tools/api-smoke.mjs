@@ -104,10 +104,11 @@ await test("Segurança", "rota inexistente /api/nao-existe → 404", async () =>
   return "404";
 });
 
-await test("Mercado", "GET /api/market/assets (20 ativos)", async () => {
+await test("Mercado", "GET /api/market/assets (universo inclui ZEC)", async () => {
   const r = await call("GET", "/api/market/assets", { auth: false });
   expectStatus(r, 200);
-  expect(r.json.data.assets.length === 20, `${r.json.data.assets.length} ativos`);
+  state.nAssets = r.json.data.assets.length;
+  expect(state.nAssets >= 21 && r.json.data.assets.some((a) => a.symbol === "ZEC"), `${state.nAssets} ativos, ZEC ausente`);
   return `${r.json.data.assets.length} ativos`;
 });
 
@@ -115,11 +116,12 @@ await test("Mercado", "GET /api/market/tickers (USD)", async () => {
   const r = await call("GET", "/api/market/tickers", { auth: false });
   expectStatus(r, 200);
   const t = r.json.data.tickers;
-  expect(t.length === 20, `${t.length} tickers`);
+  expect(t.length === state.nAssets, `${t.length} tickers de ${state.nAssets}`);
+  expect(t.some((x) => x.symbol === "ZEC" && x.price > 0), "ZEC sem preço");
   const btc = t.find((x) => x.symbol === "BTC");
   expect(btc && btc.price > 1000, "BTC sem preço plausível");
   state.btcUsd = btc.price;
-  return `20 tickers, BTC ${btc.price} (${btc.source})`;
+  return `${t.length} tickers (inclui ZEC), BTC ${btc.price} (${btc.source})`;
 });
 
 await test("Mercado", "GET /api/market/tickers?currency=BRL (conversão)", async () => {
@@ -147,6 +149,8 @@ await test("Mercado", "GET /api/market/global (CoinGecko)", async () => {
 });
 
 await test("Mercado", "GET /api/market/candles BTC 4h limit=100 indicators=1", async () => {
+  const z = await call("GET", "/api/market/candles?symbol=ZEC&timeframe=1d&limit=60", { auth: false });
+  expect(z.res.status === 200 && z.json.data.candles.length === 60, "candles de ZEC indisponíveis");
   const r = await call("GET", "/api/market/candles?symbol=BTC&timeframe=4h&limit=100&indicators=1", { auth: false });
   expectStatus(r, 200);
   const d = r.json.data;
@@ -174,11 +178,11 @@ for (const tf of ["4h", "1d", "1w"]) {
     const r = await call("GET", `/api/scanner/table?timeframe=${tf}`, { auth: false });
     expectStatus(r, 200);
     const rows = r.json.data.rows;
-    expect(rows.length === 20, `${rows.length} linhas`);
+    expect(rows.length === state.nAssets, `${rows.length} linhas`);
     const withPattern = rows.filter((x) => x.pattern || (x.patterns && x.patterns.length)).length;
     const row = rows[0];
     for (const k of ["price", "changePct24h", "volume24h", "relativeVolume", "volatilityPct", "trend", "rsi14", "momentum", "signal", "patterns", "support", "resistance"]) expect(k in row, `coluna ${k} ausente`);
-    return `20 linhas, ${withPattern} com padrão, fontes ${JSON.stringify(r.json.data.sources ?? r.json.data.source ?? "")}`;
+    return `${rows.length} linhas, ${withPattern} com padrão, fontes ${JSON.stringify(r.json.data.sources ?? r.json.data.source ?? "")}`;
   });
 }
 
@@ -221,7 +225,7 @@ await test("Scanner", "GET /api/scanner/volume (30m,1h)", async () => {
   const r = await call("GET", "/api/scanner/volume", { auth: false });
   expectStatus(r, 200);
   const d = r.json.data;
-  expect(d.assets === 20, `assets=${d.assets}`);
+  expect(d.assets === state.nAssets, `assets=${d.assets}`);
   expect((d.errors ?? []).length === 0, `erros: ${JSON.stringify(d.errors)}`);
   return `${d.alerts.length} alertas, fontes ${d.sources.join(",")}, stale=${d.stale}`;
 });
@@ -307,6 +311,15 @@ await test("Simulador", "POST /api/simulations/run aporte único ETH USD 6 meses
   const d = r.json.data.result;
   expect(d.contributions === 1 && Math.abs(d.profitPct - d.benchmarkHoldPct) < 0.01, "aporte único 100% deveria igualar HODL");
   return `final $ ${d.finalValue} (${d.profitPct}%)`;
+});
+
+await test("Simulador", "POST /api/simulations/run em EUR (câmbio EURUSDT diário)", async () => {
+  const r = await call("POST", "/api/simulations/run", { auth: false, body: { symbol: "BTC", strategy: "lump_sum", currency: "EUR", initialCapital: 1000, months: 6, riskProfile: "arrojado" } });
+  expectStatus(r, 200);
+  const d = r.json.data.result;
+  expect(d.fx.applied && /EURUSDT/.test(d.fx.source), "câmbio EUR não aplicado");
+  expect(d.lastPrice < state.btcUsd * 0.98 && d.lastPrice > state.btcUsd * 0.7, `preço em EUR incoerente: ${d.lastPrice} vs USD ${state.btcUsd}`);
+  return `BTC € ${d.lastPrice.toFixed(0)} (USD ${state.btcUsd.toFixed(0)}) · ${d.profitPct}%`;
 });
 
 await test("Simulador", "POST /api/simulations/run sem capital → 400", async () => {
@@ -810,8 +823,8 @@ await test("Planos", "POST /api/plans/change PLATINUM", async () => {
 await test("Planos", "GET /api/scanner/table?timeframe=15m como PLATINUM → 200", async () => {
   const r = await call("GET", "/api/scanner/table?timeframe=15m");
   expectStatus(r, 200);
-  expect(r.json.data.rows.length === 20, `${r.json.data.rows.length} linhas`);
-  return "20 linhas em 15M";
+  expect(r.json.data.rows.length === state.nAssets, `${r.json.data.rows.length} linhas`);
+  return `${r.json.data.rows.length} linhas em 15M`;
 });
 
 await test("Planos", "GET /api/scanner/table?timeframe=1h e 30m como PLATINUM → 200", async () => {

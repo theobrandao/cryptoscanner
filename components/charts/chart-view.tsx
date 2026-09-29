@@ -9,7 +9,8 @@ import type { PatternMatch } from "@/lib/patterns/detect";
 import type { FibResult } from "@/lib/fibonacci";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
 import { AnalysisPanel } from "@/components/charts/analysis-panel";
-import { CandlestickChart, type ChartMarker, type ChartToggles, type IndicatorSeries, type PriceLevel } from "@/components/charts/candlestick-chart";
+import { CandlestickChart, type ChartMarker, type ChartSegment, type ChartToggles, type IndicatorSeries, type PriceLevel } from "@/components/charts/candlestick-chart";
+import { detectTrendLines } from "@/lib/indicators/trendlines";
 import { ProviderBanner } from "@/components/scanner/provider-banner";
 import { Badge, DirectionBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ interface FibPayload {
 }
 
 const EMPTY_PATTERNS: PatternMatch[] = [];
-const DEFAULT_TOGGLES: ChartToggles = { ema8: true, ema25: true, ema100: true, ema200: false, bb: false, volume: true, stochRsi: true, macd: false, levels: true, fibonacci: false };
+const DEFAULT_TOGGLES: ChartToggles = { ema8: true, ema25: true, ema100: true, ema200: false, bb: false, volume: true, stochRsi: true, macd: false, levels: true, fibonacci: false, trendlines: true };
 
 export function ChartView() {
   const params = useSearchParams();
@@ -114,6 +115,19 @@ export function ChartView() {
     return { levels, markers };
   }, [data, toggles, fib, patterns, selectedPattern]);
 
+  const trendLines = React.useMemo(() => (data && toggles.trendlines ? detectTrendLines(data.candles) : []), [data, toggles.trendlines]);
+  const segments = React.useMemo<ChartSegment[]>(
+    () =>
+      trendLines.map((l) => ({
+        from: { time: l.from.time, price: l.from.price },
+        to: { time: l.to.time, price: l.to.price },
+        color: l.kind === "LTA" ? "#22c55e" : "#f43f5e",
+        label: `${l.kind}${l.broken ? " rompida" : ""} (${l.touches} toques)`,
+        dashed: l.broken,
+      })),
+    [trendLines],
+  );
+
   const snap = data?.snapshot;
   const rate = tickersData?.usdBrl ?? 1;
 
@@ -166,6 +180,7 @@ export function ChartView() {
               ["macd", "MACD"],
               ["levels", "S/R"],
               ["fibonacci", "Fib"],
+              ["trendlines", "LT"],
             ] as Array<[keyof ChartToggles, string]>
           ).map(([k, label]) => (
             <button
@@ -227,7 +242,7 @@ export function ChartView() {
               ) : isLoading && !data ? (
                 <div className="flex h-[520px] items-center justify-center text-sm text-muted-foreground">Carregando dados…</div>
               ) : data ? (
-                <CandlestickChart candles={data.candles} series={data.series} toggles={toggles} levels={levels} markers={markers} height={520} />
+                <CandlestickChart candles={data.candles} series={data.series} toggles={toggles} levels={levels} markers={markers} segments={segments} height={520} />
               ) : null}
             </CardContent>
           </Card>
