@@ -99,7 +99,7 @@ function findAsset(text: string): string | null {
 
 const dirPt = (d: string) => (d === "bullish" ? "de alta" : d === "bearish" ? "de baixa" : "neutra");
 
-export async function answerMentor(message: string): Promise<MentorReply> {
+export async function answerMentor(message: string, options: { allowLlm?: boolean } = {}): Promise<MentorReply> {
   const t = norm(message);
 
   // ---- SOS mindset
@@ -176,7 +176,7 @@ export async function answerMentor(message: string): Promise<MentorReply> {
   }
 
   // ---- LLM opcional para perguntas fora da base
-  if (isLlmConfigured()) {
+  if (options.allowLlm !== false && isLlmConfigured()) {
     const out = await completeJson({
       system: "Você é um mentor de análise técnica de criptomoedas. Responda em português do Brasil, de forma objetiva, sem prometer resultados e sem recomendar compra ou venda. Não invente preços ou dados de mercado.",
       user: message,

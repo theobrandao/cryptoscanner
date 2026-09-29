@@ -334,6 +334,7 @@ await step("Planos: trocar para PLATINUM libera 15M no scanner; voltar para FREE
   await goto("/planos");
   const btn = page.getByRole("button", { name: /Platinum|Assinar|Escolher/i }).first();
   const changed = await page.evaluate(async () => (await fetch("/api/plans/change", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan: "PLATINUM" }) })).status);
+  if (changed === 403) return "troca de plano bloqueada para não-admin (ALLOW_SELF_PLAN_CHANGE=false) — passo pulado";
   expect(changed === 200, `troca ${changed}`);
   await goto("/scanner?timeframe=15m");
   const tf = page.locator("button", { hasText: /15M/ }).first();
@@ -344,11 +345,11 @@ await step("Planos: trocar para PLATINUM libera 15M no scanner; voltar para FREE
   return `15M liberado (${await btn.count()} CTA) · ${file}`;
 });
 
-await step("Taxa de acerto: tabela 4H/1D com amostras e IC 95%", async () => {
+await step("Backtest: tabela 4H/1D com expectativa em R, 1R/2R/3R e IC 95%", async () => {
   await goto("/estatisticas?timeframe=1d");
-  await page.waitForFunction(() => /Operações testadas/i.test(document.body.innerText) && /IC 95%/i.test(document.body.innerText), null, { timeout: 60_000 });
+  await page.waitForFunction(() => /Operações no recorte/i.test(document.body.innerText) && /Expectativa/i.test(document.body.innerText), null, { timeout: 60_000 });
   await page.getByRole("tab", { name: "4H" }).click();
-  await page.waitForFunction(() => location.search.includes("4h") && /Operações testadas/i.test(document.body.innerText), null, { timeout: 60_000 });
+  await page.waitForFunction(() => location.search.includes("4h") && /Operações no recorte/i.test(document.body.innerText), null, { timeout: 60_000 });
   const n = await page.locator("table tbody tr").count();
   expect(n >= 5, `poucos padrões (${n})`);
   return `${n} padrões · ${await shot("estatisticas")}`;
@@ -373,7 +374,7 @@ await step("Mobile 390 px: scanner, taxa de acerto e gráficos sem rolagem horiz
   const m = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: "pt-BR" });
   const mp = await m.newPage();
   const out = [];
-  for (const r of ["/scanner", "/estatisticas", "/graficos", "/panorama", "/agentes"]) {
+  for (const r of ["/scanner", "/estatisticas", "/graficos", "/panorama", "/agentes", "/terminal?tab=mtf", "/risco"]) {
     await mp.goto(BASE + r, { waitUntil: "domcontentloaded", timeout: 45_000 });
     await mp.waitForTimeout(2500);
     const over = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -383,6 +384,32 @@ await step("Mobile 390 px: scanner, taxa de acerto e gráficos sem rolagem horiz
   await mp.screenshot({ path: path.join(OUT, "mobile-agentes.png") });
   await m.close();
   return `${out.length} páginas OK em 390 px`;
+});
+
+await step("Terminal: visão geral, gráfico com estrutura, liquidez, multi-TF e risco", async () => {
+  await goto("/terminal?symbol=ETH&timeframe=4h");
+  await page.waitForFunction(() => /Estrutura externa/.test(document.body.innerText) && /Alinhamento HTF/.test(document.body.innerText), null, { timeout: 60_000 });
+  const overview = await shot("terminal-overview");
+  for (const [tab, re] of [["Gráfico", /BOS|CHoCH|HH|HL|LH|LL|Marcadores/], ["Estrutura", /Eventos \(por fechamento\)/], ["Liquidez", /Mapa de liquidez/], ["Multi-TF", /Matriz multi-timeframe/], ["Risco", /Posição pelo risco/]]) {
+    await page.getByRole("tab", { name: tab, exact: true }).click();
+    await page.waitForFunction((src) => new RegExp(src).test(document.body.innerText), re.source, { timeout: 30_000 });
+  }
+  const qty = await page.locator("text=Quantidade").count();
+  expect(qty > 0, "calculadora de risco sem resultado");
+  return `6 abas · ${overview} · ${await shot("terminal-risco")}`;
+});
+
+await step("Risco: tamanho de posição 10.000 × 1% com stop de 5% = 20 unidades; liquidação 10x", async () => {
+  await goto("/risco");
+  await page.fill("#acc", "10000");
+  await page.fill("#risk", "1");
+  await page.fill("#lev", "10");
+  await page.fill("#fee", "0");
+  await page.fill("#entry", "100");
+  await page.fill("#stop", "95");
+  await page.fill("#mmr", "0.5");
+  await page.waitForFunction(() => /20[.,]000000/.test(document.body.innerText) && /90[.,]45/.test(document.body.innerText), null, { timeout: 10_000 });
+  return `qty 20 e liquidação 90,45 exibidas · ${await shot("risco")}`;
 });
 
 await step("Suporte logado: Meus chamados + exclusão da conta (LGPD) pela interface", async () => {

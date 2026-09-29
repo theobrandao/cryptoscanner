@@ -33,6 +33,17 @@ describe("walkForward", () => {
     const fullSet = new Set(full.map(key));
     for (const t of cut) expect(fullSet.has(key(t))).toBe(true);
   });
+  it("R coerente com o resultado; MAE ≤ 1R em operações não stopadas", () => {
+    const cs = candlesFromCloses(syntheticSeries(600, { seed: 11, noise: 0.04 }));
+    const tr = walkForward(cs);
+    expect(tr.length).toBeGreaterThan(0);
+    for (const t of tr) {
+      if (t.outcome === "loss") expect(t.r).toBeCloseTo(-1, 6);
+      if (t.outcome === "win") expect(t.r).toBeCloseTo(t.targetR, 6);
+      if (t.outcome !== "loss") expect(t.maeR).toBeLessThan(1 + 1e-9);
+      expect(["bull", "bear", "range"]).toContain(t.regime);
+    }
+  });
   it("retorno com sinal da direção e geometria válida", () => {
     const cs = candlesFromCloses(syntheticSeries(600, { seed: 3, noise: 0.04 }));
     for (const t of walkForward(cs)) {
@@ -46,14 +57,20 @@ describe("walkForward", () => {
 
 describe("summarizeTrades / wilsonInterval", () => {
   it("taxa de acerto ignora expiradas", () => {
-    const base = { direction: "bullish" as const, entryIndex: 0, entryTime: 0, entry: 1, target: 2, stop: 0.5, confidence: 70, bars: 1 };
+    const base = { direction: "bullish" as const, entryIndex: 0, entry: 1, target: 2, stop: 0.5, confidence: 70, bars: 1, targetR: 2, mfeR: 1, maeR: 0.5, hit1R: true, hit2R: false, hit3R: false, regime: "bull" as const, volRegime: "normal" as const };
     const s = summarizeTrades([
-      { ...base, key: "double_bottom", outcome: "win", returnPct: 10 },
-      { ...base, key: "double_bottom", outcome: "loss", returnPct: -5 },
-      { ...base, key: "double_bottom", outcome: "expired", returnPct: 1 },
+      { ...base, entryTime: 1, key: "double_bottom", outcome: "win", returnPct: 10, r: 2, mfeR: 2, hit2R: true },
+      { ...base, entryTime: 2, key: "double_bottom", outcome: "loss", returnPct: -5, r: -1, hit1R: false, mfeR: 0.4 },
+      { ...base, entryTime: 3, key: "double_bottom", outcome: "expired", returnPct: 1, r: 0.2 },
     ]);
     expect(s[0]).toMatchObject({ key: "double_bottom", samples: 3, wins: 1, losses: 1, expired: 1, hitRate: 0.5 });
     expect(s[0]?.avgReturnPct).toBeCloseTo(2);
+    // R: expectativa (2 − 1 + 0,2)/3; PF = 2,2/1; drawdown 1R após o ganho; 1R atingido em 2/3; 2R em 1/3
+    expect(s[0]?.expectancyR).toBeCloseTo(0.4);
+    expect(s[0]?.profitFactor).toBeCloseTo(2.2);
+    expect(s[0]?.maxDrawdownR).toBeCloseTo(1);
+    expect(s[0]?.hit1R).toBeCloseTo(2 / 3);
+    expect(s[0]?.hit2R).toBeCloseTo(1 / 3);
   });
   it("Wilson: 2/2 não vira 100% de certeza", () => {
     const w = wilsonInterval(2, 2)!;

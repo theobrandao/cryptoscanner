@@ -45,7 +45,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       if (mode === "register") await postJson("/api/auth/register", { name, email, password, ...(invite ? { invite } : {}) });
       else await postJson("/api/auth/login", { email, password });
       await refresh();
-      router.push(next.startsWith("/") ? next : "/scanner");
+      // só caminhos internos: "/x" sim; "//host" e "/\\host" não (open redirect)
+      router.push(/^\/(?![/\\])/.test(next) ? next : "/scanner");
     } catch (err) {
       if (err instanceof ApiClientError) {
         const details = Array.isArray(err.details) ? (err.details as Array<{ path: string; message: string }>).map((d) => `${d.path}: ${d.message}`).join("; ") : "";

@@ -4,9 +4,10 @@ import { cached, getCache } from "@/lib/cache";
 import { getMarketProviderOrder } from "@/lib/env";
 import { createLogger } from "@/lib/logger";
 import { TIMEFRAME_MS } from "@/lib/timeframes";
+import { classifyStatus, DIVERGENCE_THRESHOLD_PCT, priceDivergencePct, validateCandles } from "@/lib/engines/quality";
 import { binanceProvider } from "@/services/market/providers/binance";
 import { getCoinMarkets, getGlobal, getMarketBubbles, getUsdBrlRate, type CoinMarket, type GlobalData, type MarketBubbleRaw } from "@/services/market/providers/coingecko";
-import { krakenProvider } from "@/services/market/providers/kraken";
+import { getKrakenSpotPrices, krakenProvider } from "@/services/market/providers/kraken";
 import { ProviderError, type MarketProvider } from "@/services/market/providers/types";
 
 const log = createLogger("market");
@@ -25,6 +26,11 @@ let providerOverride: MarketProvider[] | null = null;
 export function setProvidersForTests(providers: MarketProvider[] | null) {
   providerOverride = providers;
   circuit.clear();
+}
+
+/** Fonte primária configurada (primeira da ordem). */
+function primarySource(): string {
+  return providerOverride?.[0]?.name ?? getMarketProviderOrder()[0] ?? "binance";
 }
 
 function providers(): MarketProvider[] {
@@ -81,6 +87,11 @@ export interface CandlesOptions {
   limit?: number;
   /** força nova coleta ignorando o cache "fresco" */
   refresh?: boolean;
+  /**
+   * Inclui o candle em formação no fim de `candles`. Padrão false: sinais, indicadores e padrões usam
+   * só candles fechados (sem repaint). Use true apenas para exibição (gráfico) ou volume do candle atual.
+   */
+  includeForming?: boolean;
 }
 
 export async function getCandles(symbol: string, timeframe: Timeframe, options: CandlesOptions = {}): Promise<CandleSeries> {
@@ -99,16 +110,43 @@ export async function getCandles(symbol: string, timeframe: Timeframe, options: 
       if (!value.length) throw new Error("série vazia");
       return { candles: value, source, fetchedAt: Date.now() };
     },
-    { staleTtlSeconds: 6 * 3600 },
+    // janela de reserva proporcional ao timeframe: 3 períodos, entre 30 min e 3 dias (dado velho sai como DELAYED)
+    { staleTtlSeconds: Math.min(3 * 86_400, Math.max(1800, Math.round((3 * TIMEFRAME_MS[timeframe]) / 1000))) },
   );
 
+  const v = validateCandles(res.value.candles, timeframe);
+  const base = options.includeForming ? v.candles : v.closed;
+  const lastClosed = v.closed[v.closed.length - 1];
+  const cls = classifyStatus({
+    source: res.value.source,
+    primarySource: primarySource(),
+    fetchedAt: res.value.fetchedAt,
+    stale: res.stale,
+    timeframe,
+    lastClosedOpenTime: lastClosed?.openTime ?? null,
+    gaps: v.gaps,
+    invalid: v.invalid,
+  });
   return {
     symbol: asset.symbol,
     timeframe,
-    candles: res.value.candles.slice(-limit),
+    candles: base.slice(-limit),
+    forming: v.forming,
     source: res.value.source,
     fetchedAt: res.value.fetchedAt,
     stale: res.stale,
+    quality: {
+      status: cls.status,
+      source: res.value.source,
+      fetchedAt: res.value.fetchedAt,
+      ageMs: Date.now() - res.value.fetchedAt,
+      lastClosedOpenTime: lastClosed?.openTime ?? null,
+      gaps: v.gaps,
+      invalid: v.invalid,
+      duplicates: v.duplicates,
+      outliers: v.outliers,
+      issues: [...v.issues, ...cls.issues],
+    },
   };
 }
 
@@ -140,6 +178,59 @@ export async function getTickers(options: { refresh?: boolean } = {}): Promise<T
     { staleTtlSeconds: 6 * 3600 },
   );
   return { ...res.value, stale: res.stale };
+}
+
+export interface DivergenceRow {
+  symbol: string;
+  primary: number;
+  reference: number;
+  /** (referência − primária) / primária, em % (USDT na Binance × USD na Kraken: base difere ~0,0–0,2%) */
+  pct: number;
+  discrepancy: boolean;
+}
+
+export interface DivergenceReport {
+  checkedAt: number;
+  primarySource: MarketSource;
+  referenceSource: "kraken";
+  thresholdPct: number;
+  rows: DivergenceRow[];
+  discrepancies: number;
+  maxAbsPct: number | null;
+}
+
+/**
+ * Checagem cruzada de preço: ticker da fonte primária × último preço da Kraken (1 chamada).
+ * Acima de DIVERGENCE_THRESHOLD_PCT o ativo é marcado como DATA DISCREPANCY. Cache de 60 s.
+ */
+export async function getPriceDivergence(): Promise<DivergenceReport> {
+  const res = await cached<DivergenceReport>(
+    "quality:divergence",
+    60,
+    async () => {
+      const [primary, reference] = await Promise.all([getTickers(), getKrakenSpotPrices(ASSETS)]);
+      const rows: DivergenceRow[] = [];
+      for (const t of primary.tickers) {
+        const ref = reference.get(t.symbol);
+        const pct = ref != null ? priceDivergencePct(t.price, ref) : null;
+        if (pct == null) continue;
+        rows.push({ symbol: t.symbol, primary: t.price, reference: ref as number, pct, discrepancy: Math.abs(pct) > DIVERGENCE_THRESHOLD_PCT });
+      }
+      const discrepancies = rows.filter((r) => r.discrepancy);
+      if (discrepancies.length) log.warn("DATA DISCREPANCY entre fontes", { symbols: discrepancies.map((r) => `${r.symbol} ${r.pct.toFixed(2)}%`) });
+      return {
+        checkedAt: Date.now(),
+        primarySource: primary.source,
+        referenceSource: "kraken",
+        thresholdPct: DIVERGENCE_THRESHOLD_PCT,
+        rows,
+        discrepancies: discrepancies.length,
+        maxAbsPct: rows.length ? Math.max(...rows.map((r) => Math.abs(r.pct))) : null,
+      };
+    },
+    { staleTtlSeconds: 600 },
+  );
+  return res.value;
 }
 
 export async function getTicker(symbol: string): Promise<Ticker | undefined> {

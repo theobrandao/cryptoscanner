@@ -106,7 +106,10 @@ export class TickerCollector {
 
   private async flush() {
     if (!this.wsHealthy || this.live.size === 0) return;
-    const payload: TickersResult = { tickers: [...this.live.values()], source: "binance", stale: false, fetchedAt: Date.now() };
+    // idade real = evento mais recente recebido (não o instante do flush): WebSocket parado envelhece e sai do "ao vivo"
+    const lastEvent = Math.max(...[...this.live.values()].map((t) => t.updatedAt));
+    if (!Number.isFinite(lastEvent) || Date.now() - lastEvent > 15_000) return;
+    const payload: TickersResult = { tickers: [...this.live.values()], source: "binance", stale: false, fetchedAt: lastEvent };
     await getCache().set(CACHE_KEYS.tickersLive, payload, 30);
   }
 
@@ -114,7 +117,8 @@ export class TickerCollector {
     if (this.wsHealthy && this.live.size >= ASSETS.length) return;
     try {
       const res = await getTickers({ refresh: true });
-      await getCache().set(CACHE_KEYS.tickersLive, { ...res, fetchedAt: Date.now() }, 30);
+      // preserva fetchedAt e stale da coleta; dado de cache não vira "ao vivo"
+      if (!res.stale) await getCache().set(CACHE_KEYS.tickersLive, res, 30);
       log.debug("tickers via REST", { source: res.source, stale: res.stale });
     } catch (err) {
       log.warn("polling REST falhou", { error: (err as Error).message });

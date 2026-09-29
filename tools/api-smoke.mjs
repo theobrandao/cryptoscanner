@@ -452,6 +452,46 @@ await test("Operação", "GET /api/status (banco, provedores, jobs)", async () =
   return `${d.overall} · ${d.jobs.map((j) => `${j.job}:${j.state}`).join(", ")} · push ${d.integrations.push}`;
 });
 
+await test("Engines", "GET /api/engine/ETH?timeframe=4h (estrutura, liquidez, MTF; candle fechado)", async () => {
+  const r = await call("GET", "/api/engine/ETH?timeframe=4h", { auth: false });
+  expectStatus(r, 200);
+  const d = r.json.data;
+  const ext = d.structure.external;
+  expect(["bullish", "bearish", "neutral"].includes(ext.trend), `trend ${ext.trend}`);
+  expect(ext.swings.length >= 4, `poucos swings (${ext.swings.length})`);
+  for (let i = 1; i < ext.swings.length; i++) expect(ext.swings[i].kind !== ext.swings[i - 1].kind, "swings não alternam");
+  expect(d.lastClosed && d.lastClosed.openTime + 4 * 3600_000 <= Date.now() + 1000, "último candle não está fechado");
+  expect(Array.isArray(d.liquidity.pools) && d.liquidity.pools.length > 0, "mapa de liquidez vazio");
+  expect(d.mtf.rows.length >= 4 && Math.abs(d.mtf.alignmentScore) <= 100, "MTF inválido");
+  expect(d.candles === undefined, "candles não deveriam vir sem candles=1");
+  const bad = await call("GET", "/api/engine/XXX?timeframe=4h", { auth: false });
+  expect(bad.res.status === 400, `ativo inválido → ${bad.res.status}`);
+  return `${ext.trend} · ${ext.sequence} · último ${ext.lastEvent?.type ?? "—"} · pools ${d.liquidity.pools.length} · HTF ${d.mtf.alignmentScore} · qualidade ${d.quality?.status}`;
+});
+
+await test("Engines", "GET /api/market/quality (status por ativo + divergência entre fontes)", async () => {
+  const r = await call("GET", "/api/market/quality?timeframe=4h", { auth: false });
+  expectStatus(r, 200);
+  const d = r.json.data;
+  const total = Object.values(d.counts).reduce((a, b) => a + b, 0);
+  expect(total === d.assets.length && total >= 30, `contagem ${total}`);
+  return `${JSON.stringify(d.counts)} · divergência máx. ${d.divergence?.maxAbsPct?.toFixed(2) ?? "—"}%`;
+});
+
+await test("Estatística", "GET /api/patterns/stats com recorte ativo×regime e métricas em R", async () => {
+  const r = await call("GET", "/api/patterns/stats?timeframe=4h&symbol=BTC&regime=bull", { auth: false });
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(d.symbol === "BTC" && d.regime === "bull", "recorte não aplicado");
+  const all = await call("GET", "/api/patterns/stats?timeframe=4h", { auth: false });
+  const row = all.json.data.rows[0];
+  for (const k of ["hit1R", "hit2R", "hit3R", "expectancyR", "profitFactor", "maxDrawdownR", "avgMfeR", "avgMaeR"]) expect(k in row, `campo ${k} ausente`);
+  expect(row.hit1R >= row.hit2R && row.hit2R >= row.hit3R, "1R ≥ 2R ≥ 3R violado");
+  const inv = await call("GET", "/api/patterns/stats?timeframe=4h&regime=xyz", { auth: false });
+  expectStatus(inv, 400);
+  return `BTC bull: ${d.rows.length} padrões · geral: ${row.key} E=${row.expectancyR?.toFixed(2)}R n=${row.samples}`;
+});
+
 await test("On-chain", "GET /api/market/whales (coleta do cron) e POST /api/cron/whales", async () => {
   if (CRON_SECRET) {
     const c = await call("POST", "/api/cron/whales", { auth: false, headers: { authorization: `Bearer ${CRON_SECRET}` } });
@@ -863,6 +903,10 @@ await test("Suporte", "GET /api/support (meus chamados)", async () => {
 // ------------------------------------------------------------------ planos (ambiente de teste)
 await test("Planos", "POST /api/plans/change PLATINUM", async () => {
   const r = await call("POST", "/api/plans/change", { body: { plan: "PLATINUM" } });
+  if (r.res.status === 403) {
+    state.planLocked = true;
+    return "troca de plano bloqueada para não-admin (ALLOW_SELF_PLAN_CHANGE=false) — testes de PLATINUM pulados";
+  }
   expectStatus(r, 200);
   const me = await call("GET", "/api/auth/me");
   expect(me.json.data.user.plan === "PLATINUM", `plano ${me.json.data.user.plan}`);
@@ -870,6 +914,7 @@ await test("Planos", "POST /api/plans/change PLATINUM", async () => {
 });
 
 await test("Planos", "GET /api/scanner/table?timeframe=15m como PLATINUM → 200", async () => {
+  if (state.planLocked) return "pulado (plano bloqueado)";
   const r = await call("GET", "/api/scanner/table?timeframe=15m");
   expectStatus(r, 200);
   expect(r.json.data.rows.length === state.nAssets, `${r.json.data.rows.length} linhas`);
@@ -877,6 +922,7 @@ await test("Planos", "GET /api/scanner/table?timeframe=15m como PLATINUM → 200
 });
 
 await test("Planos", "GET /api/scanner/table?timeframe=1h e 30m como PLATINUM → 200", async () => {
+  if (state.planLocked) return "pulado (plano bloqueado)";
   const a = await call("GET", "/api/scanner/table?timeframe=1h");
   expectStatus(a, 200);
   const b = await call("GET", "/api/scanner/table?timeframe=30m");
@@ -885,6 +931,7 @@ await test("Planos", "GET /api/scanner/table?timeframe=1h e 30m como PLATINUM �
 });
 
 await test("Planos", "POST /api/agents timeframe 15m + notification=both como PLATINUM → 201", async () => {
+  if (state.planLocked) return "pulado (plano bloqueado)";
   const r = await call("POST", "/api/agents", { body: agentBody({ name: "Agente Platinum 15m", timeframe: "15m", notification: "both", symbols: ["BTC"] }) });
   expectStatus(r, 201);
   state.agentId3 = r.json.data.agent.id;
@@ -892,12 +939,14 @@ await test("Planos", "POST /api/agents timeframe 15m + notification=both como PL
 });
 
 await test("Planos", "POST /api/alerts channel=telegram como PLATINUM → 200", async () => {
+  if (state.planLocked) return "pulado (plano bloqueado)";
   const r = await call("POST", "/api/alerts", { body: { symbol: "SOL", kind: "rsi_below", threshold: 30, channel: "telegram" } });
   expectStatus(r, 200);
   return `alerta ${r.json.data.alert.id}`;
 });
 
 await test("Planos", "POST /api/plans/change FREE (volta)", async () => {
+  if (state.planLocked) return "pulado (plano bloqueado)";
   const r = await call("POST", "/api/plans/change", { body: { plan: "FREE" } });
   expectStatus(r, 200);
   const t = await call("GET", "/api/scanner/table?timeframe=15m");

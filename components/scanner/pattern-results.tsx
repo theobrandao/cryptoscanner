@@ -209,19 +209,18 @@ export function VolumeAlerts({ alerts, assets, checkedAt, loading }: { alerts: V
 
 /** Taxa de acerto histórica do padrão (backtest walk-forward) — base real para ler a confiança geométrica. */
 function HitRateLine({ stat, timeframe }: { stat: PatternStatRow | undefined; timeframe: "4h" | "1d" | null }) {
-  if (!timeframe) return <p className="mt-2 text-[11px] text-muted-foreground">Taxa de acerto histórica disponível em 4H e 1D.</p>;
+  if (!timeframe) return <p className="mt-2 text-[11px] text-muted-foreground">Histórico do padrão disponível em 4H e 1D.</p>;
   if (!stat) return null;
-  const resolved = stat.wins + stat.losses;
-  const hr = stat.hitRate;
-  const tone = hr == null || resolved < 10 ? "text-muted-foreground" : hr >= 0.55 ? "text-success" : hr >= 0.4 ? "text-warning" : "text-danger";
+  const small = stat.samples < 30;
+  const e = stat.expectancyR;
+  const tone = e == null || small ? "text-muted-foreground" : e > 0.05 ? "text-success" : e < -0.05 ? "text-danger" : "text-warning";
   return (
     <Link href={`/estatisticas?timeframe=${timeframe}#${stat.key}`} className="mt-2 flex flex-wrap items-center gap-x-2 rounded-md border border-border/60 px-2 py-1 text-[11px] hover:bg-muted/40">
-      <span className="text-muted-foreground">Histórico ({timeframe.toUpperCase()}):</span>
-      <span className={cn("font-semibold tabular", tone)}>{hr == null ? "—" : `${Math.round(hr * 100)}% de acerto`}</span>
+      <span className="text-muted-foreground">Histórico ({timeframe.toUpperCase()}, 30 ativos):</span>
+      <span className={cn("font-semibold tabular", tone)}>{e == null ? "—" : `expectativa ${e >= 0 ? "+" : ""}${e.toFixed(2)}R`}</span>
       <span className="text-muted-foreground tabular">
-        n={resolved}
-        {stat.avgReturnPct != null ? ` · retorno médio ${stat.avgReturnPct >= 0 ? "+" : ""}${stat.avgReturnPct.toFixed(2)}%` : ""}
-        {resolved < 10 ? " · amostra pequena" : ""}
+        acerto {stat.hitRate == null ? "—" : `${Math.round(stat.hitRate * 100)}%`} · n={stat.samples}
+        {small ? " · amostra pequena" : ""}
       </span>
     </Link>
   );

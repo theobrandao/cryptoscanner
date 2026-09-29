@@ -72,7 +72,7 @@ export async function evaluateAlerts(): Promise<{ evaluated: number; triggered: 
           break;
         }
         case "volume": {
-          const v = detectVolumeAnomaly(symbol, tf, (await getCandles(symbol, tf, { limit: 60 })).candles, { thresholdPct: a.threshold ?? 100 });
+          const v = detectVolumeAnomaly(symbol, tf, (await getCandles(symbol, tf, { limit: 60, includeForming: true })).candles, { thresholdPct: a.threshold ?? 100 });
           if (v) {
             fired = true;
             message = `${symbol} ${tf}: volume +${v.increasePct}% sobre a média`;

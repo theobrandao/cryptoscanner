@@ -14,7 +14,7 @@ import type { ToolMap } from "@/agents/runtime";
  * bloqueia qualquer outra. Os nomes são estáveis e aparecem nos logs.
  */
 export interface MarketTools {
-  getCandles(symbol: string, timeframe: Timeframe, limit?: number): Promise<CandleSeries>;
+  getCandles(symbol: string, timeframe: Timeframe, limit?: number, includeForming?: boolean): Promise<CandleSeries>;
   getTicker(symbol: string): Promise<Ticker | undefined>;
   getTickers(): Promise<TickersResult>;
 }
@@ -47,7 +47,7 @@ export const TOOL_NAMES = {
 
 export function createDefaultTools(overrides: Partial<ToolMap> = {}): ToolMap {
   const market: MarketTools = {
-    getCandles: (symbol, timeframe, limit) => getCandles(symbol, timeframe, { limit }),
+    getCandles: (symbol, timeframe, limit, includeForming) => getCandles(symbol, timeframe, { limit, includeForming }),
     getTicker,
     getTickers,
   };

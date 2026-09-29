@@ -30,7 +30,7 @@ export const GET = withApi(async (req) => {
         tfs.map((tf) =>
           limiter(async () => {
             try {
-              const s = await getCandles(symbol, tf, { limit: 60 });
+              const s = await getCandles(symbol, tf, { limit: 60, includeForming: true });
               sources.add(s.source);
               const a = detectVolumeAnomaly(symbol, tf, s.candles, { thresholdPct: q.threshold });
               if (a) alerts.push(a);

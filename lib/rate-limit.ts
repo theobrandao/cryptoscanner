@@ -24,8 +24,18 @@ export async function rateLimit(bucket: string, key: string, limitPerMinute: num
   };
 }
 
+/**
+ * IP do cliente para rate limit. Na Vercel, `x-vercel-forwarded-for`/`x-real-ip` são definidos pela
+ * própria plataforma (o cliente não controla). Fora dela, só confia em X-Forwarded-For com TRUST_PROXY=true
+ * e usa o salto mais à direita (o proxy de borda), não o primeiro, que é falsificável.
+ */
 export function clientIp(req: Request): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]?.trim() ?? "unknown";
+  const vercel = req.headers.get("x-vercel-forwarded-for");
+  if (vercel) return vercel.split(",")[0]?.trim() || "unknown";
+  if (process.env.VERCEL) return req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (process.env.TRUST_PROXY === "true") {
+    const hops = (req.headers.get("x-forwarded-for") ?? "").split(",").map((h) => h.trim()).filter(Boolean);
+    return hops[hops.length - 1] ?? req.headers.get("x-real-ip") ?? "unknown";
+  }
   return req.headers.get("x-real-ip") ?? "unknown";
 }

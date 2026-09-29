@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, Skeleton } from "@/components/ui/misc";
 import { formatDateTime } from "@/lib/format";
+import type { QualityReport } from "@/services/data-quality-service";
 import type { SystemStatus } from "@/services/status-service";
 
 const JOB_LABEL: Record<string, string> = { cycle: "Ciclo (scan, agentes, alertas, sinais)", whales: "Baleias on-chain", backtest: "Backtest diário dos padrões" };
@@ -65,6 +66,7 @@ export function StatusView() {
               ))}
             </CardContent>
           </Card>
+          <DataQualityCard />
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -98,6 +100,54 @@ export function StatusView() {
         </div>
       )}
     </PageShell>
+  );
+}
+
+const STATUS_VARIANT: Record<string, "success" | "warning" | "danger" | "muted"> = { LIVE: "success", FALLBACK: "muted", DEGRADED: "warning", DELAYED: "warning", OFFLINE: "danger" };
+
+function DataQualityCard() {
+  const { data } = useSWR<QualityReport>("/api/market/quality?timeframe=4h", { refreshInterval: 120_000 });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Qualidade dos dados (4H, 30 ativos)</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 text-sm">
+        {!data ? (
+          <Skeleton className="h-16" />
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(data.counts) as Array<keyof QualityReport["counts"]>).map((k) => (
+                <Badge key={k} variant={STATUS_VARIANT[k] ?? "muted"}>
+                  {k} {data.counts[k]}
+                </Badge>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Divergência Binance × Kraken:{" "}
+              {data.divergence
+                ? `${data.divergence.rows.length} ativos comparados · máx. ${data.divergence.maxAbsPct?.toFixed(2) ?? "—"}% · ${data.divergence.discrepancies} acima de ${data.divergence.thresholdPct}%`
+                : "indisponível"}
+              . Sinais usam apenas candles fechados.
+            </p>
+            {data.assets.filter((a) => a.quality?.status !== "LIVE").length ? (
+              <ul className="flex flex-col gap-1 text-xs">
+                {data.assets
+                  .filter((a) => a.quality?.status !== "LIVE")
+                  .map((a) => (
+                    <li key={a.symbol} className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{a.symbol}</span>
+                      <Badge variant={STATUS_VARIANT[a.quality?.status ?? "OFFLINE"] ?? "muted"}>{a.quality?.status ?? "OFFLINE"}</Badge>
+                      <span className="text-muted-foreground">{a.error ?? a.quality?.issues.join(" · ")}</span>
+                    </li>
+                  ))}
+              </ul>
+            ) : null}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

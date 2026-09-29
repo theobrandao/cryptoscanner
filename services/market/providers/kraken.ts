@@ -1,4 +1,4 @@
-import type { Candle, Ticker, Timeframe } from "@/types/market";
+import type { AssetDefinition, Candle, Ticker, Timeframe } from "@/types/market";
 import { getEnv } from "@/lib/env";
 import { fetchJson, HttpError } from "@/lib/http";
 import { KRAKEN_INTERVAL, TIMEFRAME_MS } from "@/lib/timeframes";
@@ -128,6 +128,21 @@ export const krakenProvider: MarketProvider = {
     return out;
   },
 };
+
+/** Último preço por ativo numa única chamada (sem os OHLC de variação 24h) — usado na checagem de divergência. */
+export async function getKrakenSpotPrices(assets: readonly AssetDefinition[]): Promise<Map<string, number>> {
+  const pairs = assets.map((a) => a.krakenPair).join(",");
+  const result = await krakenGet<Record<string, KrakenTickerEntry>>(`/0/public/Ticker?pair=${pairs}`);
+  const normalized = new Map<string, KrakenTickerEntry>();
+  for (const [k, v] of Object.entries(result)) normalized.set(normalizeKrakenKey(k), v);
+  const out = new Map<string, number>();
+  for (const a of assets) {
+    const t = normalized.get(normalizeKrakenKey(a.krakenPair));
+    const price = t ? Number(t.c[0]) : NaN;
+    if (Number.isFinite(price) && price > 0) out.set(a.symbol, price);
+  }
+  return out;
+}
 
 /** XXBTZUSD → XBTUSD, XETHZUSD → ETHUSD, XDGUSD → XDGUSD, SOLUSD → SOLUSD */
 export function normalizeKrakenKey(key: string): string {

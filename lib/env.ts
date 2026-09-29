@@ -44,7 +44,7 @@ const schema = z.object({
   RATE_LIMIT_LLM_PER_MINUTE: z.coerce.number().int().min(1).default(5),
   ALLOW_SELF_PLAN_CHANGE: z
     .string()
-    .default("true")
+    .default("false")
     .transform((v) => v === "true"),
   /** Uso pessoal: se definido, o cadastro exige este código de convite. */
   REGISTRATION_INVITE_CODE: z.string().min(8).optional(),

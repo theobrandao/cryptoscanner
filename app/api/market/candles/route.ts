@@ -20,7 +20,9 @@ export const GET = withApi(async (req) => {
   await enforceRateLimit(req, "public");
   const q = parseQuery(req, querySchema);
   const tf = parseTimeframe(q.timeframe);
-  const series = await getCandles(q.symbol, tf, { limit: q.limit });
+  // exibição: inclui o candle em formação; o snapshot (sinais) usa só os fechados
+  const series = await getCandles(q.symbol, tf, { limit: q.limit, includeForming: true });
+  const closed = series.forming ? series.candles.slice(0, -1) : series.candles;
   if (q.indicators !== "1") return ok(series);
   const closes = series.candles.map((c) => c.close);
   const m = macd(closes);
@@ -29,7 +31,7 @@ export const GET = withApi(async (req) => {
   const nan = (v: number | undefined) => (v === undefined || Number.isNaN(v) ? null : v);
   return ok({
     ...series,
-    snapshot: JSON.parse(JSON.stringify(computeSnapshot(series.candles), (_k, v) => (typeof v === "number" && !Number.isFinite(v) ? null : v))),
+    snapshot: JSON.parse(JSON.stringify(computeSnapshot(closed), (_k, v) => (typeof v === "number" && !Number.isFinite(v) ? null : v))),
     series: {
       ema8: ema(closes, 8).map(nan),
       ema25: ema(closes, 25).map(nan),

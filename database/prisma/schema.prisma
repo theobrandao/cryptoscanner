@@ -468,3 +468,24 @@ model AppSetting {
   value     Json
   updatedAt DateTime @updatedAt
 }
+
+/// Backtest walk-forward agregado por padrão × timeframe × ativo × regime ("*" = todos). Recalculado diariamente.
+model BacktestStat {
+  id           String   @id @default(cuid())
+  timeframe    String
+  patternKey   String
+  symbol       String   @default("*")
+  regime       String   @default("*")
+  samples      Int
+  hitRate      Float?
+  expectancyR  Float?
+  profitFactor Float?
+  /** PatternStat completo (R, MAE/MFE, drawdown, 1R/2R/3R) */
+  metrics      Json
+  fromTime     DateTime
+  toTime       DateTime
+  computedAt   DateTime @default(now())
+
+  @@unique([timeframe, patternKey, symbol, regime])
+  @@index([timeframe, symbol, regime])
+}

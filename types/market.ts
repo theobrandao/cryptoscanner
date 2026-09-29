@@ -55,11 +55,16 @@ export type Direction = "bullish" | "bearish" | "neutral";
 export interface CandleSeries {
   symbol: string;
   timeframe: Timeframe;
+  /** candles FECHADOS (padrão) ou fechados + em formação quando pedido com includeForming */
   candles: Candle[];
+  /** candle em formação (null se o último já fechou) — nunca usado para sinal */
+  forming?: Candle | null;
   source: MarketSource;
   fetchedAt: number;
   /** true quando os dados vieram de cache por indisponibilidade dos provedores */
   stale: boolean;
+  /** diagnóstico do Data Quality Engine */
+  quality?: import("@/lib/engines/quality").DataQuality;
 }
 
 export interface ProviderHealth {

@@ -3,12 +3,16 @@ import { z } from "zod";
 import { enforceRateLimit, ok, parseQuery, withApi } from "@/lib/api";
 import { getPatternStats, STATS_TIMEFRAMES } from "@/services/pattern-stats-service";
 
-const querySchema = z.object({ timeframe: z.enum(STATS_TIMEFRAMES).default("1d") });
+const querySchema = z.object({
+  timeframe: z.enum(STATS_TIMEFRAMES).default("1d"),
+  symbol: z.string().regex(/^[A-Z0-9*]{1,10}$/).default("*"),
+  regime: z.enum(["*", "bull", "bear", "range"]).default("*"),
+});
 
 /** Taxa de acerto por padrão: backtest walk-forward + sinais acompanhados ao vivo. */
 export const GET = withApi(async (req) => {
   await connection();
   await enforceRateLimit(req, "public");
-  const { timeframe } = parseQuery(req, querySchema);
-  return ok(await getPatternStats(timeframe));
+  const { timeframe, symbol, regime } = parseQuery(req, querySchema);
+  return ok(await getPatternStats(timeframe, { symbol, regime }));
 });

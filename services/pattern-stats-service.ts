@@ -3,7 +3,7 @@ import { ASSETS } from "@/lib/assets";
 import { getCache } from "@/lib/cache";
 import { createLogger } from "@/lib/logger";
 import { resolveTrade, summarizeTrades, walkForward, wilsonInterval, type BacktestTrade, type PatternStat } from "@/lib/patterns/backtest";
-import { PATTERN_CATALOG, PATTERN_KEYS, type PatternKey } from "@/lib/patterns/catalog";
+import { PATTERN_KEYS, type PatternKey } from "@/lib/patterns/catalog";
 import { TIMEFRAME_MS } from "@/lib/timeframes";
 import { getCandles } from "@/services/market/market-service";
 import { createLimiter } from "@/services/market/providers/types";
@@ -41,6 +41,10 @@ export interface PatternStatRow extends PatternStat {
 
 export interface PatternStatsReport {
   timeframe: StatsTimeframe;
+  symbol: string;
+  regime: string;
+  minSample: number;
+  symbols: string[];
   computedAt: number;
   assets: number;
   fromTime: number;
@@ -66,14 +70,30 @@ export const METHOD_NOTE =
   `até ${HORIZON_BARS} candles. Alvo e stop no mesmo candle contam como stop. Taxa de acerto = alvos / (alvos + stops); expiradas ficam fora da taxa e entram no retorno médio. ` +
   "Sem custos de corretagem/slippage. Resultado passado não garante resultado futuro.";
 
-/** Executa o backtest de um timeframe para todo o universo de ativos e grava o agregado. */
-export async function computeBacktest(tf: StatsTimeframe, options: { symbols?: string[]; timeBudgetMs?: number } = {}): Promise<BacktestCacheValue> {
+/** Amostra mínima para exibir uma estatística sem aviso de amostra pequena. */
+export const MIN_SAMPLE = 30;
+
+export interface SliceStat extends PatternStat {
+  symbol: string; // "*" = todos
+  regime: string; // "*" = todos | bull | bear | range
+}
+
+interface BacktestCacheValueV2 extends BacktestCacheValue {
+  /** recortes por ativo e por regime (inclui o agregado "*"/"*" em `stats`) */
+  slices: SliceStat[];
+}
+
+function slice(trades: readonly BacktestTrade[], symbol: string, regime: string): SliceStat[] {
+  return summarizeTrades(trades).map((st) => ({ ...st, symbol, regime }));
+}
+
+/** Executa o backtest de um timeframe para todo o universo de ativos e grava os agregados (total, por ativo, por regime, ativo×regime). */
+export async function computeBacktest(tf: StatsTimeframe, options: { symbols?: string[]; timeBudgetMs?: number } = {}): Promise<BacktestCacheValueV2> {
   const started = Date.now();
   const symbols = options.symbols ?? ASSETS.map((a) => a.symbol);
   const budget = options.timeBudgetMs ?? 40_000;
   const limiter = createLimiter(4, 0);
-  const trades: BacktestTrade[] = [];
-  let assets = 0;
+  const bySymbol = new Map<string, BacktestTrade[]>();
   let fromTime = Number.POSITIVE_INFINITY;
   let toTime = 0;
   await Promise.all(
@@ -84,8 +104,7 @@ export async function computeBacktest(tf: StatsTimeframe, options: { symbols?: s
           const series = await getCandles(symbol, tf, { limit: 600 });
           const cs = series.candles;
           if (cs.length < 250) return;
-          trades.push(...walkForward(cs, { horizon: HORIZON_BARS, cooldown: COOLDOWN_BARS, minConfidence: MIN_CONFIDENCE }));
-          assets++;
+          bySymbol.set(symbol, walkForward(cs, { horizon: HORIZON_BARS, cooldown: COOLDOWN_BARS, minConfidence: MIN_CONFIDENCE }));
           fromTime = Math.min(fromTime, cs[0]?.openTime ?? fromTime);
           toTime = Math.max(toTime, cs[cs.length - 1]?.openTime ?? toTime);
         } catch (err) {
@@ -94,69 +113,110 @@ export async function computeBacktest(tf: StatsTimeframe, options: { symbols?: s
       }),
     ),
   );
-  const value: BacktestCacheValue = {
+  const assets = bySymbol.size;
+  if (assets === 0) throw new Error(`backtest ${tf}: nenhum ativo com histórico suficiente`);
+  const trades = [...bySymbol.values()].flat();
+  const regimes = ["bull", "bear", "range"] as const;
+  const slices: SliceStat[] = [...slice(trades, "*", "*")];
+  for (const r of regimes) slices.push(...slice(trades.filter((t) => t.regime === r), "*", r));
+  for (const [sym, list] of bySymbol) {
+    slices.push(...slice(list, sym, "*"));
+    for (const r of regimes) slices.push(...slice(list.filter((t) => t.regime === r), sym, r));
+  }
+  const value: BacktestCacheValueV2 = {
     timeframe: tf,
     computedAt: Date.now(),
     assets,
     fromTime: Number.isFinite(fromTime) ? fromTime : 0,
     toTime,
     totalTrades: trades.length,
-    stats: summarizeTrades(trades),
+    stats: slices.filter((x) => x.symbol === "*" && x.regime === "*"),
+    slices,
   };
-  if (assets === 0) throw new Error(`backtest ${tf}: nenhum ativo com histórico suficiente`);
   await getCache().set(cacheKey(tf), value, CACHE_TTL);
   const prisma = getPrisma();
   if (prisma) {
-    await prisma.$transaction(
-      value.stats.map((s) =>
-        prisma.patternStat.upsert({
-          where: { timeframe_patternKey: { timeframe: tf, patternKey: s.key } },
-          create: { timeframe: tf, patternKey: s.key, samples: s.samples, wins: s.wins, losses: s.losses, expired: s.expired, hitRate: s.hitRate, avgReturnPct: s.avgReturnPct, avgBars: s.avgBars, assets, fromTime: new Date(value.fromTime), toTime: new Date(value.toTime) },
-          update: { samples: s.samples, wins: s.wins, losses: s.losses, expired: s.expired, hitRate: s.hitRate, avgReturnPct: s.avgReturnPct, avgBars: s.avgBars, assets, fromTime: new Date(value.fromTime), toTime: new Date(value.toTime), computedAt: new Date() },
-        }),
-      ),
-    );
+    const from = new Date(value.fromTime);
+    const to = new Date(value.toTime);
+    const finite = (v: number | null) => (v != null && Number.isFinite(v) ? v : null);
+    await prisma.$transaction([
+      prisma.backtestStat.deleteMany({ where: { timeframe: tf } }),
+      prisma.backtestStat.createMany({
+        data: slices.map((x) => ({
+          timeframe: tf,
+          patternKey: x.key,
+          symbol: x.symbol,
+          regime: x.regime,
+          samples: x.samples,
+          hitRate: finite(x.hitRate),
+          expectancyR: finite(x.expectancyR),
+          profitFactor: finite(x.profitFactor),
+          metrics: JSON.parse(JSON.stringify(x, (_k, v) => (typeof v === "number" && !Number.isFinite(v) ? null : v))),
+          fromTime: from,
+          toTime: to,
+        })),
+      }),
+    ]);
   }
-  log.info("backtest concluído", { tf, assets, trades: trades.length, ms: Date.now() - started });
+  log.info("backtest concluído", { tf, assets, trades: trades.length, slices: slices.length, ms: Date.now() - started });
   return value;
 }
 
-async function loadBacktest(tf: StatsTimeframe): Promise<BacktestCacheValue | null> {
-  const hit = await getCache().get<BacktestCacheValue>(cacheKey(tf));
-  if (hit) return hit;
+async function loadBacktest(tf: StatsTimeframe): Promise<BacktestCacheValueV2 | null> {
+  const hit = await getCache().get<BacktestCacheValueV2>(cacheKey(tf));
+  if (hit?.slices) return hit;
   const prisma = getPrisma();
   if (prisma) {
-    const rows = await prisma.patternStat.findMany({ where: { timeframe: tf } });
+    const rows = await prisma.backtestStat.findMany({ where: { timeframe: tf } });
     if (rows.length) {
+      const slices = rows
+        .filter((r) => (PATTERN_KEYS as readonly string[]).includes(r.patternKey))
+        .map((r) => ({ ...(r.metrics as unknown as SliceStat), symbol: r.symbol, regime: r.regime }));
+      const all = slices.filter((x) => x.symbol === "*" && x.regime === "*").sort((a, b) => b.samples - a.samples);
       const first = rows[0]!;
-      const value: BacktestCacheValue = {
+      const value: BacktestCacheValueV2 = {
         timeframe: tf,
         computedAt: Math.max(...rows.map((r) => r.computedAt.getTime())),
-        assets: first.assets,
+        assets: new Set(rows.filter((r) => r.symbol !== "*").map((r) => r.symbol)).size,
         fromTime: first.fromTime.getTime(),
         toTime: first.toTime.getTime(),
-        totalTrades: rows.reduce((s, r) => s + r.samples, 0),
-        stats: rows
-          .filter((r): r is typeof r & { patternKey: PatternKey } => (PATTERN_KEYS as readonly string[]).includes(r.patternKey))
-          .map((r) => ({
-            key: r.patternKey,
-            label: PATTERN_CATALOG[r.patternKey].label,
-            direction: PATTERN_CATALOG[r.patternKey].direction,
-            samples: r.samples,
-            wins: r.wins,
-            losses: r.losses,
-            expired: r.expired,
-            hitRate: r.hitRate,
-            avgReturnPct: r.avgReturnPct,
-            avgBars: r.avgBars,
-          }))
-          .sort((a, b) => b.samples - a.samples),
+        totalTrades: all.reduce((s, r) => s + r.samples, 0),
+        stats: all,
+        slices,
       };
       await getCache().set(cacheKey(tf), value, CACHE_TTL);
       return value;
     }
   }
   return null;
+}
+
+export interface EdgeLookup {
+  stat: SliceStat;
+  /** granularidade usada: ativo×regime → ativo → regime → todos */
+  scope: "symbol+regime" | "symbol" | "regime" | "all";
+  smallSample: boolean;
+}
+
+/**
+ * Historical edge de um padrão: usa o recorte mais específico com n ≥ MIN_SAMPLE
+ * (ativo×regime → ativo → regime → todos). Nunca inventa: sem backtest, retorna null.
+ */
+export async function getHistoricalEdge(tf: Timeframe, key: PatternKey, symbol?: string, regime?: string): Promise<EdgeLookup | null> {
+  if (!(STATS_TIMEFRAMES as readonly string[]).includes(tf)) return null;
+  const bt = await loadBacktest(tf as StatsTimeframe);
+  if (!bt) return null;
+  const find = (sym: string, reg: string) => bt.slices.find((x) => x.key === key && x.symbol === sym && x.regime === reg);
+  const candidates: Array<[EdgeLookup["scope"], SliceStat | undefined]> = [
+    ["symbol+regime", symbol && regime ? find(symbol, regime) : undefined],
+    ["symbol", symbol ? find(symbol, "*") : undefined],
+    ["regime", regime ? find("*", regime) : undefined],
+    ["all", find("*", "*")],
+  ];
+  for (const [scope, st] of candidates) if (st && st.samples >= MIN_SAMPLE) return { stat: st, scope, smallSample: false };
+  const any = candidates.find(([, st]) => st)?.[1];
+  const scope = candidates.find(([, st]) => st)?.[0] ?? "all";
+  return any ? { stat: any, scope, smallSample: true } : null;
 }
 
 async function liveStats(tf: StatsTimeframe): Promise<Map<PatternKey, LiveStat>> {
@@ -184,17 +244,24 @@ async function liveStats(tf: StatsTimeframe): Promise<Map<PatternKey, LiveStat>>
 }
 
 /** Relatório para a página /estatisticas e para os cartões do scanner. Calcula na hora se não houver agregado. */
-export async function getPatternStats(tf: StatsTimeframe): Promise<PatternStatsReport> {
+export async function getPatternStats(tf: StatsTimeframe, filter: { symbol?: string; regime?: string } = {}): Promise<PatternStatsReport> {
   const bt = (await loadBacktest(tf)) ?? (await computeBacktest(tf));
   const live = await liveStats(tf);
-  const rows: PatternStatRow[] = bt.stats.map((s) => ({ ...s, ci: wilsonInterval(s.wins, s.wins + s.losses), live: live.get(s.key) ?? null }));
+  const symbol = filter.symbol ?? "*";
+  const regime = filter.regime ?? "*";
+  const chosen = bt.slices.filter((x) => x.symbol === symbol && x.regime === regime).sort((a, b) => b.samples - a.samples);
+  const rows: PatternStatRow[] = chosen.map((s) => ({ ...s, ci: wilsonInterval(s.wins, s.wins + s.losses), live: symbol === "*" && regime === "*" ? (live.get(s.key) ?? null) : null }));
   return {
+    symbol,
+    regime,
+    minSample: MIN_SAMPLE,
+    symbols: [...new Set(bt.slices.map((x) => x.symbol).filter((x) => x !== "*"))].sort(),
     timeframe: tf,
     computedAt: bt.computedAt,
     assets: bt.assets,
     fromTime: bt.fromTime,
     toTime: bt.toTime,
-    totalTrades: bt.totalTrades,
+    totalTrades: chosen.reduce((sum, r) => sum + r.samples, 0),
     params: { horizonBars: HORIZON_BARS, cooldownBars: COOLDOWN_BARS, minConfidence: MIN_CONFIDENCE, lookback: 160 },
     rows,
     method: METHOD_NOTE,
@@ -217,14 +284,16 @@ export async function trackLiveSignals(scans: readonly ScanResult[]): Promise<{ 
       for (const p of row.patterns) {
         if (p.direction === "neutral" || p.target == null || p.stop == null || p.confidence < MIN_CONFIDENCE) continue;
         const long = p.direction === "bullish";
-        if (long ? !(p.target > row.price && p.stop < row.price) : !(p.target < row.price && p.stop > row.price)) continue;
+        // entrada = fechamento do último candle fechado (mesma régua do backtest)
+        const entry = p.price;
+        if (long ? !(p.target > entry && p.stop < entry) : !(p.target < entry && p.stop > entry)) continue;
         const recent = await prisma.patternSignal.findFirst({
           where: { symbol: row.symbol, timeframe: tf, patternKey: p.key, detectedAt: { gte: new Date(Date.now() - cooldownMs) } },
           select: { id: true },
         });
         if (recent) continue;
         await prisma.patternSignal.create({
-          data: { symbol: row.symbol, timeframe: tf, patternKey: p.key, direction: p.direction, confidence: p.confidence, entry: row.price, target: p.target, stop: p.stop, candleTime: new Date(row.candleTime) },
+          data: { symbol: row.symbol, timeframe: tf, patternKey: p.key, direction: p.direction, confidence: p.confidence, entry, target: p.target, stop: p.stop, candleTime: new Date(row.candleTime) },
         });
         created++;
       }
@@ -272,12 +341,4 @@ export async function trackLiveSignals(scans: readonly ScanResult[]): Promise<{ 
   }
   const stillOpen = await prisma.patternSignal.count({ where: { status: "open" } });
   return { created, resolved, open: stillOpen };
-}
-
-/** Mapa compacto para os cartões do scanner: key → taxa de acerto do backtest e n. */
-export async function getHitRateMap(tf: Timeframe): Promise<Record<string, { hitRate: number | null; n: number }> | null> {
-  if (!(STATS_TIMEFRAMES as readonly string[]).includes(tf)) return null;
-  const bt = await loadBacktest(tf as StatsTimeframe);
-  if (!bt) return null;
-  return Object.fromEntries(bt.stats.map((s) => [s.key, { hitRate: s.hitRate, n: s.wins + s.losses }]));
 }

@@ -14,7 +14,7 @@ const OUT = process.env.OUT_DIR ?? "./responsive-out";
 const WIDTHS = (process.env.WIDTHS ?? "360,390,768,1280").split(",").map(Number);
 const ROUTES = (
   process.env.ROUTES ??
-  "/,/scanner,/estatisticas,/graficos,/agentes,/sentinela,/panorama,/bubbles,/fibonacci,/carteira,/simulador,/mentor,/jornada,/planos,/preferencias,/suporte,/status,/login,/registro"
+  "/,/terminal,/terminal?tab=liquidity,/terminal?tab=mtf,/risco,/scanner,/estatisticas,/graficos,/agentes,/sentinela,/panorama,/bubbles,/fibonacci,/carteira,/simulador,/mentor,/jornada,/planos,/preferencias,/suporte,/status,/login,/registro"
 ).split(",");
 mkdirSync(OUT, { recursive: true });
 

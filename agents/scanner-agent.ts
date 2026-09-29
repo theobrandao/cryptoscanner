@@ -96,7 +96,7 @@ export const scannerAgent = defineAgent<ScannerInput, ScannerOutput>({
     const volumeTool = ctx.tools.use<VolumeTools>("volume");
     const limiter = createLimiter(input.concurrency, 0);
 
-    let tickers = new Map<string, { changePct24h: number; volume24h: number; quoteVolume24h: number }>();
+    let tickers = new Map<string, { price: number; changePct24h: number; volume24h: number; quoteVolume24h: number }>();
     try {
       const t = await market.getTickers();
       tickers = new Map(t.tickers.map((k) => [k.symbol, k]));
@@ -129,7 +129,8 @@ export const scannerAgent = defineAgent<ScannerInput, ScannerOutput>({
             const lastCandle = series.candles[series.candles.length - 1];
             rows.push({
               symbol,
-              price: snap.price,
+              // preço exibido = último negócio (ticker); indicadores e padrões usam só candles fechados
+              price: t?.price ?? snap.price,
               changePct24h: t ? round(t.changePct24h, 2) : null,
               volume24h: t ? t.volume24h : null,
               quoteVolume24h: t ? t.quoteVolume24h : null,
@@ -159,7 +160,7 @@ export const scannerAgent = defineAgent<ScannerInput, ScannerOutput>({
             if (input.includeVolume) {
               for (const vtf of input.volumeTimeframes as Timeframe[]) {
                 try {
-                  const vs = await market.getCandles(symbol, vtf, 60);
+                  const vs = await market.getCandles(symbol, vtf, 60, true);
                   const anomaly = volumeTool.detect(symbol, vtf, vs.candles);
                   if (anomaly) volumeAlerts.push(anomaly);
                 } catch (err) {
