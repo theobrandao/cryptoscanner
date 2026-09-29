@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { TRIAL_DAYS } from "@/lib/entitlements";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -65,7 +66,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           {mode === "login" ? <LogIn className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />} {mode === "login" ? "Entrar" : "Criar conta"}
         </CardTitle>
         <CardDescription>
-          {mode === "login" ? "Acesse seu workspace, estratégias, monitores e watchlists." : "7 dias de teste completo, sem cartão. Depois, PRO ou ELITE."}
+          {mode === "login" ? "Acesse seu workspace, estratégias, monitores e watchlists." : `${TRIAL_DAYS} dias grátis no PRO, sem cartão. Depois, PRO ou ELITE.`}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -106,8 +107,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             </div>
           ) : null}
           {mode === "register" ? (
-            <label className="flex items-start gap-2 text-xs text-muted-foreground">
-              <input id="accept-terms" type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} required className="mt-0.5" />
+            <label className="flex min-h-11 items-start gap-2.5 text-xs leading-relaxed text-muted-foreground">
+              <input id="accept-terms" type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} required className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--primary)]" />
               <span>
                 Li e aceito os{" "}
                 <Link href="/termos" target="_blank" className="text-primary underline">
@@ -127,10 +128,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           ) : null}
           {error ? <Alert variant="danger">{error}</Alert> : null}
           <Button type="submit" loading={loading} disabled={mode === "register" && !accept}>
-            {mode === "login" ? "Entrar" : "Começar teste de 7 dias"}
+            {mode === "login" ? "Entrar" : `Começar ${TRIAL_DAYS} dias grátis`}
           </Button>
           {mode === "login" ? (
-            <Link href="/esqueci-senha" className="text-center text-xs text-muted-foreground hover:text-foreground">
+            <Link href="/esqueci-senha" className="inline-flex min-h-10 items-center justify-center text-xs text-muted-foreground hover:text-foreground">
               Esqueci minha senha
             </Link>
           ) : null}

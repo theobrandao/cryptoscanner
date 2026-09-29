@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { TRIAL_DAYS } from "@/lib/entitlements";
 import { Bot, Loader2, Send, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useActiveSelection, selectionKey } from "@/hooks/use-market-selection";
@@ -104,7 +105,7 @@ export function AiAnalystPanel({ open, onOpenChange }: { open: boolean; onOpenCh
               <Link href="/login" className="text-primary underline">
                 Entre
               </Link>{" "}
-              ou comece o teste de 7 dias para usar o Analista IA.
+              ou comece o teste grátis de {TRIAL_DAYS} dias para usar o Analista IA.
             </p>
           ) : null}
           {busy && !reply ? (

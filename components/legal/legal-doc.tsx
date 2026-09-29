@@ -1,6 +1,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { getEnv, legalDocKind } from "@/lib/env";
+import { TRIAL_DAYS } from "@/lib/entitlements";
 
 /** Dados do fornecedor/controlador vindos do ambiente. Nada é inventado: campo ausente aparece como "não configurado". */
 export function legalEntity() {
@@ -19,6 +20,10 @@ export function legalEntity() {
     pro: env.PRICE_PRO_BRL,
     elite: env.PRICE_ELITE_BRL,
     appUrl: env.NEXT_PUBLIC_APP_URL.replace(/\/$/, ""),
+    /** canal de pagamento vigente */
+    kiwify: env.BILLING_PROVIDER === "kiwify",
+    payer: env.BILLING_PROVIDER === "kiwify" ? "Kiwify" : "Mercado Pago",
+    trialDays: TRIAL_DAYS,
   };
 }
 
@@ -33,7 +38,7 @@ export function LegalDoc({ title, children }: { title: string; children: React.R
       ) : null}
       <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
       <p className="mt-1 text-[13px] text-muted-foreground">Versão {e.version}</p>
-      <nav className="mt-3 flex flex-wrap gap-3 text-[13px]" aria-label="Documentos legais">
+      <nav className="mt-3 flex flex-wrap gap-x-4 text-[13px] [&_a]:inline-flex [&_a]:min-h-10 [&_a]:items-center" aria-label="Documentos legais">
         <Link href="/termos" className="text-primary hover:underline">
           Termos de Uso
         </Link>

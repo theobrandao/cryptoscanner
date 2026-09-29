@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { TRIAL_DAYS } from "@/lib/entitlements";
 import useSWR from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Bell, ChevronDown, Layers, Maximize2, Minimize2, PanelRightClose, PanelRightOpen, RefreshCw, Star } from "lucide-react";
@@ -289,8 +290,8 @@ function ChartCard({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Link href={`/carteira?tab=alerts&symbol=${ctx.symbol}`} className="inline-flex h-7 items-center gap-1.5 rounded px-2 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground">
-          <Bell className="h-3.5 w-3.5" /> Alert
+        <Link href={`/carteira?tab=alerts&symbol=${ctx.symbol}`} className="inline-flex h-8 items-center gap-1.5 rounded px-2 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground">
+          <Bell className="h-3.5 w-3.5" /> Alerta
         </Link>
         <div className="ml-auto flex items-center gap-0.5">
           <button onClick={onFocus} className={cn("hidden h-7 items-center gap-1 rounded px-2 text-[12px] hover:bg-muted xl:inline-flex", focus ? "text-foreground" : "text-muted-foreground")} aria-pressed={focus} title="Focus Chart">
@@ -402,7 +403,7 @@ function AccessOrError({ error, sel, onReset }: { error: unknown; sel: MarketSel
       <div className="mx-auto mt-10 max-w-xl rounded-xl border border-border bg-card p-6 text-center">
         <h1 className="text-xl font-bold">Crypto market intelligence, in one workspace</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Gráfico, estrutura de mercado, liquidez, suporte/resistência, Confluence Score auditável, derivativos (Binance, Bybit, OKX), histórico do setup e gestão de risco — no mesmo contexto. 7 dias de teste completo; depois PRO ou ELITE.
+          Gráfico, estrutura de mercado, liquidez, suporte/resistência, Confluence Score auditável, derivativos (Binance, Bybit, OKX), histórico do setup e gestão de risco — no mesmo contexto. {TRIAL_DAYS} dias grátis no PRO; depois PRO ou ELITE.
         </p>
         <div className="mt-5 flex justify-center gap-2">
           <Link href={`/registro?next=${next}`} className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">

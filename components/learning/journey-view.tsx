@@ -54,7 +54,7 @@ export function JourneyView() {
             </div>
             <Progress value={pct} tone={pct === 100 ? "success" : "primary"} className="mt-1" />
           </div>
-          <div className="flex gap-2 text-xs">
+          <div className="flex flex-wrap gap-2 text-xs">
             {(["iniciante", "intermediario", "avancado"] as const).map((lv) => (
               <Badge key={lv} variant="muted">
                 {LEVEL_LABEL[lv]}: {LESSONS.filter((l) => l.level === lv && progress[l.slug]?.done).length}/{LESSONS.filter((l) => l.level === lv).length}

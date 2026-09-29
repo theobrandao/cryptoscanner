@@ -80,8 +80,8 @@ function DetailInner() {
             </button>
           ))}
         </div>
-        <Link href={`/charts/${symbol}?exchange=${prefer}&instrument=perp`} className="text-[12.5px] text-primary hover:underline">
-          Abrir no Dashboard →
+        <Link href={`/charts/${symbol}?exchange=${prefer}&instrument=perp`} className="inline-flex min-h-9 items-center text-[12.5px] text-primary hover:underline">
+          Abrir na Análise completa →
         </Link>
       </div>
       {error ? <Alert variant="danger">{(error as Error).message}</Alert> : null}

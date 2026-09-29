@@ -11,7 +11,7 @@ import { getEnv, isOwnerEmail, isRegistrationOpen } from "@/lib/env";
 export function canRegister(email: string, provided: string | undefined): boolean {
   if (isOwnerEmail(email)) return true;
   const env = getEnv();
-  // venda aberta (com fornecedor identificado): qualquer e-mail inicia o teste de 7 dias
+  // venda aberta (com fornecedor identificado): qualquer e-mail inicia o teste grátis do PRO
   if (isRegistrationOpen()) return true;
   const expected = env.REGISTRATION_INVITE_CODE;
   if (!expected) return env.OWNER_EMAILS.trim().length === 0;

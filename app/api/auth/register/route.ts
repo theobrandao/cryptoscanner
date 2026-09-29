@@ -10,6 +10,7 @@ import { logAccess } from "@/services/access-log-service";
 import { sendTemplate } from "@/services/email-service";
 import { canRegister } from "@/lib/invite";
 import { startTrial } from "@/services/subscription-service";
+import { applyPendingGrants } from "@/services/billing/kiwify";
 
 const bodySchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -47,12 +48,14 @@ export const POST = withApi(async (req) => {
       watchlists: { create: { name: "Favoritos", isDefault: true } },
     },
   });
-  // trial de 7 dias (dono/admin não precisa)
+  // teste grátis do PRO (dono/admin não precisa)
   if (!owner) {
     await startTrial(user.id);
     await prisma.user.update({ where: { id: user.id }, data: { plan: "PRO" } });
     await track("trial_started", { userId: user.id });
   }
+  // compra feita na Kiwify antes do cadastro (mesmo e-mail) substitui o teste
+  await applyPendingGrants(user.id, user.email);
   await track("signup", { userId: user.id, props: { owner } });
   await logAccess(req, user.id, "register");
   void sendTemplate("welcome", { to: user.email, name: user.name }).catch(() => undefined);

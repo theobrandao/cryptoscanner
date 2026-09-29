@@ -625,13 +625,13 @@ await test("Comercial", "Conta nova nasce em trial (sem plano FREE)", async () =
   return `tier ${me.json?.data?.access?.tier} · plano ${me.json?.data?.user?.plan}`;
 });
 
-await test("Comercial", "GET /api/billing/subscription (trial de 7 dias com entitlements do servidor)", async () => {
+await test("Comercial", "GET /api/billing/subscription (teste de 3 dias do PRO com entitlements do servidor)", async () => {
   const r = await call("GET", "/api/billing/subscription");
   expectStatus(r, 200);
   const d = r.json.data;
   expect(["TRIAL", "PRO", "ELITE", "ADMIN"].includes(d.tier), `tier ${d.tier}`);
   expect(d.entitlements.core === true, "sem acesso core no trial");
-  if (d.tier === "TRIAL") expect(d.daysLeft >= 6 && d.daysLeft <= 7, `dias ${d.daysLeft}`);
+  if (d.tier === "TRIAL") expect(d.daysLeft >= 2 && d.daysLeft <= 3 && d.plan === "PRO", `dias ${d.daysLeft} plano ${d.plan}`);
   return `${d.tier} · ${d.status} · ${d.daysLeft ?? "—"} dias · billing ${d.billing.configured ? "configurado" : "não configurado"}`;
 });
 
@@ -785,12 +785,16 @@ await test("R2", "Derivatives View Details (3 exchanges) e onboarding; admin →
   return `OI agregado ${d.json.data.aggregated.openInterestUsd ? (d.json.data.aggregated.openInterestUsd / 1e9).toFixed(2) + " bi" : "n/d"} (${d.json.data.aggregated.venues} exchanges) · histórico ${d.json.data.history.venue ?? "n/d"} · onboarding ${o.json.data.done}/6`;
 });
 
-await test("Comercial", "Webhook Mercado Pago sem assinatura → 401; checkout sem token → 503", async () => {
+await test("Comercial", "Webhooks sem assinatura → 401 (Mercado Pago) e 401/503 (Kiwify); checkout sem token → 503", async () => {
   const w = await call("POST", "/api/billing/webhook", { auth: false, body: { type: "subscription_preapproval", data: { id: "x" } } });
   expectStatus(w, 401);
+  const k = await call("POST", "/api/billing/kiwify", { auth: false, body: { webhook_event_type: "order_approved", order_id: "x", Customer: { email: EMAIL } } });
+  expect([401, 503].includes(k.res.status), `kiwify sem assinatura ${k.res.status}`);
+  const ks = await call("POST", "/api/billing/kiwify?signature=0000", { auth: false, body: { webhook_event_type: "order_approved", order_id: "x" } });
+  expect([401, 503].includes(ks.res.status), `kiwify assinatura errada ${ks.res.status}`);
   const c = await call("POST", "/api/billing/checkout", { body: { plan: "PRO" } });
   expect([200, 503].includes(c.res.status), `checkout ${c.res.status}`);
-  return `webhook 401 · checkout ${c.res.status}`;
+  return `MP 401 · Kiwify ${k.res.status}/${ks.res.status} · checkout ${c.res.status}`;
 });
 
 
@@ -1325,12 +1329,14 @@ await test("Venda", "Cadastro sem aceite dos termos → 400; preços públicos; 
   expectStatus(r, 400, "validation");
   const p = await call("GET", "/api/billing/prices", { auth: false });
   expectStatus(p, 200);
-  expect(p.json.data.prices.PRO > 0 && p.json.data.prices.ELITE > p.json.data.prices.PRO && p.json.data.trialDays === 7, "preços/trial inválidos");
-  for (const path of ["/termos", "/privacidade", "/reembolso", "/esqueci-senha"]) {
+  expect(p.json.data.prices.PRO > 0 && p.json.data.prices.ELITE > p.json.data.prices.PRO && p.json.data.trialDays === 3 && p.json.data.trialPlan === "PRO", "preços/trial inválidos");
+  expect(["mercadopago", "kiwify"].includes(p.json.data.provider), `canal ${p.json.data.provider}`);
+  expect(p.json.data.checkoutEnabled || p.json.data.checkoutUrls === null, "links de checkout expostos com checkout bloqueado");
+  for (const path of ["/termos", "/privacidade", "/reembolso", "/esqueci-senha", "/vendas"]) {
     const { res } = await call("GET", path, { auth: false, raw: true });
     expect(res.status === 200, `${path} HTTP ${res.status}`);
   }
-  return `PRO R$ ${p.json.data.prices.PRO} · ELITE R$ ${p.json.data.prices.ELITE} · checkout ${p.json.data.checkoutEnabled ? "liberado" : "bloqueado (termos/cobrança)"}`;
+  return `PRO R$ ${p.json.data.prices.PRO} · ELITE R$ ${p.json.data.prices.ELITE} · teste ${p.json.data.trialDays}d PRO · ${p.json.data.provider} · checkout ${p.json.data.checkoutEnabled ? "liberado" : "bloqueado (termos/cobrança)"}`;
 });
 
 await test("Venda", "Esqueci a senha: resposta idêntica para e-mail existente/inexistente; token inválido → 400", async () => {

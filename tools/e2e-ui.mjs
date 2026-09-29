@@ -62,9 +62,9 @@ for (let i = 0; i < 2; i++) {
 consoleErrors.length = 0;
 
 // ------------------------------------------------------------ páginas públicas
-await step("Início (anônimo): página de venda com ferramentas, números fora da amostra, simulador, preços e teste de 7 dias", async () => {
+await step("Início (anônimo): página de venda com ferramentas, números fora da amostra, simulador, preços e teste de 3 dias do PRO", async () => {
   await goto("/");
-  await page.waitForFunction(() => /ferramentas claras e/i.test(document.body.innerText) && /Começar teste de 7 dias/.test(document.body.innerText) && /R\$ \d+/.test(document.body.innerText) && /fora da amostra/i.test(document.body.innerText) && /Mercado agora/i.test(document.body.innerText), null, { timeout: 30_000 });
+  await page.waitForFunction(() => /ferramentas claras e/i.test(document.body.innerText) && /Testar o PRO grátis por 3 dias/.test(document.body.innerText) && /R\$ \d+/.test(document.body.innerText) && /fora da amostra/i.test(document.body.innerText) && /Mercado agora/i.test(document.body.innerText), null, { timeout: 30_000 });
   const t = await page.locator("body").innerText();
   for (const tool of ["Scanner", "Agentes IA", "Sentinela", "Gráficos", "Fibonacci", "Carteira", "Simulador", "Jornada"]) expect(t.includes(tool), `ferramenta ${tool} ausente na página de venda`);
   expect(!/Depoimento|depoimento/.test(t), "depoimento na página (não há depoimentos reais)");
@@ -198,12 +198,24 @@ await step("Mentor: pergunta com dados reais e SOS mindset", async () => {
   return `dados reais + protocolo · ${await shot("mentor")}`;
 });
 
-await step("Planos: PRO e ELITE em R$, teste de 7 dias, sem plano gratuito", async () => {
+await step("Página de vendas /vendas: oferta, modelo, planos com teste só no PRO, garantia, FAQ e CTA fixo no celular", async () => {
+  await goto("/vendas");
+  await page.waitForFunction(() => /Padrões, sinais testados e alertas/i.test(document.body.innerText) && /R\$ \d+/.test(document.body.innerText) && /Garantia de 7 dias/i.test(document.body.innerText), null, { timeout: 30_000 });
+  const t = await page.locator("body").innerText();
+  expect(/Testar o PRO grátis por 3 dias/.test(t), "CTA do teste de 3 dias ausente");
+  expect(/O ELITE não tem teste|Criar conta e assinar o ELITE|Assinar ELITE agora/.test(t), "ELITE sem indicação de compra/sem teste");
+  expect(/Não é para você se/i.test(t) && /fora da amostra/i.test(t), "seções de transparência ausentes");
+  expect(!/[Dd]epoimento/.test(t), "depoimento na página de vendas");
+  expect((await page.locator('nav[aria-label="Navegação móvel"]').count()) === 0, "menu do produto aparece na página de vendas");
+  return await shot("vendas");
+});
+
+await step("Planos: PRO e ELITE em R$, teste de 3 dias só no PRO, sem plano gratuito", async () => {
   await goto("/planos");
   await page.waitForFunction(() => /PRO/.test(document.body.innerText) && /ELITE/.test(document.body.innerText), null, { timeout: 20_000 });
   const t = await page.locator("body").innerText();
   expect(/R\$\s?\d+/.test(t), "preço em R$ ausente");
-  expect(/7 dias/i.test(t), "teste de 7 dias não mencionado");
+  expect(/3 dias grátis/i.test(t), "teste de 3 dias não mencionado");
   expect(!/\bFREE\b/.test(t), "plano gratuito exibido");
   return await shot("planos");
 });
@@ -239,7 +251,7 @@ await step("Registro pela interface", async () => {
   const inviteInput = page.locator("input#invite");
   if (await inviteInput.count()) await inviteInput.fill(process.env.INVITE_CODE ?? "");
   // aceite obrigatório dos termos (botão fica desabilitado sem ele)
-  const btn = page.getByRole("button", { name: /Começar teste|Criar conta/i });
+  const btn = page.getByRole("button", { name: /Começar \d+ dias grátis|Começar teste|Criar conta/i });
   expect(await btn.isDisabled(), "cadastro permitido sem aceite dos termos");
   await page.check("#accept-terms");
   await btn.click();

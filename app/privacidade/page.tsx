@@ -18,7 +18,12 @@ export default async function PrivacyPage() {
         <li>Uso do serviço: preferências, watchlists, carteira informada pelo usuário, alertas, monitores, estratégias, backtests, análises salvas e chamados de suporte.</li>
         <li>Imagens de gráfico enviadas voluntariamente para análise.</li>
         <li>Notificações: endereço de inscrição push do navegador e, se informado, o chat ID do Telegram.</li>
-        <li>Assinatura: plano, status e identificador da assinatura no Mercado Pago. Dados de cartão são tratados pelo Mercado Pago e não chegam ao CryptoScanner.</li>
+        <li>
+          Assinatura: plano, status e identificador da assinatura no {e.payer}.{" "}
+          {e.kiwify
+            ? "Da Kiwify, o CryptoScanner recebe o e-mail do comprador, o produto, o identificador do pedido e da assinatura e o status, para liberar o acesso à conta com o mesmo e-mail. Dados de cartão e de pagamento ficam com a Kiwify."
+            : "Dados de cartão são tratados pelo Mercado Pago e não chegam ao CryptoScanner."}
+        </li>
         <li>Registros de acesso: endereço IP, evento (cadastro, login, redefinição de senha, exclusão de conta) e data/hora, guardados por 6 meses (Marco Civil da Internet, art. 15).</li>
         <li>Eventos de uso do produto (ex.: abertura do dashboard, criação de monitor) vinculados ao identificador da conta, sem IP e sem conteúdo livre.</li>
       </ul>
@@ -33,7 +38,7 @@ export default async function PrivacyPage() {
       <p>Os dados são tratados por fornecedores de infraestrutura contratados, somente para operar o serviço:</p>
       <ul>
         <li>Hospedagem da aplicação (Vercel), banco de dados (Neon) e cache (Upstash).</li>
-        <li>Pagamentos (Mercado Pago) e e-mail transacional (Resend), quando ativos.</li>
+        <li>Pagamentos ({e.payer}) e e-mail transacional (Resend), quando ativos.</li>
         <li>AI Analyst (Anthropic), quando ativo: recebe dados de mercado do contexto e a pergunta digitada; não recebe nome nem e-mail.</li>
         <li>Serviços de push do navegador (Google, Mozilla, Apple) e Telegram, quando o usuário ativa esses canais.</li>
       </ul>

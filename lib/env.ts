@@ -62,6 +62,20 @@ const schema = z.object({
   /** Mercado Pago (assinaturas). Sem token, o checkout fica desativado e o app informa. */
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),
   MERCADOPAGO_WEBHOOK_SECRET: z.string().optional(),
+  /** Canal de venda: "mercadopago" (checkout próprio) | "kiwify" (links de checkout da Kiwify + webhook). */
+  BILLING_PROVIDER: z.enum(["mercadopago", "kiwify"]).default("mercadopago"),
+  /** Kiwify: links de checkout (https://pay.kiwify.com.br/...) de cada plano. */
+  KIWIFY_CHECKOUT_PRO_URL: z.string().optional(),
+  KIWIFY_CHECKOUT_ELITE_URL: z.string().optional(),
+  /** Token definido no webhook da Kiwify (valida o parâmetro signature). */
+  KIWIFY_WEBHOOK_TOKEN: z.string().optional(),
+  /** IDs dos produtos na Kiwify (mapeiam a compra para PRO ou ELITE). */
+  KIWIFY_PRODUCT_PRO_ID: z.string().optional(),
+  KIWIFY_PRODUCT_ELITE_ID: z.string().optional(),
+  /** API pública da Kiwify (opcional): com as três, a venda é relida na API antes de liberar o acesso. */
+  KIWIFY_CLIENT_ID: z.string().optional(),
+  KIWIFY_CLIENT_SECRET: z.string().optional(),
+  KIWIFY_ACCOUNT_ID: z.string().optional(),
   PRICE_PRO_BRL: z.coerce.number().positive().default(97),
   PRICE_ELITE_BRL: z.coerce.number().positive().default(197),
   /**

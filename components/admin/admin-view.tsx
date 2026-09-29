@@ -67,7 +67,7 @@ export function AdminView() {
             <Kpi k="Usuários" v={String(data.users.total)} sub={`+${data.users.signups7d} em 7d · +${data.users.signups30d} em 30d`} />
             <Kpi k="Em teste" v={String(s.trialing)} sub={`${s.expired} testes encerrados`} />
             <Kpi k="Pagantes" v={String(s.activePaid)} sub={`PRO ${s.pro} · ELITE ${s.elite}`} />
-            <Kpi k="MRR" v={`R$ ${s.mrrBrl.toLocaleString("pt-BR")}`} sub="assinaturas Mercado Pago ativas" />
+            <Kpi k="MRR" v={`R$ ${s.mrrBrl.toLocaleString("pt-BR")}`} sub="assinaturas pagas ativas" />
             <Kpi k="Teste → pago (30d)" v={s.trialToPaid30d != null ? `${(s.trialToPaid30d * 100).toFixed(1)}%` : "—"} sub={`${s.trialsStarted30d} testes iniciados`} />
             <Kpi k="Inadimplentes" v={String(s.pastDue)} sub={`${s.cancelled} cancelados no período`} />
             <Kpi k="Monitores ativos" v={String(data.usage.activeMonitors)} sub={`${data.usage.strategies} estratégias`} />

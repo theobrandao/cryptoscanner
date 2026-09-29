@@ -662,3 +662,27 @@ model AccessLog {
   @@index([createdAt])
   @@index([userId, createdAt])
 }
+
+/// Compra feita fora do app (Kiwify): guardada pelo e-mail do comprador e aplicada à conta com o mesmo e-mail
+/// (na hora, se a conta existe; no cadastro/login, se ainda não existe).
+model ExternalGrant {
+  id               String    @id @default(cuid())
+  provider         String
+  /// id da assinatura (ou do pedido, sem assinatura) no provedor — uma linha por assinatura
+  externalId       String
+  email            String
+  /// PRO | ELITE
+  plan             String
+  /// ACTIVE | PAST_DUE | CANCELLED | EXPIRED
+  status           String
+  currentPeriodEnd DateTime?
+  lastEvent        String
+  lastOrderId      String?
+  appliedUserId    String?
+  appliedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([provider, externalId])
+  @@index([email])
+}

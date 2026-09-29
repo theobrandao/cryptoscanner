@@ -213,3 +213,17 @@ body {
     animation: none;
   }
 }
+
+/* Toque (celular/tablet): campos e seletores com altura mínima confortável para o dedo */
+@media (pointer: coarse) {
+  select,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="date"],
+  input:not([type]) {
+    min-height: 2.25rem;
+  }
+}

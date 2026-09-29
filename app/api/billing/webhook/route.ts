@@ -37,8 +37,10 @@ export const POST = withApi(async (req) => {
   try {
     await prisma.billingEvent.create({ data: { provider: "mercadopago", eventKey, type, resourceId: dataId ?? null, payload: body as Prisma.InputJsonValue } });
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return ok({ duplicate: true });
-    throw err;
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
+    // reentrega: só ignora se o anterior foi processado (falha anterior → processa de novo)
+    const prev = await prisma.billingEvent.findUnique({ where: { eventKey }, select: { processed: true } });
+    if (prev?.processed) return ok({ duplicate: true });
   }
   if (!dataId || !type.includes("preapproval")) {
     await prisma.billingEvent.update({ where: { eventKey }, data: { processed: true } });

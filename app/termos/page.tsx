@@ -33,22 +33,30 @@ export default async function TermsPage() {
       </ul>
       <h2>5. Teste gratuito</h2>
       <p>
-        Novas contas recebem 7 dias de teste com as funcionalidades do plano PRO, sem cadastro de meio de pagamento e sem cobrança automática ao final. Encerrado o teste sem assinatura, o acesso ao workspace é pausado e os dados da conta (watchlists,
-        estratégias, monitores e preferências) permanecem salvos.
+        Novas contas recebem {e.trialDays} dias de teste com as funcionalidades do plano PRO (o plano ELITE não tem teste), sem cadastro de meio de pagamento e sem cobrança automática ao final. Encerrado o teste sem assinatura, o acesso ao
+        workspace é pausado e os dados da conta (watchlists, estratégias, monitores e preferências) permanecem salvos.
       </p>
       <h2>6. Planos, preços e pagamento</h2>
       <ul>
         <li>
           PRO: R$ {e.pro} por mês. ELITE: R$ {e.elite} por mês. O conteúdo de cada plano está descrito na página <Link href="/planos">Planos</Link>.
         </li>
-        <li>A cobrança é mensal e recorrente, processada pelo Mercado Pago. O CryptoScanner não recebe nem armazena dados de cartão.</li>
+        {e.kiwify ? (
+          <>
+            <li>A contratação é feita no checkout da Kiwify, que processa o pagamento mensal recorrente. O CryptoScanner não recebe nem armazena dados de cartão ou de pagamento.</li>
+            <li>O acesso pago é liberado para a conta do CryptoScanner cadastrada com o mesmo e-mail informado na compra. Compra feita antes do cadastro é aplicada quando a conta é criada com esse e-mail.</li>
+          </>
+        ) : (
+          <li>A cobrança é mensal e recorrente, processada pelo Mercado Pago. O CryptoScanner não recebe nem armazena dados de cartão.</li>
+        )}
         <li>Alteração de preço é comunicada com no mínimo 30 dias de antecedência e vale a partir do ciclo seguinte ao aviso.</li>
         <li>Falha de pagamento: o acesso é mantido por 3 dias de tolerância; depois, pausado até a regularização.</li>
       </ul>
       <h2>7. Cancelamento e direito de arrependimento</h2>
       <p>
-        O usuário cancela a renovação a qualquer momento em Plans &amp; Billing, sem multa; o acesso continua até o fim do período já pago. Na primeira contratação paga, o usuário pode exercer o direito de arrependimento em até 7 dias (art. 49 do Código
-        de Defesa do Consumidor), com reembolso integral. Detalhes na <Link href="/reembolso">Política de Cancelamento e Reembolso</Link>.
+        O usuário cancela a renovação a qualquer momento, sem multa ({e.kiwify ? "pelos canais da Kiwify indicados no e-mail de confirmação da compra ou pelo atendimento do CryptoScanner" : "em Planos → Cancelar renovação"}); o acesso continua até o fim
+        do período já pago. Na primeira contratação paga, o usuário pode exercer o direito de arrependimento em até 7 dias (art. 49 do Código de Defesa do Consumidor), com reembolso integral. Detalhes na{" "}
+        <Link href="/reembolso">Política de Cancelamento e Reembolso</Link>.
       </p>
       <h2>8. Disponibilidade e alterações do serviço</h2>
       <ul>

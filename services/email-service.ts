@@ -1,6 +1,7 @@
 import { getEnv, legalDocKind } from "@/lib/env";
 import { fetchJson } from "@/lib/http";
 import { createLogger } from "@/lib/logger";
+import { TRIAL_DAYS } from "@/lib/entitlements";
 
 const log = createLogger("email");
 
@@ -62,15 +63,15 @@ export async function sendTemplate(kind: TemplateKind, d: { to: string; name?: s
   const plans = { label: "Ver planos", url: `${app}/planos` };
   const t: Record<TemplateKind, { subject: string; title: string; p: string[]; cta?: { label: string; url: string } }> = {
     welcome: {
-      subject: "Seu teste de 7 dias do CryptoScanner começou",
-      title: "Teste de 7 dias ativo",
-      p: [hi, "Seu acesso completo vale por 7 dias: Dashboard com estrutura, liquidez e Confluence Score, Market Scanner, Market Monitor, Strategy Builder, Backtest com custos e derivativos de Binance, Bybit e OKX.", "Sugestão para o primeiro dia: escolha exchange e instrumento no Dashboard, crie um monitor para o seu ativo principal e salve uma estratégia a partir de um modelo."],
+      subject: `Seu teste grátis de ${TRIAL_DAYS} dias do CryptoScanner começou`,
+      title: `Teste de ${TRIAL_DAYS} dias ativo (PRO)`,
+      p: [hi, `Seu acesso ao PRO vale por ${TRIAL_DAYS} dias: Scanner de padrões, Agentes IA, Sentinela, Gráficos, sinais do modelo de rompimento, Construtor de estratégias, Backtest com custos e Derivativos.`, "Sugestão para o primeiro dia: veja os sinais ativos no Início, crie um agente para o seu ativo principal e ative as notificações."],
       cta: { label: "Abrir o Dashboard", url: `${app}/` },
     },
     trial_ending: { subject: `Seu teste termina em ${d.daysLeft ?? 2} dias`, title: `Faltam ${d.daysLeft ?? 2} dias do teste`, p: [hi, "Para manter monitores, estratégias e watchlists ativos depois do teste, escolha o plano PRO ou ELITE. Sem assinatura, os dados continuam salvos, mas o acesso ao workspace é pausado."], cta: plans },
     trial_last_day: { subject: "Último dia do seu teste", title: "Hoje é o último dia do teste", p: [hi, "Amanhã o acesso ao workspace é pausado. Seus dados continuam salvos e voltam a funcionar ao assinar."], cta: plans },
     trial_ended: { subject: "Seu teste terminou", title: "Teste encerrado", p: [hi, "Seu período de teste terminou. Monitores foram pausados; estratégias, watchlists e preferências continuam salvos."], cta: plans },
-    payment_failed: { subject: "Pagamento não aprovado", title: "Não conseguimos processar o pagamento", p: [hi, "O Mercado Pago não aprovou a última cobrança da sua assinatura. Atualize o meio de pagamento para evitar a pausa do acesso após o período de tolerância."], cta: { label: "Revisar assinatura", url: `${app}/planos` } },
+    payment_failed: { subject: "Pagamento não aprovado", title: "Não conseguimos processar o pagamento", p: [hi, "A última cobrança da sua assinatura não foi aprovada. Atualize o meio de pagamento para evitar a pausa do acesso após o período de tolerância."], cta: { label: "Revisar assinatura", url: `${app}/planos` } },
     subscription_active: { subject: `Assinatura ${d.plan ?? ""} ativa`, title: `Assinatura ${d.plan ?? ""} ativa`, p: [hi, "Pagamento confirmado. Seu acesso está ativo. Você pode cancelar a renovação a qualquer momento em Plans & Billing; o acesso segue até o fim do período pago."], cta: { label: "Abrir o Dashboard", url: `${app}/` } },
     password_reset: { subject: "Redefinição de senha", title: "Redefinir sua senha", p: [hi, "Recebemos um pedido para redefinir a senha da sua conta. O link vale por 60 minutos e pode ser usado uma vez. Se você não fez o pedido, ignore este e-mail."], cta: d.url ? { label: "Criar nova senha", url: d.url } : undefined },
   };

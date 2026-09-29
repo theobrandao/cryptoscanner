@@ -6,15 +6,18 @@ import useSWR from "swr";
 import { ArrowRight, Calculator, Check, ShieldCheck, Signal } from "lucide-react";
 import { MarketStrip, MoversCard, NewsCard } from "@/components/market/market-now";
 import { Chip, Eyebrow, LineChart, PillGroup, SectionHeading, StatTile, TickerMarquee, ToolsGrid } from "@/components/ui/showcase";
+import { fmtR, ValidatedModels } from "@/components/marketing/validated-models";
+import { billingNote, PLAN_FEATURES, type BillingProvider } from "@/lib/plans-copy";
 import { postJson } from "@/lib/client-api";
 import { MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 
-interface Prices {
+export interface Prices {
   prices: { PRO: number; ELITE: number };
   trialDays: number;
   checkoutEnabled: boolean;
-  limits: Record<"PRO" | "ELITE", { alerts: number; monitors: number; strategies: number; historyDays: number }>;
+  provider: BillingProvider;
+  checkoutUrls: { PRO: string | null; ELITE: string | null } | null;
 }
 
 type Level = "iniciante" | "intermediario" | "avancado";
@@ -40,12 +43,12 @@ const LEVELS: Array<{ key: Level; label: string; tone: string; text: string }> =
   { key: "avancado", label: "Avançado", tone: "bg-danger/15 text-danger", text: "Derivativos, automação com agentes, psicologia e backtests." },
 ];
 
-const FAQ = [
+const faq = (trial: number) => [
   ["O CryptoScanner recomenda compra ou venda?", "Não. As ferramentas calculam padrões, níveis e sinais com regras fixas e mostram de onde vem cada número. A decisão é sua. Não é recomendação de investimento."],
   ["O que quer dizer \"testado fora da amostra\"?", "As regras do modelo foram escolhidas com dados de um período e medidas em outro período, que não foi usado na escolha. Só publicamos o modelo porque o resultado nesse segundo período foi positivo, já descontando taxa e slippage. O setup que não passou nesse teste não é vendido como estratégia."],
   ["Preciso conectar minha corretora ou informar chaves de API?", "Não. Usamos apenas dados públicos de mercado. O CryptoScanner nunca pede chaves de API nem executa ordens."],
-  ["O teste de 7 dias pede cartão?", "Não. O teste libera as funções do PRO por 7 dias. Ao final, o acesso é pausado até você escolher um plano; seus dados ficam salvos."],
-  ["Como cancelo?", "Em Planos, a qualquer momento, sem multa. O acesso segue até o fim do período pago. Na primeira contratação, o pedido em até 7 dias garante reembolso integral."],
+  ["O teste grátis pede cartão?", `Não. O teste libera as funções do PRO por ${trial} dias (o ELITE não tem teste). Ao final, o acesso é pausado até você escolher um plano; seus dados ficam salvos.`],
+  ["Como cancelo?", "A qualquer momento, sem multa. O acesso segue até o fim do período pago. Na primeira contratação, o pedido em até 7 dias garante reembolso integral."],
   ["Funciona no celular?", "Sim. O site é responsivo e os avisos chegam por push no navegador e pelo Telegram."],
 ] as const;
 
@@ -54,10 +57,9 @@ interface SimResult {
 }
 
 const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(v);
-const R = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2).replace(".", ",")}R`;
 
 /** Simulador de aportes (API pública, não salva nada): pílulas, controle deslizante e curva. */
-function Simulator() {
+export function Simulator() {
   const [symbol, setSymbol] = React.useState("BTC");
   const [strategy, setStrategy] = React.useState<"dca" | "lump_sum">("dca");
   const [amount, setAmount] = React.useState(500);
@@ -140,10 +142,57 @@ function Simulator() {
   );
 }
 
+/** Cartões PRO/ELITE: PRO com teste grátis; compra direta pelo link da Kiwify quando o checkout está liberado. */
+export function PlanCards({ data, trial }: { data: Prices | undefined; trial: number }) {
+  return (
+    <div className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-2">
+      {(["PRO", "ELITE"] as const).map((p) => {
+        const buy = data?.checkoutUrls?.[p] ?? null;
+        return (
+          <div key={p} className={cn("flex min-w-0 flex-col rounded-2xl border p-5 sm:p-6", p === "ELITE" ? "card-glow border-primary/50" : "border-border bg-card")}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-lg font-extrabold tracking-tight">{p}</h3>
+              {p === "PRO" ? <span className="rounded-full bg-success/15 px-2.5 py-0.5 text-[11px] font-semibold text-success">{trial} dias grátis</span> : <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold text-primary">Mais recursos</span>}
+            </div>
+            <div className="mt-2">
+              <span className="tabular text-4xl font-extrabold">{data ? `R$ ${data.prices[p]}` : "—"}</span>
+              <span className="text-sm text-muted-foreground"> /mês</span>
+            </div>
+            <ul className="mt-5 flex flex-1 flex-col gap-2 text-[13.5px]">
+              {PLAN_FEATURES[p].map((i) => (
+                <li key={i} className="flex gap-2">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> <span className="min-w-0">{i}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6 flex flex-col gap-2">
+              {p === "PRO" ? (
+                <Link href="/registro?next=/" className="flex h-12 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110">
+                  Começar {trial} dias grátis
+                </Link>
+              ) : null}
+              {buy ? (
+                <a href={buy} rel="noopener" data-testid={`buy-${p}`} className={cn("flex h-12 items-center justify-center rounded-xl text-sm font-semibold", p === "ELITE" ? "bg-primary text-primary-foreground hover:brightness-110" : "border border-border hover:border-primary/50")}>
+                  Assinar {p} agora
+                </a>
+              ) : p === "ELITE" ? (
+                <Link href="/registro?next=/planos" className="flex h-12 items-center justify-center rounded-xl border border-border text-sm font-semibold hover:border-primary/50">
+                  Criar conta e assinar o ELITE
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function Landing({ content }: { content: LandingData }) {
   const { data } = useSWR<Prices>("/api/billing/prices", { revalidateOnFocus: false });
   const [open, setOpen] = React.useState<number | null>(0);
-  const trial = data?.trialDays ?? 7;
+  const trial = data?.trialDays ?? 3;
+  const FAQ = faq(trial);
   const main = content.validated[0];
   return (
     <div className="flex w-full flex-col">
@@ -160,7 +209,7 @@ export function Landing({ content }: { content: LandingData }) {
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-2.5">
             <Link href="/registro?next=/" className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
-              Começar teste de {trial} dias <ArrowRight className="h-4 w-4" />
+              Testar o PRO grátis por {trial} dias <ArrowRight className="h-4 w-4" />
             </Link>
             <a href="#modelo" className="inline-flex h-12 items-center gap-2.5 rounded-xl border border-border bg-card px-4 text-left hover:border-primary/50">
               <Signal className="h-5 w-5 text-primary" />
@@ -182,7 +231,7 @@ export function Landing({ content }: { content: LandingData }) {
               [String(content.assets), "ativos monitorados"],
               [String(content.patterns), "padrões gráficos"],
               [String(content.lessons.length), "aulas"],
-              [main ? R(main.validation.metrics.expectancyR) : "—", `por operação fora da amostra (${main?.tf ?? ""})`],
+              [main ? fmtR(main.validation.metrics.expectancyR) : "—", `por operação fora da amostra (${main?.tf ?? ""})`],
             ].map(([v, l]) => (
               <div key={l}>
                 <dt className="sr-only">{l}</dt>
@@ -224,30 +273,8 @@ export function Landing({ content }: { content: LandingData }) {
             subtitle="Regras escolhidas em um período e medidas em outro, já descontando taxa e slippage, em 30 criptos. O setup de pullback que testamos junto não passou e por isso não é oferecido como estratégia."
           />
           <h2 id="validado" className="sr-only">Modelo validado</h2>
-          <div className="mt-8 grid gap-4 lg:grid-cols-2">
-            {content.validated.map((m) => {
-              const k = m.validation.metrics;
-              return (
-                <article key={m.name} className="card-glow flex flex-col gap-4 rounded-2xl border border-border p-5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-[17px] font-bold">{m.name}</h3>
-                    <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">{m.validation.label}</span>
-                  </div>
-                  <p className="text-[13px] text-muted-foreground">{m.description}</p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <StatTile label="Operações" value={k.trades} sub={k.period} className="px-3" />
-                    <StatTile label="Por operação" value={R(k.expectancyR)} tone="up" sub="líquido de custos" className="px-3" />
-                    <StatTile label="Fator de lucro" value={k.profitFactor.toFixed(2).replace(".", ",")} sub={`acerto ${k.winPct}%`} className="px-3" />
-                    <StatTile label="Ativos positivos" value={`${k.assetsPositive}/${k.assetsTotal}`} className="px-3" />
-                  </div>
-                  <div>
-                    <div className="mb-1 text-[11.5px] text-muted-foreground">R acumulado fora da amostra, operação a operação</div>
-                    <LineChart values={m.curve} height={130} tone="up" label={`R acumulado fora da amostra — ${m.name}`} />
-                  </div>
-                  <p className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12.5px] leading-relaxed text-warning">{m.validation.caveats}</p>
-                </article>
-              );
-            })}
+          <div className="mt-8">
+            <ValidatedModels models={content.validated} />
           </div>
         </section>
 
@@ -287,44 +314,10 @@ export function Landing({ content }: { content: LandingData }) {
 
         {/* PLANOS */}
         <section id="planos" aria-labelledby="pricing" className="scroll-mt-20">
-          <SectionHeading eyebrow="Planos" title="Comece com" accent={`${trial} dias grátis`} subtitle="Sem cartão no teste. Depois, escolha o plano." />
+          <SectionHeading eyebrow="Planos" title="Teste o PRO" accent={`${trial} dias grátis`} subtitle="Sem cartão no teste. Depois, escolha o plano." />
           <h2 id="pricing" className="sr-only">Planos</h2>
-          <div className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-2">
-            {(["PRO", "ELITE"] as const).map((p) => {
-              const l = data?.limits[p];
-              const items =
-                p === "PRO"
-                  ? [
-                      "Todas as ferramentas do menu principal",
-                      "Sinais do modelo de rompimento testado (4H e 1D)",
-                      `${l?.monitors ?? "—"} monitores no servidor · ${l?.alerts ?? "—"} alertas`,
-                      `${l?.strategies ?? "—"} estratégias próprias · backtest de 1 timeframe`,
-                      `${l ? Math.round(l.historyDays / 30) : "—"} meses de histórico no backtest`,
-                      "Análise por IA: 100 consultas/dia",
-                    ]
-                  : ["Tudo do PRO", "Backtest multi-timeframe", `${l ? Math.round(l.historyDays / 365) : "—"} anos de histórico no backtest`, `${l?.monitors ?? "—"} monitores · ${l?.alerts ?? "—"} alertas · ${l?.strategies ?? "—"} estratégias`, "Análise por IA: 500 consultas/dia"];
-              return (
-                <div key={p} className={cn("flex flex-col rounded-2xl border p-6", p === "ELITE" ? "card-glow border-primary/50" : "border-border bg-card")}>
-                  <h3 className="text-lg font-extrabold tracking-tight">{p}</h3>
-                  <div className="mt-2">
-                    <span className="tabular text-4xl font-extrabold">{data ? `R$ ${data.prices[p]}` : "—"}</span>
-                    <span className="text-sm text-muted-foreground"> /mês</span>
-                  </div>
-                  <ul className="mt-5 flex flex-1 flex-col gap-2 text-[13.5px]">
-                    {items.map((i) => (
-                      <li key={i} className="flex gap-2">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> {i}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href="/registro?next=/planos" className="mt-6 flex h-11 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110">
-                    Começar teste de {trial} dias
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
-          <p className="mt-3 text-center text-[12px] text-muted-foreground">Cobrança mensal via Mercado Pago. Cancelamento a qualquer momento. Arrependimento em até 7 dias da primeira cobrança com reembolso integral.</p>
+          <PlanCards data={data} trial={trial} />
+          <p className="mx-auto mt-3 max-w-4xl text-center text-[12px] leading-relaxed text-muted-foreground">{billingNote(data?.provider ?? "mercadopago")}</p>
         </section>
 
         {/* FAQ */}
@@ -347,7 +340,7 @@ export function Landing({ content }: { content: LandingData }) {
         <section className="card-glow rounded-3xl border border-border p-8 text-center sm:p-12">
           <ShieldCheck className="mx-auto h-7 w-7 text-primary" aria-hidden />
           <h2 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">
-            Teste todas as ferramentas por <span className="text-gradient">{trial} dias</span>
+            Teste o PRO por <span className="text-gradient">{trial} dias grátis</span>
           </h2>
           <p className="mt-2 text-[14px] text-muted-foreground">Sem cartão, sem chaves de API.</p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">

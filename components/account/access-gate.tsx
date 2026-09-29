@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { TRIAL_DAYS } from "@/lib/entitlements";
 import useSWR from "swr";
 import { usePathname } from "next/navigation";
 import { useSession } from "@/hooks/use-session";
@@ -19,7 +20,7 @@ export function useAccess() {
 }
 
 /**
- * Portão de acesso das páginas do produto: sem sessão → teste de 7 dias/entrar; sem plano → escolher plano;
+ * Portão de acesso das páginas do produto: sem sessão → teste grátis do PRO/entrar; sem plano → escolher plano;
  * recurso ELITE → upgrade. O backend repete a mesma verificação em cada rota.
  */
 export function AccessGate({ need = "core", feature, children }: { need?: "core" | "elite"; feature: string; children: React.ReactNode }) {
@@ -29,7 +30,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
   if (loading) return <div className="skeleton m-4 h-64 rounded-lg" aria-busy="true" />;
   if (!user)
     return (
-      <Gate title={feature} text="Disponível no teste de 7 dias e nos planos PRO e ELITE.">
+      <Gate title={feature} text={`Disponível no teste grátis de ${TRIAL_DAYS} dias e nos planos PRO e ELITE.`}>
         <Link href={`/registro?next=${next}`} className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">
           Start 7-day trial
         </Link>
@@ -41,7 +42,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
   if (!access) return <div className="skeleton m-4 h-64 rounded-lg" aria-busy="true" />;
   if (!access.entitlements.core)
     return (
-      <Gate title="Choose your plan" text="Seu período de teste terminou. Sua conta, watchlists, estratégias e monitores continuam salvos.">
+      <Gate title="Escolha seu plano" text="Seu período de teste terminou. Sua conta, watchlists, estratégias e monitores continuam salvos.">
         <Link href="/planos" className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">
           View Plans
         </Link>

@@ -1,6 +1,6 @@
 /**
  * Entitlements — decididos no BACKEND a partir da assinatura (nunca pelo frontend).
- * Tiers: TRIAL (≈ PRO por 7 dias), PRO, ELITE, NONE (trial expirado/cancelado sem período ativo), ADMIN (dono).
+ * Tiers: TRIAL (≈ PRO por TRIAL_DAYS dias), PRO, ELITE, NONE (trial expirado/cancelado sem período ativo), ADMIN (dono).
  */
 export type Tier = "TRIAL" | "PRO" | "ELITE" | "NONE" | "ADMIN";
 export type SubscriptionStatus = "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELLED" | "EXPIRED";
@@ -30,7 +30,8 @@ export const ENTITLEMENTS: Record<Tier, Entitlements> = {
   ADMIN: { tier: "ADMIN", core: true, elite: true, timeframes: PRO_TF, maxAlerts: 1000, maxMonitors: 100, maxStrategies: 500, aiQueriesPerDay: 5000, historyDays: 3650 },
 };
 
-export const TRIAL_DAYS = 7;
+/** Teste grátis: só do plano PRO, sem cartão. */
+export const TRIAL_DAYS = 3;
 /** dias de tolerância após falha de pagamento antes de cortar o acesso */
 export const PAST_DUE_GRACE_DAYS = 3;
 

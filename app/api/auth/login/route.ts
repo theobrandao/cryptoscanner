@@ -6,6 +6,7 @@ import { ApiError, enforceRateLimit, parseBody, withApi } from "@/lib/api";
 import { isOwnerEmail } from "@/lib/env";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions, verifyPassword } from "@/lib/auth";
 import { logAccess } from "@/services/access-log-service";
+import { applyPendingGrants } from "@/services/billing/kiwify";
 import { track } from "@/services/analytics-service";
 
 const bodySchema = z.object({ email: z.string().trim().toLowerCase().email(), password: z.string().min(1).max(128) });
@@ -22,6 +23,8 @@ export const POST = withApi(async (req) => {
   if (isOwnerEmail(user.email) && (user.plan !== "PLATINUM" || user.role !== "ADMIN")) {
     user = await prisma.user.update({ where: { id: user.id }, data: { plan: "PLATINUM", role: "ADMIN" } });
   }
+  // compra na Kiwify ainda não aplicada a esta conta (mesmo e-mail)
+  if (await applyPendingGrants(user.id, user.email)) user = (await prisma.user.findUnique({ where: { id: user.id } })) ?? user;
   const session = { id: user.id, email: user.email, name: user.name, plan: user.plan, role: user.role };
   const token = await createSessionToken(session);
   await logAccess(req, user.id, "login");

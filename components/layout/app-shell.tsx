@@ -79,7 +79,7 @@ function isActive(pathname: string, l: NavLink) {
 
 export function BrandMark({ compact }: { compact?: boolean }) {
   return (
-    <Link href="/" className="flex items-center gap-2" aria-label="CryptoScanner — início">
+    <Link href="/" className="flex min-h-10 items-center gap-2" aria-label="CryptoScanner — início">
       <svg viewBox="0 0 24 24" className="h-7 w-7 text-primary" aria-hidden>
         <rect x="2" y="11" width="4" height="9" rx="1" fill="currentColor" opacity="0.55" />
         <rect x="8" y="6" width="4" height="14" rx="1" fill="currentColor" opacity="0.8" />
@@ -481,6 +481,66 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
   );
 }
 
+/** Rotas de venda: sem menu do produto (foco na oferta). */
+const SALES_ROUTES = ["/vendas"];
+
+function SalesShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
+        <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center gap-3 px-4">
+          <BrandMark />
+          <nav className="ml-6 hidden items-center gap-5 text-[13.5px] text-muted-foreground md:flex" aria-label="Seções">
+            <a href="#ferramentas" className="hover:text-foreground">
+              Ferramentas
+            </a>
+            <a href="#modelo" className="hover:text-foreground">
+              Modelo
+            </a>
+            <a href="#planos" className="hover:text-foreground">
+              Planos
+            </a>
+            <a href="#faq" className="hover:text-foreground">
+              Dúvidas
+            </a>
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
+            <Link href="/login?next=/" className="hidden h-9 items-center rounded-md px-3 text-[13.5px] font-medium hover:bg-muted sm:inline-flex">
+              Entrar
+            </Link>
+            <Link href="/registro?next=/" className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-[13px] font-semibold text-primary-foreground hover:brightness-110">
+              Testar grátis
+            </Link>
+          </div>
+        </div>
+      </header>
+      <main className="min-w-0 flex-1">{children}</main>
+      <footer className="border-t border-border px-4 pb-24 pt-4 text-[11.5px] text-muted-foreground lg:pb-4">
+        <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2">
+          <span>© CryptoScanner</span>
+          <nav className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Documentos legais">
+            <Link href="/termos" className="hover:text-foreground">
+              Termos
+            </Link>
+            <Link href="/privacidade" className="hover:text-foreground">
+              Privacidade
+            </Link>
+            <Link href="/reembolso" className="hover:text-foreground">
+              Cancelamento e reembolso
+            </Link>
+            <Link href="/suporte" className="hover:text-foreground">
+              Suporte
+            </Link>
+            <Link href="/login?next=/" className="hover:text-foreground">
+              Entrar
+            </Link>
+          </nav>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
 /**
  * Casca do produto: sidebar compacta (desktop), barra superior com busca global (Ctrl/Cmd+K),
  * cotações, estado do dado, notificações, tema e conta; navegação inferior no celular.
@@ -501,6 +561,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+  if (SALES_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"))) return <SalesShell>{children}</SalesShell>;
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-[210px] shrink-0 overflow-y-auto border-r border-border bg-card lg:block">
@@ -528,7 +589,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <MarketDataStatus />
             <AiAnalystButton />
             <NotificationsBell />
-            <button onClick={toggle} className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted" aria-label="Alternar tema">
+            <button onClick={toggle} className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted max-[359px]:hidden" aria-label="Alternar tema">
               {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </button>
             <UserMenu />

@@ -112,7 +112,7 @@ export function MoversCard({ limit = 8 }: { limit?: number }) {
       </ul>
       <div className="flex items-center justify-between border-t border-border px-4 py-2 text-[11.5px] text-muted-foreground">
         <span>Preços ao vivo · volume em USDT</span>
-        <Link href="/panorama" className="font-semibold text-primary hover:underline">
+        <Link href="/panorama" className="inline-flex min-h-9 items-center font-semibold text-primary hover:underline">
           Ver os 30 ativos
         </Link>
       </div>
@@ -153,7 +153,7 @@ export function NewsCard({ limit = 6 }: { limit?: number }) {
         {!n ? <li className="skeleton m-3 h-40 rounded-md" aria-busy="true" /> : null}
       </ul>
       <div className="border-t border-border px-4 py-2 text-right text-[11.5px]">
-        <Link href="/panorama" className="font-semibold text-primary hover:underline">
+        <Link href="/panorama" className="inline-flex min-h-9 items-center font-semibold text-primary hover:underline">
           Panorama do dia
         </Link>
       </div>

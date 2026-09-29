@@ -12,10 +12,12 @@ export interface AccessView {
   cancelAtPeriodEnd: boolean;
   daysLeft: number | null;
   trialDays: number;
+  /** canal da assinatura paga (mercadopago | kiwify | manual) */
+  provider: string | null;
   entitlements: Entitlements;
 }
 
-/** Cria o trial de 7 dias (uma vez por conta). */
+/** Cria o teste grátis do PRO (TRIAL_DAYS, uma vez por conta). */
 export async function startTrial(userId: string) {
   const prisma = getPrisma();
   if (!prisma) return null;
@@ -49,7 +51,7 @@ export async function getAccess(userId: string): Promise<AccessView> {
   return view(tier, sub);
 }
 
-function view(tier: Tier, sub: { plan: string; status: string; trialEndsAt: Date | null; currentPeriodEnd: Date | null; cancelAtPeriodEnd: boolean } | null): AccessView {
+function view(tier: Tier, sub: { plan: string; status: string; trialEndsAt: Date | null; currentPeriodEnd: Date | null; cancelAtPeriodEnd: boolean; provider?: string | null } | null): AccessView {
   const now = Date.now();
   const status = sub ? (effectiveStatus(sub) as SubscriptionStatus) : "NONE";
   return {
@@ -61,6 +63,7 @@ function view(tier: Tier, sub: { plan: string; status: string; trialEndsAt: Date
     cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
     daysLeft: status === "TRIALING" && sub?.trialEndsAt ? Math.max(0, Math.ceil((sub.trialEndsAt.getTime() - now) / 86_400_000)) : null,
     trialDays: TRIAL_DAYS,
+    provider: sub?.provider ?? null,
     entitlements: ENTITLEMENTS[tier],
   };
 }

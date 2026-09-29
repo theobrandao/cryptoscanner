@@ -1,5 +1,5 @@
 /**
- * Auditoria de responsividade: todas as rotas em 360, 390, 768 e 1280 px.
+ * Auditoria de responsividade: todas as rotas nas larguras de WIDTHS (padrão 320 a 1440 px). ANON=1 audita sem login.
  * Critérios por página/largura:
  *  - sem rolagem horizontal do documento (scrollWidth ≤ largura da janela);
  *  - elementos que ultrapassam a borda direita e não estão dentro de um contêiner com rolagem própria;
@@ -11,10 +11,10 @@ import { chromium } from "playwright";
 
 const BASE = (process.env.BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const OUT = process.env.OUT_DIR ?? "./responsive-out";
-const WIDTHS = (process.env.WIDTHS ?? "360,390,768,1280").split(",").map(Number);
+const WIDTHS = (process.env.WIDTHS ?? "320,360,390,414,768,1024,1440").split(",").map(Number);
 const ROUTES = (
   process.env.ROUTES ??
-  "/,/charts/BTC,/strategies,/monitor,/backtest,/derivatives,/scanner/padroes,/termos,/privacidade,/reembolso,/esqueci-senha,/admin,/terminal,/terminal?tab=liquidity,/terminal?tab=mtf,/risco,/scanner,/estatisticas,/graficos,/agentes,/sentinela,/panorama,/bubbles,/fibonacci,/carteira,/simulador,/mentor,/jornada,/planos,/preferencias,/suporte,/status,/login,/registro"
+  "/,/vendas,/charts/BTC,/strategies,/monitor,/backtest,/derivatives,/scanner/padroes,/termos,/privacidade,/reembolso,/esqueci-senha,/admin,/terminal,/terminal?tab=liquidity,/terminal?tab=mtf,/risco,/scanner,/estatisticas,/graficos,/agentes,/sentinela,/panorama,/bubbles,/fibonacci,/carteira,/simulador,/mentor,/jornada,/planos,/preferencias,/suporte,/status,/login,/registro"
 ).split(",");
 mkdirSync(OUT, { recursive: true });
 
@@ -26,6 +26,7 @@ async function newSession(width) {
   const page = await ctx.newPage();
   // conta autenticada para as páginas que exigem login
   const email = `resp+${Date.now()}-${width}@cryptoscanner.local`;
+  if (process.env.ANON === "1") return { ctx, page, email: null };
   await page.goto(BASE + "/login", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     async ({ email, invite }) => {

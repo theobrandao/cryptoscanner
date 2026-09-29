@@ -2,6 +2,7 @@ import { requirePrisma } from "@/database/client";
 import { getEnv, isRegistrationOpen, legalStatus } from "@/lib/env";
 import { effectiveStatus } from "@/lib/entitlements";
 import { isBillingConfigured, priceFor, verifyBillingAccount } from "@/services/billing/mercadopago";
+import { isKiwifyApiConfigured, isKiwifyConfigured, kiwifyCheckoutUrl } from "@/services/billing/kiwify";
 import { isEmailConfigured } from "@/services/email-service";
 import { isPushConfigured } from "@/services/push-service";
 
@@ -24,8 +25,8 @@ export async function getAdminOverview() {
     prisma.strategy.count(),
   ]);
   const eff = subs.map((s) => ({ ...s, eff: effectiveStatus(s, now) }));
-  const paid = eff.filter((s) => s.eff === "ACTIVE" && s.provider === "mercadopago");
-  const manual = eff.filter((s) => s.eff === "ACTIVE" && s.provider !== "mercadopago").length;
+  const paid = eff.filter((s) => s.eff === "ACTIVE" && (s.provider === "mercadopago" || s.provider === "kiwify"));
+  const manual = eff.filter((s) => s.eff === "ACTIVE" && s.provider !== "mercadopago" && s.provider !== "kiwify").length;
   const mrr = paid.reduce((sum, s) => sum + priceFor(s.plan === "ELITE" ? "ELITE" : "PRO"), 0);
   const trialsStarted30 = eff.filter((s) => s.trialStartedAt && s.trialStartedAt >= d30).length;
   const converted30 = paid.filter((s) => s.trialStartedAt && s.trialStartedAt >= d30).length;
@@ -53,6 +54,14 @@ export async function getAdminOverview() {
     recentBilling: billing,
     recentUsers: recentUsers.map((u) => ({ email: u.email, createdAt: u.createdAt, role: u.role, status: u.subscription?.status ?? "—", plan: u.subscription?.plan ?? "—" })),
     readiness: [
+      ...(env.BILLING_PROVIDER === "kiwify"
+        ? [
+            { key: "kiwify_checkout", label: `Kiwify: links de checkout PRO ${kiwifyCheckoutUrl("PRO") ? "ok" : "ausente/inválido"} · ELITE ${kiwifyCheckoutUrl("ELITE") ? "ok" : "ausente/inválido"} (KIWIFY_CHECKOUT_*_URL)`, ok: Boolean(kiwifyCheckoutUrl("PRO") && kiwifyCheckoutUrl("ELITE")) },
+            { key: "kiwify_webhook", label: "Kiwify: token do webhook (KIWIFY_WEBHOOK_TOKEN) — URL {APP}/api/billing/kiwify", ok: Boolean(env.KIWIFY_WEBHOOK_TOKEN) },
+            { key: "kiwify_products", label: "Kiwify: IDs dos produtos PRO/ELITE (KIWIFY_PRODUCT_*_ID) ou nome do plano com PRO/ELITE", ok: Boolean(env.KIWIFY_PRODUCT_PRO_ID && env.KIWIFY_PRODUCT_ELITE_ID) },
+            { key: "kiwify_api", label: "Kiwify: API para reler a venda (KIWIFY_CLIENT_ID/SECRET/ACCOUNT_ID) — opcional", ok: isKiwifyApiConfigured() },
+          ]
+        : []),
       {
         key: "billing",
         label: mpAccount?.ok
@@ -69,6 +78,6 @@ export async function getAdminOverview() {
       { key: "app_url", label: `URL pública (NEXT_PUBLIC_APP_URL=${env.NEXT_PUBLIC_APP_URL})`, ok: env.NEXT_PUBLIC_APP_URL.startsWith("https://") },
       { key: "self_plan", label: "Troca de plano sem pagamento desligada (ALLOW_SELF_PLAN_CHANGE=false)", ok: !env.ALLOW_SELF_PLAN_CHANGE },
     ],
-    checkoutEnabled: isBillingConfigured() && legal.ready,
+    checkoutEnabled: (env.BILLING_PROVIDER === "kiwify" ? isKiwifyConfigured() : isBillingConfigured()) && legal.ready,
   };
 }

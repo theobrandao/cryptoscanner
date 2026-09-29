@@ -352,7 +352,7 @@ function WhalesCard() {
 
 function Row({ symbol, pct }: { symbol: string; pct: number }) {
   return (
-    <Link href={`/graficos?symbol=${symbol}`} className="flex items-center justify-between rounded px-2 py-1 hover:bg-muted">
+    <Link href={`/graficos?symbol=${symbol}`} className="flex min-h-9 items-center justify-between rounded px-2 py-1 hover:bg-muted">
       <span className="font-semibold">{symbol}</span>
       <span className={cn("tabular", pct > 0 ? "text-success" : pct < 0 ? "text-danger" : "")}>{formatPct(pct)}</span>
     </Link>
