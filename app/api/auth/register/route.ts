@@ -5,7 +5,7 @@ import { requirePrisma } from "@/database/client";
 import { ApiError, enforceRateLimit, parseBody, withApi } from "@/lib/api";
 import { createSessionToken, hashPassword, passwordPolicy, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 import { isInviteRequired, isOwnerEmail } from "@/lib/env";
-import { checkInvite } from "@/lib/invite";
+import { canRegister } from "@/lib/invite";
 
 const bodySchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -24,7 +24,7 @@ export const POST = withApi(async (req) => {
   await connection();
   await enforceRateLimit(req, "auth");
   const body = await parseBody(req, bodySchema);
-  if (!checkInvite(body.invite)) throw new ApiError(403, "Cadastro restrito: código de convite inválido", "invite_required");
+  if (!canRegister(body.email, body.invite)) throw new ApiError(403, "Cadastro restrito ao dono da conta (uso pessoal)", "invite_required");
   const prisma = requirePrisma();
   const exists = await prisma.user.findUnique({ where: { email: body.email } });
   if (exists) throw new ApiError(409, "E-mail já cadastrado", "email_taken");

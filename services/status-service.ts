@@ -66,7 +66,7 @@ async function jobStatuses(): Promise<JobStatus[]> {
 }
 
 export async function getSystemStatus(): Promise<SystemStatus> {
-  const [database, providers, jobs] = await Promise.all([checkDatabase(), getProviderHealth(), jobStatuses().catch(() => [])]);
+  const [database, providers, jobs, push] = await Promise.all([checkDatabase(), getProviderHealth(), jobStatuses().catch(() => []), isPushConfigured()]);
   const anyProvider = providers.some((p) => p.ok);
   const cycle = jobs.find((j) => j.job === "cycle");
   let overall: SystemStatus["overall"] = "ok";
@@ -79,6 +79,6 @@ export async function getSystemStatus(): Promise<SystemStatus> {
     cache: getCache().kind(),
     providers,
     jobs,
-    integrations: { llm: isLlmConfigured(), telegram: isTelegramConfigured(), push: isPushConfigured() },
+    integrations: { llm: isLlmConfigured(), telegram: isTelegramConfigured(), push },
   };
 }

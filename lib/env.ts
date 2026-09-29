@@ -111,6 +111,8 @@ export function isOwnerEmail(email: string): boolean {
     .includes(email.trim().toLowerCase());
 }
 
+/** Cadastro restrito (uso pessoal): há código de convite ou lista de e-mails do dono. */
 export function isInviteRequired(): boolean {
-  return Boolean(getEnv().REGISTRATION_INVITE_CODE);
+  const env = getEnv();
+  return Boolean(env.REGISTRATION_INVITE_CODE) || env.OWNER_EMAILS.trim().length > 0;
 }

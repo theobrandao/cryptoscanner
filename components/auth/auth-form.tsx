@@ -94,8 +94,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           {mode === "register" && inviteRequired ? (
             <div className="flex flex-col gap-1">
               <Label htmlFor="invite">Código de convite</Label>
-              <Input id="invite" value={invite} onChange={(e) => setInvite(e.target.value)} required autoComplete="off" />
-              <span className="text-xs text-muted-foreground">Uso pessoal: o cadastro é restrito a quem tem o código.</span>
+              <Input id="invite" value={invite} onChange={(e) => setInvite(e.target.value)} autoComplete="off" />
+              <span className="text-xs text-muted-foreground">Uso pessoal: o e-mail do dono cadastra sem código; outras pessoas precisam do convite.</span>
             </div>
           ) : null}
           {error ? <Alert variant="danger">{error}</Alert> : null}

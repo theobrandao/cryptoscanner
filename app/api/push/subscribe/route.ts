@@ -14,7 +14,7 @@ export const GET = withApi(async (req) => {
   await connection();
   const user = await requireUser(req);
   const count = await requirePrisma().pushSubscription.count({ where: { userId: user.id } });
-  return ok({ configured: isPushConfigured(), publicKey: getVapidPublicKey(), subscriptions: count });
+  return ok({ configured: await isPushConfigured(), publicKey: await getVapidPublicKey(), subscriptions: count });
 });
 
 export const POST = withApi(async (req) => {

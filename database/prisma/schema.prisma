@@ -461,3 +461,10 @@ model CronRun {
 
   @@index([job, startedAt(sort: Desc)])
 }
+
+/// Configuração gerada pelo próprio app (ex.: chaves VAPID quando não definidas no ambiente).
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
