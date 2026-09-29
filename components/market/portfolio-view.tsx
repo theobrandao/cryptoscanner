@@ -434,7 +434,7 @@ function SavedAnalyses() {
         title="Nenhuma análise salva"
         description="As análises de gráfico por IA feitas no Scanner ficam registradas aqui."
         action={
-          <Link href="/scanner#analise-ia" className="text-sm text-primary hover:underline">
+          <Link href="/scanner/padroes#analise-ia" className="text-sm text-primary hover:underline">
             Ir para o Scanner
           </Link>
         }

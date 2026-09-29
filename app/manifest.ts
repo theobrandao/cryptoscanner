@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "CryptoScanner — Padrões & Agentes IA",
     short_name: "CryptoScanner",
     description: "Scanner de padrões gráficos, agentes de IA, panorama e simulador de aportes para Bitcoin e altcoins.",
-    start_url: "/scanner",
+    start_url: "/",
     display: "standalone",
     background_color: "#0f0b1f",
     theme_color: "#7c5cff",

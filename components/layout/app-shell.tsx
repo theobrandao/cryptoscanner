@@ -54,11 +54,11 @@ export const PRIMARY_NAV: NavLink[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/panorama", label: "Markets", icon: Globe2, match: ["/panorama", "/bubbles"] },
   { href: "/scanner", label: "Market Scanner", icon: Radar },
-  { href: "/sentinela", label: "Market Monitor", icon: Activity },
+  { href: "/monitor", label: "Market Monitor", icon: Activity, match: ["/monitor", "/sentinela"] },
   { href: "/charts", label: "Charts", icon: CandlestickChart, match: ["/charts", "/graficos", "/terminal", "/fibonacci"] },
   { href: "/derivatives", label: "Derivatives", icon: Gauge },
-  { href: "/agentes", label: "Strategies", icon: Workflow },
-  { href: "/estatisticas", label: "Backtest", icon: FlaskConical },
+  { href: "/strategies", label: "Strategies", icon: Workflow, match: ["/strategies", "/agentes"] },
+  { href: "/backtest", label: "Backtest", icon: FlaskConical, match: ["/backtest", "/estatisticas"] },
   { href: "/risco", label: "Risk Management", icon: ShieldCheck },
   { href: "/carteira", label: "Portfolio", icon: Briefcase },
 ];
@@ -75,6 +75,10 @@ const FOOT_NAV: NavLink[] = [
 
 /** Páginas fora da sidebar, acessíveis pela busca global. */
 const EXTRA_PAGES: NavLink[] = [
+  { href: "/scanner/padroes", label: "Chart Patterns Scanner", icon: Radar },
+  { href: "/agentes", label: "AI Agents (classic)", icon: Workflow },
+  { href: "/sentinela", label: "Sentinel (classic)", icon: Activity },
+  { href: "/estatisticas", label: "Pattern Statistics", icon: FlaskConical },
   { href: "/jornada", label: "Academy", icon: BookOpen },
   { href: "/bubbles", label: "Market Bubbles", icon: Globe2 },
   { href: "/planos", label: "Plans & Billing", icon: Briefcase },
@@ -84,7 +88,7 @@ const EXTRA_PAGES: NavLink[] = [
 const MOBILE_NAV: NavLink[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/scanner", label: "Scanner", icon: Radar },
-  { href: "/sentinela", label: "Monitor", icon: Activity },
+  { href: "/monitor", label: "Monitor", icon: Activity },
   { href: "/risco", label: "Risk", icon: ShieldCheck },
 ];
 
@@ -310,6 +314,61 @@ function MarketDataStatus() {
   );
 }
 
+interface NotifEvent {
+  id: string;
+  title: string;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+  payload: { contextKey?: string } | null;
+}
+
+/** Sino: eventos do Market Monitor (in-app), contagem de não lidos, marcar como lidos. */
+function NotificationsBell() {
+  const { user } = useSession();
+  const { data, mutate } = useSWR<{ items: NotifEvent[]; unread: number }>(user ? "/api/monitors/events?limit=8" : null, { refreshInterval: 60_000 });
+  const unread = data?.unread ?? 0;
+  if (!user)
+    return (
+      <Link href="/login" className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted" aria-label="Notificações">
+        <Bell className="h-4 w-4" />
+      </Link>
+    );
+  return (
+    <DropdownMenu
+      onOpenChange={async (o) => {
+        if (!o && unread) {
+          await apiFetch("/api/monitors/events/read", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).catch(() => undefined);
+          await mutate();
+        }
+      }}
+    >
+      <DropdownMenuTrigger asChild>
+        <button className="relative grid h-9 w-9 place-items-center rounded-md hover:bg-muted" aria-label={`Notificações${unread ? ` (${unread} não lidas)` : ""}`}>
+          <Bell className="h-4 w-4" />
+          {unread ? <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[9.5px] font-bold text-primary-foreground">{unread > 9 ? "9+" : unread}</span> : null}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 p-0">
+        <div className="border-b border-border px-3 py-2 text-[13px] font-semibold">Notificações</div>
+        {data && data.items.length === 0 ? <p className="px-3 py-3 text-[12px] text-muted-foreground">Sem eventos. Crie monitores no Market Monitor.</p> : null}
+        <ul className="max-h-96 divide-y divide-border overflow-y-auto">
+          {(data?.items ?? []).map((e) => (
+            <li key={e.id} className={cn("px-3 py-2 text-[12px]", !e.readAt && "bg-primary/5")}>
+              <div className="font-semibold leading-snug">{e.title}</div>
+              <p className="line-clamp-2 text-muted-foreground">{e.body}</p>
+              <p className="text-[10.5px] text-muted-foreground">{timeAgo(e.createdAt)}</p>
+            </li>
+          ))}
+        </ul>
+        <Link href="/monitor" className="block border-t border-border px-3 py-2 text-center text-[12px] text-primary hover:bg-muted">
+          Abrir Market Monitor
+        </Link>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function UserMenu() {
   const { user, refresh } = useSession();
   const router = useRouter();
@@ -340,6 +399,7 @@ function UserMenu() {
         <DropdownMenuItem onSelect={() => router.push("/preferencias")}>Settings</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => router.push("/planos")}>Plans & billing</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => router.push("/status")}>System health</DropdownMenuItem>
+        {user.role === "ADMIN" ? <DropdownMenuItem onSelect={() => router.push("/admin")}>Admin</DropdownMenuItem> : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={async () => {
@@ -466,9 +526,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="ml-auto flex items-center gap-1.5">
             <MarketDataStatus />
             <AiAnalystButton />
-            <Link href="/carteira?tab=alerts" className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted" aria-label="Notificações">
-              <Bell className="h-4 w-4" />
-            </Link>
+            <NotificationsBell />
             <button onClick={toggle} className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted" aria-label="Alternar tema">
               {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </button>
@@ -476,8 +534,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main className="min-w-0 flex-1 pb-16 lg:pb-0">{children}</main>
-        <footer className="border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
-          Conteúdo técnico e educacional, não é recomendação de investimento. Dados: Binance, Bybit, OKX, Kraken, CoinGecko, CoinPaprika, BCB (PTAX), alternative.me. Confluence Score mede qualidade de confluência, não probabilidade.
+        <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
+          <span>
+            Conteúdo técnico e educacional, não é recomendação de investimento. Dados: Binance, Bybit, OKX, Kraken, CoinGecko, CoinPaprika, BCB (PTAX), alternative.me. Confluence Score mede qualidade de confluência, não probabilidade.
+          </span>
+          <nav className="flex gap-3" aria-label="Documentos legais">
+            <Link href="/termos" className="hover:text-foreground">
+              Termos
+            </Link>
+            <Link href="/privacidade" className="hover:text-foreground">
+              Privacidade
+            </Link>
+            <Link href="/reembolso" className="hover:text-foreground">
+              Cancelamento e reembolso
+            </Link>
+            <Link href="/planos" className="hover:text-foreground">
+              Planos
+            </Link>
+          </nav>
         </footer>
       </div>
 

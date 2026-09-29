@@ -65,6 +65,15 @@ async function call(method, path, { body, form, headers = {}, auth = true, raw =
  */
 let accountSection = false;
 
+/** Chamada no balde "auth" (10/min por IP): em 429 espera a janela reabrir (até 65 s) e tenta de novo. */
+async function callAuth(method, path, opts) {
+  const r = await call(method, path, opts);
+  if (r.res.status !== 429) return r;
+  const resetAt = Number(r.json?.error?.details?.resetAt ?? Date.now() + 60_000);
+  await new Promise((ok) => setTimeout(ok, Math.min(65_000, Math.max(1_000, resetAt - Date.now() + 1_000))));
+  return call(method, path, opts);
+}
+
 async function test(group, name, fn) {
   if (accountSection && state.noAccount) {
     results.push({ group, name, ok: true, skipped: true, ms: 0, detail: state.noAccount });
@@ -567,7 +576,7 @@ await test("Auth", "rota protegida sem sessão → 401", async () => {
 });
 
 await test("Auth", "POST /api/auth/register senha fraca → 400", async () => {
-  const r = await call("POST", "/api/auth/register", { body: { name: "Smoke", email: EMAIL, password: "abc" } });
+  const r = await call("POST", "/api/auth/register", { body: { name: "Smoke", email: EMAIL, password: "abc", acceptTerms: true } });
   expectStatus(r, 400, "validation");
   return "400";
 });
@@ -578,7 +587,7 @@ await test("Auth", "GET /api/auth/register (convite exigido?) + recusa sem convi
   const required = g.json?.data?.inviteRequired === true;
   if (required && !INVITE) state.noAccount = "ignorado: cadastro exige convite e INVITE_CODE não foi informado (secret do GitHub)";
   if (!required) return "cadastro aberto (sem REGISTRATION_INVITE_CODE)";
-  const r = await call("POST", "/api/auth/register", { auth: false, body: { name: "Intruso", email: `x${EMAIL}`, password: PASSWORD, invite: "codigo-errado" } });
+  const r = await call("POST", "/api/auth/register", { auth: false, body: { name: "Intruso", email: `x${EMAIL}`, password: PASSWORD, invite: "codigo-errado", acceptTerms: true } });
   if (r.res.status !== 403) throw new Error(`esperado 403, veio ${r.res.status}`);
   return "convite exigido; código errado → 403";
 });
@@ -593,9 +602,17 @@ await test("Comercial", "GET /api/markets/status (Market Data Status por exchang
   return v.map((x) => `${x.label} ${x.status}${x.latencyMs != null ? ` ${x.latencyMs}ms` : ""}`).join(" · ");
 });
 
+await test("Analytics", "POST /api/analytics/event: nome fora da lista → 400; válido → 200", async () => {
+  const bad = await call("POST", "/api/analytics/event", { auth: false, body: { name: "hack" } });
+  expectStatus(bad, 400);
+  const good = await call("POST", "/api/analytics/event", { auth: false, body: { name: "plans_view", anonId: `smoke-${stamp}` } });
+  expectStatus(good, 200);
+  return "ok";
+});
+
 accountSection = true;
 await test("Auth", "POST /api/auth/register → 201 + cookie", async () => {
-  const r = await call("POST", "/api/auth/register", { body: { name: "Smoke Test", email: EMAIL, password: PASSWORD, ...(INVITE ? { invite: INVITE } : {}) } });
+  const r = await call("POST", "/api/auth/register", { body: { name: "Smoke Test", email: EMAIL, password: PASSWORD, acceptTerms: true, ...(INVITE ? { invite: INVITE } : {}) } });
   expectStatus(r, 201);
   expect(cookie.startsWith("cs_session="), "cookie de sessão ausente");
   state.userId = r.json.data.user.id;
@@ -685,6 +702,73 @@ await test("Comercial", "GET /api/markets/setups e /api/markets/overview", async
   return `${s.json.data.rows.length} ativos ranqueados · F&G ${o.json.data.fearGreed?.value ?? "n/d"} · dominância ${o.json.data.global?.btcDominance?.toFixed?.(1) ?? "n/d"}%`;
 });
 
+await test("R2", "Strategies: catálogo, criar, avaliar, varrer universo, editar, excluir; definição inválida → 400", async () => {
+  const cat = await call("GET", "/api/strategies");
+  expectStatus(cat, 200);
+  expect(cat.json.data.catalog.features.length >= 20 && cat.json.data.templates.length >= 3, "catálogo incompleto");
+  const bad = await call("POST", "/api/strategies", { body: { name: "Inválida", definition: { direction: "long", groups: [{ conditions: [{ tf: "4h", feature: "trend", op: ">", value: "bullish" }] }] } } });
+  expectStatus(bad, 400);
+  const tpl = cat.json.data.templates[0];
+  const c = await call("POST", "/api/strategies", { body: { name: "Smoke MTF", definition: tpl.definition } });
+  expectStatus(c, 201);
+  state.strategyId = c.json.data.strategy.id;
+  const ev = await call("POST", "/api/strategies/evaluate", { body: { id: state.strategyId, symbol: "BTC", exchange: "okx", instrument: "perp" } });
+  expectStatus(ev, 200);
+  expect(ev.json.data.groups[0].results.length === tpl.definition.groups[0].conditions.length, "resultado por condição ausente");
+  const sc = await call("POST", "/api/strategies/scan", { body: { id: state.strategyId } });
+  expectStatus(sc, 200);
+  expect(sc.json.data.rows.length >= 25, `scan com ${sc.json.data.rows.length} ativos`);
+  const up = await call("PATCH", `/api/strategies/${state.strategyId}`, { body: { name: "Smoke MTF 2" } });
+  expectStatus(up, 200);
+  const passing = sc.json.data.rows.filter((r) => r.pass).length;
+  return `${cat.json.data.catalog.features.length} features · BTC OKX perp ${ev.json.data.pass ? "atende" : "não atende"} · universo ${passing}/${sc.json.data.rows.length} atendem`;
+});
+
+await test("R2", "Market Monitor: criar, duplicado → 409, listar, eventos, pausar, excluir", async () => {
+  const c = await call("POST", "/api/monitors", { body: { symbol: "BTC", timeframe: "4h", exchange: "binance", instrument: "spot", kind: "SETUP" } });
+  expectStatus(c, 201);
+  const dup = await call("POST", "/api/monitors", { body: { symbol: "BTC", timeframe: "4h", exchange: "binance", instrument: "spot", kind: "SETUP" } });
+  expectStatus(dup, 409, "duplicate");
+  const s = await call("POST", "/api/monitors", { body: { symbol: "ETH", timeframe: "1h", kind: "STRATEGY", strategyId: state.strategyId } });
+  expectStatus(s, 201);
+  const list = await call("GET", "/api/monitors");
+  expectStatus(list, 200);
+  expect(list.json.data.items.length === 2, `${list.json.data.items.length} monitores`);
+  const ev = await call("GET", "/api/monitors/events?limit=5");
+  expectStatus(ev, 200);
+  const p = await call("PATCH", `/api/monitors/${c.json.data.monitor.id}`, { body: { active: false } });
+  expectStatus(p, 200);
+  for (const m of list.json.data.items) expectStatus(await call("DELETE", `/api/monitors/${m.id}`), 200);
+  return `limite do plano ${list.json.data.limit} · eventos não lidos ${ev.json.data.unread}`;
+});
+
+await test("R2", "Backtest: setup 4H 90 dias com custos; multi-TF no trial → 402; feature ao vivo → 400", async () => {
+  const r = await call("POST", "/api/backtest/run", { body: { symbol: "BTC", mode: "setup", timeframe: "4h", days: 90, feeBps: 10, slippageBps: 5 } });
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(Array.isArray(d.trades) && Array.isArray(d.equity) && typeof d.metrics.samples === "number", "resposta incompleta");
+  for (const t of d.trades) expect(t.rNet <= t.rGross + 1e-9, "custo aumentou o R");
+  const mtf = await call("POST", "/api/backtest/run", { body: { symbol: "BTC", mode: "strategy", strategyId: state.strategyId, days: 90 } });
+  expect(mtf.res.status === 402 || mtf.res.status === 200, `multi-TF ${mtf.res.status}`);
+  const live = await call("POST", "/api/backtest/run", { body: { symbol: "BTC", mode: "strategy", days: 90, definition: { direction: "long", groups: [{ conditions: [{ tf: "4h", feature: "confluence_score", op: ">=", value: 60 }] }] } } });
+  expectStatus(live, 400, "live_only_feature");
+  return `${d.trades.length} operações · E ${d.metrics.expectancyR != null ? d.metrics.expectancyR.toFixed(2) : "—"}R líquido (bruto ${d.grossExpectancyR != null ? d.grossExpectancyR.toFixed(2) : "—"}R) · custos ${d.totalCostR.toFixed(2)}R · multi-TF ${mtf.res.status}`;
+});
+
+await test("R2", "Derivatives View Details (3 exchanges) e onboarding; admin → 403 para usuário comum", async () => {
+  const d = await call("GET", "/api/markets/BTC/derivatives?exchange=okx");
+  expectStatus(d, 200);
+  expect(d.json.data.venues.length === 3, "comparativo sem 3 exchanges");
+  expect(d.json.data.venues.some((v) => v.ok), "nenhuma exchange respondeu");
+  const o = await call("GET", "/api/onboarding");
+  expectStatus(o, 200);
+  expect(o.json.data.steps.length === 6, "checklist incompleto");
+  const a = await call("GET", "/api/admin/overview");
+  expectStatus(a, 403);
+  expectStatus(await call("DELETE", `/api/strategies/${state.strategyId}`), 200);
+  return `OI agregado ${d.json.data.aggregated.openInterestUsd ? (d.json.data.aggregated.openInterestUsd / 1e9).toFixed(2) + " bi" : "n/d"} (${d.json.data.aggregated.venues} exchanges) · histórico ${d.json.data.history.venue ?? "n/d"} · onboarding ${o.json.data.done}/6`;
+});
+
 await test("Comercial", "Webhook Mercado Pago sem assinatura → 401; checkout sem token → 503", async () => {
   const w = await call("POST", "/api/billing/webhook", { auth: false, body: { type: "subscription_preapproval", data: { id: "x" } } });
   expectStatus(w, 401);
@@ -695,7 +779,7 @@ await test("Comercial", "Webhook Mercado Pago sem assinatura → 401; checkout s
 
 
 await test("Auth", "POST /api/auth/register e-mail repetido → 409", async () => {
-  const r = await call("POST", "/api/auth/register", { auth: false, body: { name: "Smoke Test", email: EMAIL, password: PASSWORD, ...(INVITE ? { invite: INVITE } : {}) } });
+  const r = await call("POST", "/api/auth/register", { auth: false, body: { name: "Smoke Test", email: EMAIL, password: PASSWORD, acceptTerms: true, ...(INVITE ? { invite: INVITE } : {}) } });
   expectStatus(r, 409, "email_taken");
   return "409";
 });
@@ -1218,6 +1302,28 @@ await test("LGPD", "DELETE /api/auth/account (exclusão definitiva da conta de t
 });
 
 accountSection = false;
+
+// testes que usam o balde "auth" (10/min por IP) ficam aqui para não esgotar o limite antes do login
+await test("Venda", "Cadastro sem aceite dos termos → 400; preços públicos; páginas legais", async () => {
+  const r = await callAuth("POST", "/api/auth/register", { auth: false, body: { name: "Sem Aceite", email: `noterms+${EMAIL}`, password: PASSWORD, ...(INVITE ? { invite: INVITE } : {}) } });
+  expectStatus(r, 400, "validation");
+  const p = await call("GET", "/api/billing/prices", { auth: false });
+  expectStatus(p, 200);
+  expect(p.json.data.prices.PRO > 0 && p.json.data.prices.ELITE > p.json.data.prices.PRO && p.json.data.trialDays === 7, "preços/trial inválidos");
+  for (const path of ["/termos", "/privacidade", "/reembolso", "/esqueci-senha"]) {
+    const { res } = await call("GET", path, { auth: false, raw: true });
+    expect(res.status === 200, `${path} HTTP ${res.status}`);
+  }
+  return `PRO R$ ${p.json.data.prices.PRO} · ELITE R$ ${p.json.data.prices.ELITE} · checkout ${p.json.data.checkoutEnabled ? "liberado" : "bloqueado (termos/cobrança)"}`;
+});
+
+await test("Venda", "Esqueci a senha: resposta idêntica para e-mail existente/inexistente; token inválido → 400", async () => {
+  const a = await callAuth("POST", "/api/auth/password/forgot", { auth: false, body: { email: `inexistente+${stamp}@cryptoscanner.local` } });
+  expectStatus(a, 200);
+  const b = await callAuth("POST", "/api/auth/password/reset", { auth: false, body: { token: "x".repeat(43), password: "NovaSenha123" } });
+  expectStatus(b, 400, "invalid_token");
+  return `e-mail ${a.json.data.emailEnabled ? "ativo" : "não configurado"}`;
+});
 
 // ------------------------------------------------------------------ rate limit (por último: bloqueia auth por 60 s)
 if (!SKIP_RATE_LIMIT) {

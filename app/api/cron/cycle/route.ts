@@ -16,7 +16,7 @@ export const maxDuration = 60;
  * Ciclo do worker exposto como endpoint HTTP — para hospedagens serverless (Vercel) sem processo
  * de longa duração. Deve ser chamado a cada 5 min por um agendador externo (QStash, cron-job.org,
  * Vercel Cron) com `Authorization: Bearer <CRON_SECRET>` (QStash: Upstash-Forward-Authorization).
- * Etapas: scan 4H/1D → snapshot de mercado → agentes do usuário → alertas → sinais de padrão ao vivo.
+ * Etapas: scan 4H/1D → snapshot de mercado → agentes do usuário → alertas → monitores → sinais de padrão ao vivo.
  */
 async function handle(req: Request) {
   await connection();
@@ -50,6 +50,17 @@ async function handle(req: Request) {
     return { agents: res.length, signals: res.reduce((s, r) => s + r.signals.length, 0), alertsSent: res.reduce((s, r) => s + r.alertsSent, 0) };
   });
   await step("alerts", () => evaluateAlerts());
+
+  // Market Monitor: usa o tempo que sobrar do ciclo (endpoint dedicado /api/cron/monitors cobre o restante)
+  await step("monitors", async () => {
+    const { evaluateMonitors } = await import("@/services/monitor-service");
+    return evaluateMonitors({ budgetMs: Math.max(5_000, 48_000 - (Date.now() - t0)) });
+  });
+
+  await step("lifecycle", async () => {
+    const { runLifecycle } = await import("@/services/lifecycle-service");
+    return runLifecycle();
+  });
 
   await step("pattern-signals", async () => {
     const { trackLiveSignals } = await import("@/services/pattern-stats-service");

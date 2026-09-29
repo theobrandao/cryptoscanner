@@ -14,7 +14,7 @@ const OUT = process.env.OUT_DIR ?? "./responsive-out";
 const WIDTHS = (process.env.WIDTHS ?? "360,390,768,1280").split(",").map(Number);
 const ROUTES = (
   process.env.ROUTES ??
-  "/,/terminal,/terminal?tab=liquidity,/terminal?tab=mtf,/risco,/scanner,/estatisticas,/graficos,/agentes,/sentinela,/panorama,/bubbles,/fibonacci,/carteira,/simulador,/mentor,/jornada,/planos,/preferencias,/suporte,/status,/login,/registro"
+  "/,/charts/BTC,/strategies,/monitor,/backtest,/derivatives,/scanner/padroes,/termos,/privacidade,/reembolso,/esqueci-senha,/admin,/terminal,/terminal?tab=liquidity,/terminal?tab=mtf,/risco,/scanner,/estatisticas,/graficos,/agentes,/sentinela,/panorama,/bubbles,/fibonacci,/carteira,/simulador,/mentor,/jornada,/planos,/preferencias,/suporte,/status,/login,/registro"
 ).split(",");
 mkdirSync(OUT, { recursive: true });
 
@@ -29,7 +29,7 @@ async function newSession(width) {
   await page.goto(BASE + "/login", { waitUntil: "domcontentloaded" });
   await page.evaluate(
     async ({ email, invite }) => {
-      await fetch("/api/auth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Responsivo", email, password: "Resp12345678", ...(invite ? { invite } : {}) }) });
+      await fetch("/api/auth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Responsivo", email, password: "Resp12345678", acceptTerms: true, ...(invite ? { invite } : {}) }) });
     },
     { email, invite: process.env.INVITE_CODE ?? "" },
   );

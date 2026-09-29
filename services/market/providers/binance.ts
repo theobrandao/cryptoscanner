@@ -104,6 +104,24 @@ export async function getBinanceSpotPrice(pair: string): Promise<number> {
   return v;
 }
 
+/**
+ * Histórico longo de klines spot (paginado para trás com endTime), até `bars` candles.
+ * Mesmas bases com fallback regional.
+ */
+export async function getSpotKlinesHistory(pair: string, interval: string, bars: number): Promise<Candle[]> {
+  const out: Candle[] = [];
+  let endTime: number | undefined;
+  while (out.length < bars) {
+    const limit = Math.min(1000, bars - out.length);
+    const raw = await withBase((base) => fetchJson<Kline[]>(`${base}/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}${endTime ? `&endTime=${endTime}` : ""}`, { retries: 1, timeoutMs: 10_000 }));
+    if (!raw.length) break;
+    out.unshift(...parseKlines(raw));
+    endTime = raw[0]![0] - 1;
+    if (raw.length < limit) break;
+  }
+  return out.slice(-bars);
+}
+
 /** Usado em testes. */
 export function resetBinanceBases(): void {
   blockedUntil.clear();

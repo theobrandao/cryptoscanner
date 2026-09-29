@@ -62,9 +62,9 @@ for (let i = 0; i < 2; i++) {
 consoleErrors.length = 0;
 
 // ------------------------------------------------------------ páginas públicas
-await step("Dashboard (anônimo): convite ao teste de 7 dias; barra com busca, Live Markets e AI Analyst neutro", async () => {
+await step("Dashboard (anônimo): landing de venda com preços, teste de 7 dias e AI Analyst neutro", async () => {
   await goto("/");
-  await page.waitForFunction(() => /Start 7-day trial/.test(document.body.innerText), null, { timeout: 30_000 });
+  await page.waitForFunction(() => /Contexto de mercado cripto completo/.test(document.body.innerText) && /Começar teste de 7 dias/.test(document.body.innerText) && /R\$ \d+/.test(document.body.innerText), null, { timeout: 30_000 });
   await page.getByRole("button", { name: "Market Data Status" }).first().waitFor({ timeout: 10_000 }).catch(() => {});
   const analyst = await page.getByRole("button", { name: "AI Analyst" }).count();
   expect(analyst >= 1, "botão AI Analyst ausente na barra superior");
@@ -74,7 +74,7 @@ await step("Dashboard (anônimo): convite ao teste de 7 dias; barra com busca, L
 });
 
 await step("Scanner: tabela em tempo real com 30 linhas (inclui ZEC e ALGO) e RSI", async () => {
-  await goto("/scanner");
+  await goto("/scanner/padroes");
   await page.waitForSelector("table tbody tr", { timeout: 30_000 });
   await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 30, null, { timeout: 30_000 });
   const rows = await page.locator("table tbody tr").count();
@@ -234,7 +234,11 @@ await step("Registro pela interface", async () => {
   if ((await pw.count()) > 1) await pw.nth(1).fill(PASSWORD);
   const inviteInput = page.locator("input#invite");
   if (await inviteInput.count()) await inviteInput.fill(process.env.INVITE_CODE ?? "");
-  await page.getByRole("button", { name: /Criar conta|Cadastrar|Registrar/i }).click();
+  // aceite obrigatório dos termos (botão fica desabilitado sem ele)
+  const btn = page.getByRole("button", { name: /Começar teste|Criar conta/i });
+  expect(await btn.isDisabled(), "cadastro permitido sem aceite dos termos");
+  await page.check("#accept-terms");
+  await btn.click();
   await page.waitForFunction(() => !location.pathname.startsWith("/registro"), null, { timeout: 30_000 });
   const me = await page.evaluate(async () => (await (await fetch("/api/auth/me")).json()).data.user?.email);
   expect(me === EMAIL, `sessão não criada (${me})`);
@@ -242,7 +246,7 @@ await step("Registro pela interface", async () => {
 });
 
 await step("Tema claro/escuro e moeda BRL", async () => {
-  await goto("/scanner");
+  await goto("/scanner/padroes");
   const themeBtn = page.getByRole("button", { name: /Alternar tema/i }).first();
   if (await themeBtn.count()) {
     await themeBtn.click();
@@ -290,7 +294,7 @@ await step("Sentinela: criar BTC 4H, varrer agora, ver relatórios, pausar", asy
 });
 
 await step("Scanner: análise de gráfico (upload PNG) em modo determinístico", async () => {
-  await goto("/scanner");
+  await goto("/scanner/padroes");
   await page.waitForFunction(() => /Modo determinístico|Analisar/i.test(document.body.innerText), null, { timeout: 30_000 });
   const input = page.locator("input[type='file']").first();
   await input.setInputFiles({ name: "chart.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64") });
@@ -341,7 +345,7 @@ await step("Planos: trocar para PLATINUM libera 15M no scanner; voltar para PRO"
   const changed = await page.evaluate(async () => (await fetch("/api/plans/change", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan: "PLATINUM" }) })).status);
   if (changed === 403) return "troca de plano bloqueada para não-admin (ALLOW_SELF_PLAN_CHANGE=false) — passo pulado";
   expect(changed === 200, `troca ${changed}`);
-  await goto("/scanner?timeframe=15m");
+  await goto("/scanner/padroes?timeframe=15m");
   const tf = page.locator("button", { hasText: /15M/ }).first();
   await tf.click();
   await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 30, null, { timeout: 40_000 });
@@ -380,7 +384,7 @@ await step("Mobile 390 px: scanner, taxa de acerto e gráficos sem rolagem horiz
   const m = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: "pt-BR" });
   const mp = await m.newPage();
   const out = [];
-  for (const r of ["/scanner", "/estatisticas", "/graficos", "/panorama", "/agentes", "/terminal?tab=mtf", "/risco"]) {
+  for (const r of ["/scanner/padroes", "/scanner", "/strategies", "/monitor", "/backtest", "/derivatives", "/estatisticas", "/graficos", "/panorama", "/agentes", "/terminal?tab=mtf", "/risco"]) {
     await mp.goto(BASE + r, { waitUntil: "domcontentloaded", timeout: 45_000 });
     await mp.waitForTimeout(2500);
     const over = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -448,6 +452,56 @@ await step("AI Analyst: painel lê o contexto ativo e só usa números do contex
   const file = await shot("ai-analyst");
   await page.keyboard.press("Escape");
   return file;
+});
+
+await step("Strategies: modelo → salvar → testar agora → rodar no universo", async () => {
+  await goto("/strategies");
+  await page.getByRole("button", { name: /Pullback em tendência/ }).click();
+  await page.getByRole("button", { name: /^Salvar$/ }).click();
+  await page.waitForFunction(() => /Estratégia salva/.test(document.body.innerText), null, { timeout: 30_000 });
+  await page.getByRole("button", { name: /Testar agora/ }).click();
+  await page.waitForFunction(() => /Condições (não )?atendidas/.test(document.body.innerText), null, { timeout: 90_000 });
+  await page.getByRole("button", { name: /Rodar no universo/ }).click();
+  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 20, null, { timeout: 120_000 });
+  return await shot("strategies");
+});
+
+await step("Market Scanner R2: 30 ativos com estado, score, regime, R:R; filtros", async () => {
+  await goto("/scanner?tf=4h");
+  await page.waitForFunction(() => /Market Scanner/.test(document.body.innerText) && /de 30 ativos|de \d+ ativos/.test(document.body.innerText), null, { timeout: 120_000 });
+  await page.getByLabel("Ocultar NO TRADE").uncheck();
+  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 25, null, { timeout: 30_000 });
+  return await shot("market-scanner");
+});
+
+await step("Market Monitor: criar monitor de setup (servidor) e listar", async () => {
+  await goto("/monitor?symbol=ETH&tf=4h");
+  await page.getByRole("button", { name: /Criar monitor/ }).click();
+  await page.waitForFunction(() => /ETH\/USDT 4H/.test(document.body.innerText) && /aguardando 1º ciclo|FORMING|READY|DETECTED|NONE/.test(document.body.innerText), null, { timeout: 30_000 });
+  return await shot("monitor");
+});
+
+await step("Backtest: setup 4H 180 dias com custos → métricas e curva de capital", async () => {
+  await goto("/backtest");
+  await page.getByRole("button", { name: /Rodar backtest/ }).click();
+  await page.waitForFunction(() => /Expectativa líquida/.test(document.body.innerText) && /Curva de capital/.test(document.body.innerText), null, { timeout: 120_000 });
+  const canvases = await page.locator("canvas").count();
+  expect(canvases >= 1, "curva de capital sem canvas");
+  return await shot("backtest");
+});
+
+await step("Derivatives: comparativo por exchange e histórico", async () => {
+  await goto("/derivatives?symbol=BTC&exchange=okx");
+  await page.waitForFunction(() => /Agregado/.test(document.body.innerText) && /Histórico:/.test(document.body.innerText), null, { timeout: 60_000 });
+  return await shot("derivatives");
+});
+
+await step("Documentos legais e recuperação de senha acessíveis", async () => {
+  for (const [path, re] of [["/termos", /Termos de Uso/], ["/privacidade", /Política de Privacidade/], ["/reembolso", /Cancelamento e Reembolso/], ["/esqueci-senha", /Esqueci minha senha/]]) {
+    await goto(path);
+    await page.waitForFunction((src) => new RegExp(src).test(document.body.innerText), re.source, { timeout: 20_000 });
+  }
+  return "termos, privacidade, reembolso e esqueci-senha";
 });
 
 await step("Suporte logado: Meus chamados + exclusão da conta (LGPD) pela interface", async () => {

@@ -23,6 +23,9 @@ import { apiFetch, ApiClientError, postJson } from "@/lib/client-api";
 import type { MarketContext } from "@/services/market-context-service";
 import type { SetupRow } from "@/services/market-overview-service";
 import type { Timeframe } from "@/types/market";
+import { Landing } from "@/components/marketing/landing";
+import { OnboardingCard } from "@/components/terminal/onboarding-card";
+import { trackClient } from "@/lib/analytics-client";
 
 export const TERMINAL_TFS: Timeframe[] = SELECTION_TFS;
 const px = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? "—" : formatPrice(v));
@@ -81,6 +84,14 @@ function AssetHeader({ ctx, sel, onChange, live }: { ctx: MarketContext; sel: Ma
   }, []);
   const { user } = useSession();
   const { toast } = useToast();
+  const monitor = async () => {
+    try {
+      await postJson("/api/monitors", { symbol: ctx.symbol, timeframe: ctx.timeframe, exchange: ctx.exchange, instrument: ctx.instrument, kind: "SETUP" });
+      toast({ title: `Monitor criado: ${ctx.symbol} ${ctx.timeframe.toUpperCase()}`, description: "Aviso quando o setup mudar para READY, TRIGGERED, INVALIDATED ou TARGET HIT.", variant: "success" });
+    } catch (err) {
+      toast({ title: "Não foi possível criar o monitor", description: err instanceof ApiClientError ? err.message : String(err), variant: "danger" });
+    }
+  };
   const addToWatchlist = async () => {
     try {
       await postJson("/api/watchlist", { symbol: ctx.symbol });
@@ -127,6 +138,11 @@ function AssetHeader({ ctx, sel, onChange, live }: { ctx: MarketContext; sel: Ma
               {q.status}
               {fallback ? ` · ${VENUE_LABEL[ctx.dataVenue]}` : ""}
             </span>
+          ) : null}
+          {user ? (
+            <button onClick={() => void monitor()} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-[12px] text-muted-foreground hover:text-foreground" title="Monitorar este setup no servidor">
+              <Bell className="h-3.5 w-3.5" /> Monitor
+            </button>
           ) : null}
           {user ? (
             <button onClick={() => void addToWatchlist()} className="grid h-8 w-8 place-items-center rounded-md border border-border text-muted-foreground hover:text-warning" aria-label="Adicionar à watchlist" title="Adicionar à watchlist">
@@ -447,6 +463,7 @@ export function TerminalWorkspace({ symbol: routeSymbol, mode = "dashboard" }: {
   const update = React.useCallback(
     (p: Partial<MarketSelection>) => {
       const n = { ...sel, ...p };
+      trackClient("context_change", { symbol: n.symbol, tf: n.timeframe, exchange: n.exchange, instrument: n.instrument });
       const q = `tf=${n.timeframe}&exchange=${n.exchange}&instrument=${n.instrument}`;
       router.replace(mode === "charts" ? `/charts/${n.symbol}?${q}` : `/?symbol=${n.symbol}&${q}`, { scroll: false });
     },
@@ -483,6 +500,12 @@ export function TerminalWorkspace({ symbol: routeSymbol, mode = "dashboard" }: {
   const showError = (error && !aborted && !consistent) || anon;
   const shownError = anon ? new ApiClientError(401, "unauthorized", "Faça login ou comece o teste") : error;
   const showRight = analysisOpen && !focus;
+  const loggedIn = Boolean(user);
+  React.useEffect(() => {
+    if (loggedIn && mode === "dashboard") trackClient("dashboard_view");
+  }, [loggedIn, mode]);
+
+  if (anon && mode === "dashboard") return <Landing />;
 
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -496,6 +519,7 @@ export function TerminalWorkspace({ symbol: routeSymbol, mode = "dashboard" }: {
           </div>
         </div>
       ) : null}
+      {consistent && mode === "dashboard" ? <OnboardingCard /> : null}
       {consistent ? (
         <>
           <AssetHeader ctx={consistent} sel={sel} onChange={update} live={liveT ? { price: liveT.price, changePct24h: liveT.changePct24h } : null} />

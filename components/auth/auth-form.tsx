@@ -14,7 +14,7 @@ import { ApiClientError, apiFetch, postJson } from "@/lib/client-api";
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") ?? "/scanner";
+  const next = params.get("next") ?? "/";
   const { refresh } = useSession();
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -23,6 +23,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [loading, setLoading] = React.useState(false);
   const [invite, setInvite] = React.useState("");
   const [inviteRequired, setInviteRequired] = React.useState(false);
+  const [accept, setAccept] = React.useState(false);
 
   React.useEffect(() => {
     if (mode !== "register") return;
@@ -42,11 +43,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     setLoading(true);
     setError(null);
     try {
-      if (mode === "register") await postJson("/api/auth/register", { name, email, password, ...(invite ? { invite } : {}) });
+      if (mode === "register") await postJson("/api/auth/register", { name, email, password, acceptTerms: accept, ...(invite ? { invite } : {}) });
       else await postJson("/api/auth/login", { email, password });
       await refresh();
       // só caminhos internos: "/x" sim; "//host" e "/\\host" não (open redirect)
-      router.push(/^\/(?![/\\])/.test(next) ? next : "/scanner");
+      router.push(/^\/(?![/\\])/.test(next) ? next : "/");
     } catch (err) {
       if (err instanceof ApiClientError) {
         const details = Array.isArray(err.details) ? (err.details as Array<{ path: string; message: string }>).map((d) => `${d.path}: ${d.message}`).join("; ") : "";
@@ -64,10 +65,15 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           {mode === "login" ? <LogIn className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />} {mode === "login" ? "Entrar" : "Criar conta"}
         </CardTitle>
         <CardDescription>
-          {mode === "login" ? "Acesse seus agentes, watchlist, alertas e análises salvas." : "Conta gratuita: scanner em 4H/1D/7D, 3 análises de IA por dia e até 2 agentes."}
+          {mode === "login" ? "Acesse seu workspace, estratégias, monitores e watchlists." : "7 dias de teste completo, sem cartão. Depois, PRO ou ELITE."}
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {mode === "login" && params.get("reset") === "1" ? (
+          <Alert variant="success" className="mb-3">
+            Senha redefinida. Entre com a nova senha.
+          </Alert>
+        ) : null}
         <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3">
           {mode === "register" ? (
             <div className="flex flex-col gap-1">
@@ -96,13 +102,38 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             <div className="flex flex-col gap-1">
               <Label htmlFor="invite">Código de convite</Label>
               <Input id="invite" value={invite} onChange={(e) => setInvite(e.target.value)} autoComplete="off" />
-              <span className="text-xs text-muted-foreground">Uso pessoal: o e-mail do dono cadastra sem código; outras pessoas precisam do convite.</span>
+              <span className="text-xs text-muted-foreground">Cadastro por convite nesta fase.</span>
             </div>
           ) : null}
+          {mode === "register" ? (
+            <label className="flex items-start gap-2 text-xs text-muted-foreground">
+              <input id="accept-terms" type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} required className="mt-0.5" />
+              <span>
+                Li e aceito os{" "}
+                <Link href="/termos" target="_blank" className="text-primary underline">
+                  Termos de Uso
+                </Link>
+                , a{" "}
+                <Link href="/privacidade" target="_blank" className="text-primary underline">
+                  Política de Privacidade
+                </Link>{" "}
+                e a{" "}
+                <Link href="/reembolso" target="_blank" className="text-primary underline">
+                  Política de Cancelamento e Reembolso
+                </Link>
+                . Entendo que o CryptoScanner é ferramenta de análise técnica e não faz recomendação de investimento.
+              </span>
+            </label>
+          ) : null}
           {error ? <Alert variant="danger">{error}</Alert> : null}
-          <Button type="submit" loading={loading}>
-            {mode === "login" ? "Entrar" : "Criar conta"}
+          <Button type="submit" loading={loading} disabled={mode === "register" && !accept}>
+            {mode === "login" ? "Entrar" : "Começar teste de 7 dias"}
           </Button>
+          {mode === "login" ? (
+            <Link href="/esqueci-senha" className="text-center text-xs text-muted-foreground hover:text-foreground">
+              Esqueci minha senha
+            </Link>
+          ) : null}
         </form>
         <p className="mt-4 text-center text-sm text-muted-foreground">
           {mode === "login" ? (

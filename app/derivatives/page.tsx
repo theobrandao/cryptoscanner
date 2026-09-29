@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { DerivativesView } from "@/components/market/derivatives-view";
 
-export const metadata: Metadata = { title: "Derivatives", description: "Open interest, funding e agressão taker dos perpétuos USDT." };
+export const metadata: Metadata = { title: "Derivatives — CryptoScanner", description: "Open interest, funding, basis e CVD aproximado dos perpétuos USDT em Binance, Bybit e OKX." };
 export default function Page() {
-  return <DerivativesView />;
+  return (
+    <Suspense>
+      <DerivativesView />
+    </Suspense>
+  );
 }

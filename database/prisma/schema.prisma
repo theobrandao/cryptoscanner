@@ -35,6 +35,12 @@ model User {
   plan         Plan     @default(FREE)
   role         Role     @default(USER)
   telegramChatId String?
+  /// versão dos termos aceita no cadastro (ou depois) e quando
+  termsVersion    String?
+  termsAcceptedAt DateTime?
+  onboardedAt     DateTime?
+  /// sessões (JWT) emitidas antes desta data são recusadas (troca/redefinição de senha)
+  passwordChangedAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -49,6 +55,10 @@ model User {
   agentExecutions AgentExecution[]
   pushSubscriptions PushSubscription[]
   subscription      Subscription?
+  strategies        Strategy[]
+  monitors          Monitor[]
+  monitorEvents     MonitorEvent[]
+  passwordResets    PasswordReset[]
 }
 
 model UserPreference {
@@ -510,6 +520,9 @@ model Subscription {
   provider               String?
   providerSubscriptionId String?   @unique
   lastPaymentStatus      String?
+  /// último aviso de ciclo de vida enviado (trial_ending | trial_last_day | trial_ended) — evita repetição
+  lastNoticeKind         String?
+  lastNoticeAt           DateTime?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
@@ -532,4 +545,120 @@ model BillingEvent {
   createdAt  DateTime @default(now())
 
   @@index([resourceId])
+}
+
+// ------------------------------------------------------------------
+// R2 — estratégias, monitores, eventos, analytics, recuperação de senha
+// ------------------------------------------------------------------
+
+/// Estratégia do usuário: regras AND/OR com timeframe por condição (MTF nativo). Reutilizada no scanner,
+/// no monitor e no backtest ("escreva uma vez, use em todo lugar").
+model Strategy {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  /// { direction, logic: "AND"|"OR", groups: [{ logic, conditions: [{ tf, feature, op, value }] }], exits }
+  definition  Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monitors Monitor[]
+
+  @@index([userId])
+}
+
+/// Monitor contínuo avaliado no servidor (ciclo do cron): estado do setup ou estratégia salva.
+model Monitor {
+  id          String    @id @default(cuid())
+  userId      String
+  symbol      String
+  timeframe   String
+  exchange    String    @default("binance")
+  instrument  String    @default("spot")
+  /// SETUP (estados do setup) | STRATEGY (condições de uma estratégia salva)
+  kind        String    @default("SETUP")
+  strategyId  String?
+  /// estados que notificam: READY, TRIGGERED, ACTIVE, TARGET_HIT, INVALIDATED, EXPIRED
+  states      String[]  @default(["READY", "TRIGGERED", "INVALIDATED", "TARGET_HIT"])
+  minScore    Int       @default(60)
+  /// canais: inapp sempre; push e telegram opcionais
+  notifyPush     Boolean @default(true)
+  notifyTelegram Boolean @default(false)
+  active      Boolean   @default(true)
+  lastState   String?
+  lastScore   Int?
+  lastCheckedAt DateTime?
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy Strategy?      @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  events   MonitorEvent[]
+
+  @@unique([userId, symbol, timeframe, exchange, instrument, kind, strategyId])
+  @@index([active, lastCheckedAt])
+}
+
+/// Evento do alert engine. `fingerprint` único = deduplicação (o mesmo fato nunca notifica duas vezes).
+model MonitorEvent {
+  id          String    @id @default(cuid())
+  monitorId   String?
+  userId      String
+  fingerprint String    @unique
+  kind        String
+  title       String
+  body        String
+  payload     Json
+  channels    String[]  @default([])
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  monitor Monitor? @relation(fields: [monitorId], references: [id], onDelete: SetNull)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+/// Eventos de produto (funil e uso). Sem dado pessoal além do userId; IP não é gravado.
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  anonId    String?
+  name      String
+  props     Json?
+  createdAt DateTime @default(now())
+
+  @@index([name, createdAt])
+  @@index([userId, createdAt])
+}
+
+/// Recuperação de senha: guarda só o hash SHA-256 do token (o token vai por e-mail).
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Registros de acesso (Marco Civil da Internet, art. 15: provedor de aplicação PJ guarda por 6 meses).
+/// Só IP, evento e data/hora; sem conteúdo. Limpeza automática após 190 dias.
+model AccessLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  ip        String
+  event     String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
 }

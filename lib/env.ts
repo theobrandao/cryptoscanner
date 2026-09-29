@@ -64,6 +64,29 @@ const schema = z.object({
   MERCADOPAGO_WEBHOOK_SECRET: z.string().optional(),
   PRICE_PRO_BRL: z.coerce.number().positive().default(97),
   PRICE_ELITE_BRL: z.coerce.number().positive().default(197),
+  /**
+   * Cadastro: "invite" (padrão, exige REGISTRATION_INVITE_CODE ou e-mail do dono) | "open" (venda aberta).
+   * Abrir o cadastro é decisão comercial explícita.
+   */
+  REGISTRATION_MODE: z.enum(["invite", "open"]).default("invite"),
+  /**
+   * Termos de uso, privacidade e reembolso: identificação do fornecedor (Decreto 7.962/2013) e controlador (LGPD).
+   * Sem esses dados as páginas mostram "não configurado" e o checkout permanece desligado.
+   */
+  LEGAL_ENTITY_NAME: z.string().optional(),
+  LEGAL_ENTITY_DOC: z.string().optional(),
+  LEGAL_ENTITY_ADDRESS: z.string().optional(),
+  SUPPORT_EMAIL: z.string().optional(),
+  DPO_EMAIL: z.string().optional(),
+  /** Versão vigente dos termos. Checkout só liga com LEGAL_TERMS_APPROVED=true (revisão humana obrigatória). */
+  LEGAL_TERMS_VERSION: z.string().default("2026-09-29"),
+  LEGAL_TERMS_APPROVED: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+  /** E-mail transacional (Resend). Sem chave: reset de senha e avisos de trial ficam só no app. */
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 
@@ -119,5 +142,13 @@ export function isOwnerEmail(email: string): boolean {
 /** Cadastro restrito (uso pessoal): há código de convite ou lista de e-mails do dono. */
 export function isInviteRequired(): boolean {
   const env = getEnv();
+  if (env.REGISTRATION_MODE === "open") return false;
   return Boolean(env.REGISTRATION_INVITE_CODE) || env.OWNER_EMAILS.trim().length > 0;
+}
+
+/** Dados do fornecedor completos e termos aprovados: condição para ligar o checkout. */
+export function legalStatus(): { ready: boolean; missing: string[]; approved: boolean; version: string } {
+  const env = getEnv();
+  const missing = (["LEGAL_ENTITY_NAME", "LEGAL_ENTITY_DOC", "LEGAL_ENTITY_ADDRESS", "SUPPORT_EMAIL"] as const).filter((k) => !env[k]);
+  return { ready: missing.length === 0 && env.LEGAL_TERMS_APPROVED, missing, approved: env.LEGAL_TERMS_APPROVED, version: env.LEGAL_TERMS_VERSION };
 }

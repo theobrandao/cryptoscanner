@@ -5,6 +5,8 @@ import { requirePrisma } from "@/database/client";
 import { ApiError, enforceRateLimit, parseBody, withApi } from "@/lib/api";
 import { isOwnerEmail } from "@/lib/env";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions, verifyPassword } from "@/lib/auth";
+import { logAccess } from "@/services/access-log-service";
+import { track } from "@/services/analytics-service";
 
 const bodySchema = z.object({ email: z.string().trim().toLowerCase().email(), password: z.string().min(1).max(128) });
 
@@ -22,6 +24,8 @@ export const POST = withApi(async (req) => {
   }
   const session = { id: user.id, email: user.email, name: user.name, plan: user.plan, role: user.role };
   const token = await createSessionToken(session);
+  await logAccess(req, user.id, "login");
+  await track("login", { userId: user.id });
   const res = NextResponse.json({ ok: true, data: { user: session } });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
   return res;

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { symbolSchema } from "@/agents/schemas";
 import { ApiError, enforceRateLimit, ok, parseBody, requireUser, withApi } from "@/lib/api";
 import { parseTimeframe } from "@/lib/timeframes";
+import { getCache } from "@/lib/cache";
 import { INSTRUMENTS, VENUES } from "@/lib/venues";
 import { requireEntitlement } from "@/services/subscription-service";
 import { getMarketContext } from "@/services/market-context-service";
@@ -32,6 +33,10 @@ export const POST = withApi(async (req, ctx) => {
   const tf = parseTimeframe(body.tf);
   if (!access.entitlements.timeframes.includes(tf)) throw new ApiError(402, `Timeframe ${tf} não incluído no seu plano`, "timeframe_locked");
   if (body.llm) await enforceRateLimit(req, "llm", `u:${user.id}`);
+  // cota diária do plano (TRIAL 20, PRO 100, ELITE 500)
+  const day = new Date().toISOString().slice(0, 10);
+  const used = await getCache().incr(`ai:quota:${user.id}:${day}`, 26 * 3600);
+  if (used > access.entitlements.aiQueriesPerDay) throw new ApiError(429, `Limite diário de ${access.entitlements.aiQueriesPerDay} consultas ao AI Analyst atingido no seu plano`, "ai_quota");
   const c = await getMarketContext(sym, tf, { exchange: body.exchange, instrument: body.instrument });
   return ok(await analyzeContext(c, { question: body.question, useLlm: body.llm }));
 });

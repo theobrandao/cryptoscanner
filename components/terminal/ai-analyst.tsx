@@ -9,6 +9,7 @@ import { useSession } from "@/hooks/use-session";
 import { ApiClientError, postJson } from "@/lib/client-api";
 import { INSTRUMENT_LABEL, VENUE_LABEL } from "@/lib/venues";
 import { cn } from "@/lib/utils";
+import { trackClient } from "@/lib/analytics-client";
 import type { AnalystReply } from "@/services/ai-analyst-service";
 
 /**
@@ -20,7 +21,10 @@ export function AiAnalystButton({ className }: { className?: string }) {
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOpen(true);
+          trackClient("analyst_open");
+        }}
         className={cn("inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-foreground hover:border-primary/50 hover:bg-muted", className)}
         aria-label="AI Analyst"
       >

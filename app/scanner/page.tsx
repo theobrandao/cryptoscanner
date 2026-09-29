@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
-import { ScannerView } from "@/components/scanner/scanner-view";
+import { Suspense } from "react";
+import { MarketScanner } from "@/components/scanner/market-scanner";
 
 export const metadata: Metadata = {
-  title: "Scanner de Padrões",
-  description: "Detecta padrões gráficos em formação em Bitcoin e altcoins com análise técnica programática e agentes de IA.",
+  title: "Market Scanner — CryptoScanner",
+  description: "Scanner de 30 criptoativos por estado do setup, Confluence Score, regime, R:R e estratégias salvas.",
 };
 
 export default function ScannerPage() {
-  return <ScannerView />;
+  return (
+    <Suspense>
+      <MarketScanner />
+    </Suspense>
+  );
 }

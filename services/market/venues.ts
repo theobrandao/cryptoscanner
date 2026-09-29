@@ -4,7 +4,7 @@ import { fetchJson, HttpError } from "@/lib/http";
 import { cached } from "@/lib/cache";
 import { TIMEFRAME_MS } from "@/lib/timeframes";
 import { classifyStatus, validateCandles, type DataQuality } from "@/lib/engines/quality";
-import { binanceProvider } from "@/services/market/providers/binance";
+import { binanceProvider, getSpotKlinesHistory } from "@/services/market/providers/binance";
 import { getDerivativesSnapshot, type DerivativesSnapshot } from "@/services/market/providers/binance-futures";
 import { getOkxDerivativesSnapshot } from "@/services/market/providers/okx-derivatives";
 import { ProviderError } from "@/services/market/providers/types";
@@ -189,6 +189,46 @@ export async function getSeriesWithFallback(venue: Venue, inst: Instrument, asse
     }
   }
   throw new ProviderError(venue, `nenhuma exchange respondeu (${errors.join(" · ")})`);
+}
+
+/* ------------------------------------------------------------------ histórico longo (backtest) */
+
+async function rawHistory(venue: Venue, inst: Instrument, asset: AssetDefinition, tf: Timeframe, bars: number): Promise<Candle[]> {
+  const span = TIMEFRAME_MS[tf];
+  try {
+    if (venue === "binance" && inst === "spot") return await getSpotKlinesHistory(asset.binancePair, tf, bars);
+    const out: Candle[] = [];
+    let end: number | undefined;
+    for (let guard = 0; out.length < bars && guard < 40; guard++) {
+      let page: Candle[] = [];
+      if (venue === "binance") {
+        const base = getEnv().BINANCE_FUTURES_REST_URL.replace(/\/$/, "");
+        const limit = Math.min(1500, bars - out.length);
+        const raw = await fetchJson<BinanceKline[]>(`${base}/fapi/v1/klines?symbol=${asset.binancePair}&interval=${tf}&limit=${limit}${end ? `&endTime=${end}` : ""}`, OPTS);
+        page = raw.map((k) => ({ openTime: k[0], open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5], closeTime: k[6], quoteVolume: +k[7] }));
+      } else if (venue === "bybit") {
+        const limit = Math.min(1000, bars - out.length);
+        const { result } = await bybit<{ list: string[][] }>(`/v5/market/kline?category=${inst === "spot" ? "spot" : "linear"}&symbol=${asset.binancePair}&interval=${BYBIT_INTERVAL[tf]}&limit=${limit}${end ? `&end=${end}` : ""}`);
+        page = result.list.map((k) => ({ openTime: +k[0]!, open: +k[1]!, high: +k[2]!, low: +k[3]!, close: +k[4]!, volume: +k[5]!, quoteVolume: +k[6]!, closeTime: +k[0]! + span - 1 })).reverse();
+      } else {
+        const path = end ? `/market/history-candles?instId=${okxInst(asset, inst)}&bar=${OKX_BAR[tf]}&after=${end + 1}&limit=100` : `/market/candles?instId=${okxInst(asset, inst)}&bar=${OKX_BAR[tf]}&limit=300`;
+        const rows = await okx<string[][]>(path);
+        page = rows.map((k) => ({ openTime: +k[0]!, open: +k[1]!, high: +k[2]!, low: +k[3]!, close: +k[4]!, volume: inst === "perp" ? +k[6]! : +k[5]!, quoteVolume: +k[7]!, closeTime: +k[0]! + span - 1 })).reverse();
+      }
+      if (!page.length) break;
+      out.unshift(...page.filter((c) => !out.length || c.openTime < (out[0] as Candle).openTime));
+      end = (page[0] as Candle).openTime - 1;
+    }
+    return out.slice(-bars);
+  } catch (err) {
+    venueError(venue, err);
+  }
+}
+
+/** Histórico longo validado (candles FECHADOS) para backtest. Cache 10 min. */
+export async function getVenueHistory(venue: Venue, inst: Instrument, asset: AssetDefinition, tf: Timeframe, bars: number): Promise<Candle[]> {
+  const res = await cached<Candle[]>(`vhist:v1:${venue}:${inst}:${asset.symbol}:${tf}:${bars}`, 600, () => rawHistory(venue, inst, asset, tf, bars), { staleTtlSeconds: 3600 });
+  return validateCandles(res.value, tf).closed;
 }
 
 /* ------------------------------------------------------------------ ticker */

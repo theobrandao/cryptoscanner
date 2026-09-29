@@ -33,12 +33,13 @@ export async function getOkxDerivativesSnapshot(symbol: string): Promise<Derivat
   } catch (err) {
     throw err instanceof ProviderError ? err : new ProviderError("okx", (err as Error).message);
   }
-  const [mark, oiHist, taker] = await Promise.all([
+  const [mark, oiHist, taker, index] = await Promise.all([
     optional(okx<Array<{ markPx: string; ts: string }>>(`/public/mark-price?instType=SWAP&instId=${instId}`)),
     // [ts, openInterestUsd, volumeUsd] — mais recente primeiro
     optional(okx<string[][]>(`/rubik/stat/contracts/open-interest-volume?ccy=${symbol.toUpperCase()}&period=1H`)),
     // [ts, sellVol, buyVol] — mais recente primeiro
     optional(okx<string[][]>(`/rubik/stat/taker-volume?ccy=${symbol.toUpperCase()}&instType=CONTRACTS&period=1H`)),
+    optional(okx<Array<{ idxPx: string }>>(`/market/index-tickers?instId=${symbol.toUpperCase()}-USDT`)),
   ]);
   const f = funding[0];
   const o = oi[0];
@@ -55,7 +56,7 @@ export async function getOkxDerivativesSnapshot(symbol: string): Promise<Derivat
     symbol: symbol.toUpperCase(),
     pair: `${symbol.toUpperCase()}USDT`,
     markPrice,
-    indexPrice: NaN,
+    indexPrice: index?.[0] ? Number(index[0].idxPx) : NaN,
     fundingRate: Number(f.fundingRate),
     nextFundingTime: Number(f.nextFundingTime ?? f.fundingTime),
     openInterest: Number(o.oi),

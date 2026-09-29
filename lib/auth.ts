@@ -17,6 +17,8 @@ export interface SessionUser {
   name: string;
   plan: PlanKey;
   role: "USER" | "ADMIN";
+  /** emissão do JWT (segundos) — comparada com passwordChangedAt */
+  iat?: number;
 }
 
 const sessionSchema = z.object({
@@ -59,7 +61,7 @@ export async function verifySessionToken(token: string): Promise<SessionUser | n
     const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
     const parsed = sessionSchema.safeParse(payload);
     if (!parsed.success) return null;
-    return { id: parsed.data.sub, email: parsed.data.email, name: parsed.data.name, plan: parsed.data.plan, role: parsed.data.role };
+    return { id: parsed.data.sub, email: parsed.data.email, name: parsed.data.name, plan: parsed.data.plan, role: parsed.data.role, iat: typeof payload.iat === "number" ? payload.iat : undefined };
   } catch {
     return null;
   }

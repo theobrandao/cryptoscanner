@@ -197,7 +197,8 @@ describe("sessão JWT", () => {
   it("assina e verifica o token; rejeita token adulterado", async () => {
     const user = { id: "u1", email: "a@b.c", name: "A", plan: "PRO" as const, role: "USER" as const };
     const token = await createSessionToken(user);
-    expect(await verifySessionToken(token)).toEqual(user);
+    expect(await verifySessionToken(token)).toMatchObject(user);
+    expect(typeof (await verifySessionToken(token))?.iat).toBe("number");
     expect(await verifySessionToken(token.slice(0, -2) + "xx")).toBeNull();
   });
 });

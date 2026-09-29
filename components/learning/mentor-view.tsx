@@ -66,7 +66,7 @@ export function MentorView() {
     const c = /^Criar um Sentinela para (\w+)/.exec(s);
     if (c) return router.push("/sentinela");
     if (/^Abrir o Panorama/.test(s)) return router.push("/panorama");
-    if (/^Escanear agora/.test(s)) return router.push("/scanner");
+    if (/^Escanear agora/.test(s)) return router.push("/scanner/padroes");
     if (/^Abrir a aula/.test(s)) return router.push("/jornada");
     void send(s);
   };

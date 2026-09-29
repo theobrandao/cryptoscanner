@@ -67,11 +67,38 @@ export interface SetupRow {
   label: string;
   score: number;
   rr: number | null;
+  regime: string;
+  condition: string;
+  distanceToZoneAtr: number | null;
+  triggerLevel: number | null;
+  entryLow: number | null;
+  entryHigh: number | null;
+  stop: number | null;
+  tp1: number | null;
+  rsi: number | null;
+  atrPct: number | null;
+  rvol: number | null;
+  dataStatus: string | null;
+  /** motivo curto do NO TRADE (primeiro da lista), para a tabela */
+  noTradeCode: string | null;
+}
+
+/** Código curto e estável do primeiro motivo de NO TRADE. */
+export function noTradeCodeOf(reasons: readonly string[]): string | null {
+  const r = reasons[0];
+  if (!r) return null;
+  if (/^R:R/.test(r)) return "R:R < 1";
+  if (/^Sem direção/.test(r)) return "NO DIRECTION";
+  if (/^Sem geometria/.test(r)) return "NO SETUP";
+  if (/^Timeframes superiores/.test(r)) return "CONFLICTING TF";
+  if (/^Dados/.test(r)) return "DATA";
+  if (/^Confluência/.test(r)) return "LOW CONFLUENCE";
+  return "NO TRADE";
 }
 
 /** Ranking de setups do universo (confluência do contexto completo). Cache 120 s; aquecido pelo ciclo. */
 export async function getSetupRanking(tf: Timeframe): Promise<{ timeframe: Timeframe; generatedAt: number; rows: SetupRow[]; errors: string[] }> {
-  const res = await cached(`setups:v1:${tf}`, 120, async () => {
+  const res = await cached(`setups:v3:${tf}`, 120, async () => {
     const limiter = createLimiter(4, 0);
     const errors: string[] = [];
     const rows: SetupRow[] = [];
@@ -93,6 +120,19 @@ export async function getSetupRanking(tf: Timeframe): Promise<{ timeframe: Timef
               label: c.confluence.label,
               score: c.confluence.score,
               rr: c.setup?.rr ?? null,
+              regime: c.regime.regime,
+              condition: c.confluence.condition,
+              distanceToZoneAtr: c.setup ? c.setup.distanceToZoneAtr : null,
+              triggerLevel: c.setup?.triggerLevel?.price ?? null,
+              entryLow: c.setup?.entryZone.low ?? null,
+              entryHigh: c.setup?.entryZone.high ?? null,
+              stop: c.setup?.stop ?? null,
+              tp1: c.setup?.targets[0]?.price ?? null,
+              rsi: c.technicals.rsi,
+              atrPct: c.technicals.atrPct,
+              rvol: c.technicals.rvol,
+              dataStatus: c.quality?.status ?? null,
+              noTradeCode: noTradeCodeOf(c.confluence.noTradeReasons),
             });
           } catch (err) {
             errors.push(`${a.symbol}: ${(err as Error).message}`);

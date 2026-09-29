@@ -4,6 +4,8 @@ import { getPrisma } from "@/database/client";
 import { ApiError, ok, withApi } from "@/lib/api";
 import { createLogger } from "@/lib/logger";
 import { getPreapproval, mapPreapprovalStatus, verifyWebhookSignature } from "@/services/billing/mercadopago";
+import { track } from "@/services/analytics-service";
+import { sendTemplate } from "@/services/email-service";
 
 const log = createLogger("billing-webhook");
 
@@ -43,12 +45,23 @@ export const POST = withApi(async (req) => {
     const status = mapPreapprovalStatus(pre.status);
     if (userId && status && (plan === "PRO" || plan === "ELITE")) {
       const next = pre.next_payment_date ? new Date(pre.next_payment_date) : null;
+      const before = await prisma.subscription.findUnique({ where: { userId }, select: { status: true, plan: true } });
       await prisma.subscription.upsert({
         where: { userId },
         create: { userId, plan, status, provider: "mercadopago", providerSubscriptionId: pre.id, currentPeriodEnd: next, lastPaymentStatus: pre.status },
         update: { plan, status, provider: "mercadopago", providerSubscriptionId: pre.id, currentPeriodEnd: next, lastPaymentStatus: pre.status, cancelAtPeriodEnd: status === "CANCELLED" },
       });
-      await prisma.user.update({ where: { id: userId }, data: { plan: status === "ACTIVE" ? (plan === "ELITE" ? "PLATINUM" : "PRO") : undefined } });
+      const u = await prisma.user.update({ where: { id: userId }, data: { plan: status === "ACTIVE" ? (plan === "ELITE" ? "PLATINUM" : "PRO") : undefined }, select: { email: true, name: true } });
+      // avisos só na transição de estado (reentrega do mesmo evento não repete e-mail)
+      if (before?.status !== status || before?.plan !== plan) {
+        if (status === "ACTIVE") {
+          await track("subscription_activated", { userId, props: { plan } });
+          void sendTemplate("subscription_active", { to: u.email, name: u.name, plan }).catch(() => undefined);
+        } else if (status === "PAST_DUE") {
+          await track("payment_failed", { userId, props: { plan } });
+          void sendTemplate("payment_failed", { to: u.email, name: u.name }).catch(() => undefined);
+        } else if (status === "CANCELLED") await track("subscription_cancelled", { userId, props: { plan } });
+      }
     }
     await prisma.billingEvent.update({ where: { eventKey }, data: { processed: true } });
     log.info("preapproval processado", { id: pre.id, status: pre.status, userId });

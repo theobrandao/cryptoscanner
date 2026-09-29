@@ -6,6 +6,7 @@ import { PageShell, PageTitle } from "@/components/layout/page-shell";
 import { Alert, Skeleton } from "@/components/ui/misc";
 import { formatCompact, formatPct, formatPrice, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { DerivativesDetailSection } from "@/components/market/derivatives-detail";
 
 interface Row {
   symbol: string;
@@ -25,7 +26,9 @@ export function DerivativesView() {
   const { data, error } = useSWR<{ items: Row[]; errors: Array<{ symbol: string; error: string }>; source: string }>(`/api/market/derivatives?symbols=${SYMBOLS}`, { refreshInterval: 60_000 });
   return (
     <PageShell>
-      <PageTitle title="Derivatives" description="Perpétuos USDT: open interest, variação 24h, funding, long/short e agressão taker. Fonte e horário em cada linha." />
+      <PageTitle title="Derivatives" description="Perpétuos USDT: comparativo Binance/Bybit/OKX (OI, funding, basis), histórico de funding, open interest e CVD aproximado. Fonte e horário em cada linha." />
+      <DerivativesDetailSection />
+      <h2 className="mb-2 text-[15px] font-semibold">Universo · Binance USDⓈ-M</h2>
       {error ? <Alert variant="danger">Derivativos indisponíveis no momento.</Alert> : null}
       {data?.errors.length ? <Alert variant="warning" className="mb-3">{`Sem dados para ${data.errors.map((e) => e.symbol).join(", ")} nesta fonte (${data.errors[0]?.error}). O terminal de cada ativo usa a OKX como alternativa.`}</Alert> : null}
       {!data && !error ? <Skeleton className="h-64" /> : null}

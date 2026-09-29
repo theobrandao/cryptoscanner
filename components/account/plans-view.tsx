@@ -11,6 +11,7 @@ import { useSession } from "@/hooks/use-session";
 import { useToast } from "@/components/providers/toast-provider";
 import { ApiClientError, postJson } from "@/lib/client-api";
 import { cn } from "@/lib/utils";
+import { trackClient } from "@/lib/analytics-client";
 import type { AccessView } from "@/services/subscription-service";
 
 interface SubPayload extends AccessView {
@@ -19,20 +20,21 @@ interface SubPayload extends AccessView {
 
 const FEATURES: Record<"PRO" | "ELITE", string[]> = {
   PRO: [
-    "Terminal completo: gráfico, estrutura, liquidez, Confluence Score",
-    "Market Scanner, Market Monitor e alertas (até 50)",
-    "Derivativos: open interest, funding, taker buy/sell",
-    "Histórico do setup (backtest) e gestão de risco",
-    "AI Analyst com contexto do ativo",
-    "Timeframes de 1m a 1W · Telegram e push",
+    "Dashboard completo: estrutura, liquidez, suporte/resistência, Confluence Score auditável, setup e gatilho",
+    "Binance, Bybit e OKX · spot e perpétuo · timeframes de 1m a 1W",
+    "Market Scanner com filtros e estratégias salvas",
+    "Market Monitor no servidor: 5 monitores, 50 alertas, push e Telegram",
+    "Strategy Builder: 10 estratégias",
+    "Backtest do setup e de estratégias de um timeframe, com taxas, slippage e funding · 1 ano de histórico",
+    "Derivatives: OI, funding, basis e CVD por exchange",
+    "AI Analyst com números verificados: 100 consultas/dia",
   ],
   ELITE: [
     "Tudo do PRO",
-    "Backtest avançado e multi-timeframe",
-    "Strategy Builder avançado e Setup Replay",
-    "Até 200 alertas e 20 monitores contínuos",
-    "Histórico de 3 anos e risco de carteira avançado",
-    "Recursos quantitativos avançados",
+    "Backtest multi-timeframe",
+    "3 anos de histórico no backtest",
+    "20 monitores, 200 alertas e 50 estratégias",
+    "AI Analyst: 500 consultas/dia",
   ],
 };
 
@@ -43,8 +45,12 @@ export function PlansView() {
   const params = useSearchParams();
   const { toast } = useToast();
   const { data, mutate } = useSWR<SubPayload>(user ? "/api/billing/subscription" : null);
+  const { data: pub } = useSWR<{ prices: { PRO: number; ELITE: number }; checkoutEnabled: boolean; trialDays: number }>("/api/billing/prices", { revalidateOnFocus: false });
   const [busy, setBusy] = React.useState<string | null>(null);
-  const prices = data?.billing.prices ?? { PRO: 97, ELITE: 197 };
+  React.useEffect(() => {
+    trackClient("plans_view");
+  }, []);
+  const prices = pub?.prices ?? data?.billing.prices ?? null;
 
   const checkout = async (plan: "PRO" | "ELITE") => {
     setBusy(plan);
@@ -86,7 +92,11 @@ export function PlansView() {
           ) : null}
         </div>
       ) : null}
-      {data && !data.billing.configured ? <Alert variant="warning" className="mb-4" title="Cobrança em configuração">O checkout do Mercado Pago ainda não foi ativado neste ambiente.</Alert> : null}
+      {pub && !pub.checkoutEnabled ? (
+        <Alert variant="info" className="mb-4" title="Assinaturas em liberação">
+          O teste de 7 dias está disponível. A contratação paga é liberada após a ativação do Mercado Pago e a publicação dos termos definitivos.
+        </Alert>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         {(["PRO", "ELITE"] as const).map((p) => {
           const current = data && data.plan === p && (data.status === "ACTIVE" || data.status === "CANCELLED");
@@ -97,7 +107,7 @@ export function PlansView() {
                 {p === "PRO" ? <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">Mais escolhido</span> : null}
               </div>
               <div className="mt-2">
-                <span className="tabular text-3xl font-bold">R$ {prices[p]}</span>
+                <span className="tabular text-3xl font-bold">{prices ? `R$ ${prices[p]}` : "—"}</span>
                 <span className="text-sm text-muted-foreground"> /mês</span>
               </div>
               <ul className="mt-4 flex flex-1 flex-col gap-2 text-sm">
@@ -116,7 +126,7 @@ export function PlansView() {
               ) : (
                 <button
                   onClick={() => void checkout(p)}
-                  disabled={!data?.billing.configured || busy !== null || data?.tier === "ADMIN"}
+                  disabled={!pub?.checkoutEnabled || busy !== null || data?.tier === "ADMIN"}
                   className={cn("mt-5 h-10 rounded-md text-sm font-semibold disabled:opacity-50", "bg-primary text-primary-foreground hover:brightness-110")}
                 >
                   {busy === p ? "Abrindo Mercado Pago…" : `Assinar ${p}`}
@@ -127,7 +137,11 @@ export function PlansView() {
         })}
       </div>
       <p className="mt-4 text-xs text-muted-foreground">
-        Pagamento recorrente mensal via Mercado Pago (cartão). Cancelamento a qualquer momento; o acesso segue até o fim do período pago. Conteúdo técnico e educacional; não é recomendação de investimento.
+        Pagamento recorrente mensal via Mercado Pago (cartão). Cancelamento a qualquer momento; o acesso segue até o fim do período pago. Arrependimento em até 7 dias da primeira cobrança com reembolso integral (
+        <Link href="/reembolso" className="underline">
+          política
+        </Link>
+        ). Conteúdo técnico e educacional; não é recomendação de investimento.
       </p>
     </PageShell>
   );

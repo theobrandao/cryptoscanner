@@ -1,4 +1,5 @@
 import { connection, NextResponse } from "next/server";
+import { logAccess } from "@/services/access-log-service";
 import { z } from "zod";
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from "@/lib/api";
 import { SESSION_COOKIE, verifyPassword } from "@/lib/auth";
@@ -23,6 +24,7 @@ export const DELETE = withApi(async (req) => {
   const prisma = requirePrisma();
   const db = await prisma.user.findUnique({ where: { id: user.id }, select: { passwordHash: true } });
   if (!db || !(await verifyPassword(body.password, db.passwordHash))) throw new ApiError(401, "Senha incorreta", "invalid_credentials");
+  await logAccess(req, user.id, "account_deleted");
   await prisma.user.delete({ where: { id: user.id } });
   const res = NextResponse.json({ ok: true, data: { deleted: true } });
   res.cookies.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });

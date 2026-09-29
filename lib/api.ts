@@ -77,8 +77,10 @@ export async function requireUser(req: Request): Promise<SessionUser> {
   // plano e papel relidos do banco: o JWT vale 7 dias e não pode carregar acesso desatualizado
   const prisma = getPrisma();
   if (prisma) {
-    const db = await prisma.user.findUnique({ where: { id: user.id }, select: { plan: true, role: true, email: true, name: true } });
+    const db = await prisma.user.findUnique({ where: { id: user.id }, select: { plan: true, role: true, email: true, name: true, passwordChangedAt: true } });
     if (!db) throw new ApiError(401, "Sessão inválida", "unauthorized");
+    // senha trocada depois da emissão do token: sessão antiga deixa de valer
+    if (db.passwordChangedAt && user.iat != null && user.iat * 1000 < db.passwordChangedAt.getTime() - 1000) throw new ApiError(401, "Sessão encerrada após troca de senha. Entre novamente.", "unauthorized");
     return { ...user, plan: db.plan, role: db.role, email: db.email, name: db.name };
   }
   return user;
