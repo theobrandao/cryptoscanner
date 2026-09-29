@@ -47,6 +47,7 @@ model User {
   supportTickets SupportTicket[]
   simulations    Simulation[]
   agentExecutions AgentExecution[]
+  pushSubscriptions PushSubscription[]
 }
 
 model UserPreference {
@@ -384,4 +385,79 @@ model SupportTicket {
   createdAt DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// ------------------------------------------------------------------
+// Estatística real dos padrões, push no navegador e monitoramento
+// ------------------------------------------------------------------
+
+/// Resultado agregado do backtest walk-forward por padrão e timeframe (recalculado diariamente).
+model PatternStat {
+  id           String   @id @default(cuid())
+  timeframe    String
+  patternKey   String
+  samples      Int
+  wins         Int
+  losses       Int
+  expired      Int
+  hitRate      Float?
+  avgReturnPct Float?
+  avgBars      Float?
+  assets       Int
+  fromTime     DateTime
+  toTime       DateTime
+  computedAt   DateTime @default(now())
+
+  @@unique([timeframe, patternKey])
+}
+
+/// Sinal de padrão registrado ao vivo pelo ciclo e acompanhado até alvo, stop ou expiração.
+model PatternSignal {
+  id          String    @id @default(cuid())
+  symbol      String
+  timeframe   String
+  patternKey  String
+  direction   String
+  confidence  Float
+  entry       Float
+  target      Float
+  stop        Float
+  detectedAt  DateTime  @default(now())
+  candleTime  DateTime
+  status      String    @default("open") // open | win | loss | expired
+  resolvedAt  DateTime?
+  exitPrice   Float?
+  returnPct   Float?
+
+  @@index([status])
+  @@index([patternKey, timeframe, status])
+  @@index([symbol, timeframe, patternKey, detectedAt(sort: Desc)])
+}
+
+/// Inscrição Web Push (VAPID) de um navegador.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  lastError String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Execução de tarefas agendadas (heartbeat para /status e alerta de falhas consecutivas).
+model CronRun {
+  id         String   @id @default(cuid())
+  job        String
+  ok         Boolean
+  durationMs Int
+  detail     Json?
+  startedAt  DateTime @default(now())
+
+  @@index([job, startedAt(sort: Desc)])
 }

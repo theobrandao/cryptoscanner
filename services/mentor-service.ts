@@ -187,7 +187,7 @@ export async function answerMentor(message: string): Promise<MentorReply> {
   }
 
   return {
-    answer: "Não encontrei isso na base de conhecimento. Posso responder sobre: preço/tendência/padrões de qualquer um dos 21 ativos (ex.: “como está o ETH em 4h?”), o mercado hoje (Medo & Ganância, BTC diário), os 17 padrões gráficos, indicadores (EMA, RSI, StochRSI, MACD, Fibonacci), gestão de risco e os protocolos de mindset (“tomei stop”, “FOMO”, “euforia”, “medo de clicar”, “reset”).",
+    answer: "Não encontrei isso na base de conhecimento. Posso responder sobre: preço/tendência/padrões de qualquer um dos 30 ativos (ex.: “como está o ETH em 4h?”), o mercado hoje (Medo & Ganância, BTC diário), os 17 padrões gráficos, indicadores (EMA, RSI, StochRSI, MACD, Fibonacci), gestão de risco e os protocolos de mindset (“tomei stop”, “FOMO”, “euforia”, “medo de clicar”, “reset”).",
     sources: [],
     suggestions: ["Como está o BTC hoje?", "O que é uma cunha de alta?", "Tomei stop, e agora?", "Como calcular o tamanho da posição?"],
     mode: "rules",

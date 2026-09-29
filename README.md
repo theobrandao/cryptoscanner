@@ -4,7 +4,7 @@ Scanner de padrões gráficos em Bitcoin e altcoins com sistema multiagente, dad
 
 ## Funcionalidades
 
-- **Scanner** (`/scanner`): 17 padrões gráficos (fundo/topo duplo, C&O, triângulos, bandeiras, cunhas de alta e de baixa, pivôs HH+HL/LH+LL, toques em S/R, bear/bull trap, consolidação) sobre 21 ativos; filtros de timeframe (4H/1D/7D livres; 1H/30M/15M no plano PLATINUM), direção, moeda e confiança mínima; tabela em tempo real (preço, 24h, volume, volume relativo, volatilidade, tendência, RSI, momentum, sinal, padrão) com ordenação, busca, paginação, favoritos, filtros e auto-atualização; alertas de volume (≥100 % sobre a média, candles 30M e 1H); histórico de alertas; análise de gráfico por IA (upload JPG/PNG/WebP ≤ 5 MB, requer login e provedor LLM); bloco/modal PLATINUM.
+- **Scanner** (`/scanner`): 17 padrões gráficos (fundo/topo duplo, C&O, triângulos, bandeiras, cunhas de alta e de baixa, pivôs HH+HL/LH+LL, toques em S/R, bear/bull trap, consolidação) sobre 30 ativos; filtros de timeframe (4H/1D/7D livres; 1H/30M/15M no plano PLATINUM), direção, moeda e confiança mínima; tabela em tempo real (preço, 24h, volume, volume relativo, volatilidade, tendência, RSI, momentum, sinal, padrão) com ordenação, busca, paginação, favoritos, filtros e auto-atualização; alertas de volume (≥100 % sobre a média, candles 30M e 1H); histórico de alertas; análise de gráfico por IA (upload JPG/PNG/WebP ≤ 5 MB, requer login e provedor LLM); bloco/modal PLATINUM.
 - **Gráficos** (`/graficos`): candles (TradingView Lightweight Charts) com EMA 8/25/100/200, Bollinger, volume, StochRSI, MACD, suportes/resistências, Fibonacci automático, desenho de padrões detectados e painel de **análise consolidada** pelo orquestrador.
 - **Agentes de IA** (`/agentes`): wizard de 5 passos, 15 estratégias determinísticas em 4 categorias, verificação server-side a cada 5 min, cooldown de 30 min, log ao vivo, Telegram, presets "Scanner de IA", excluir todos.
 - **Carteira** (`/carteira`): watchlist com posições simuladas e P&L, alertas (preço, RSI, padrão, volume), análises salvas.
@@ -65,7 +65,7 @@ Todas públicas e sem chave por padrão:
 ```bash
 # banco (se for usar recursos de conta)
 npm run db:migrate        # aplica database/prisma/migrations
-npm run db:seed           # 21 ativos + usuário demo (demo@cryptoscanner.local / Demo12345!)
+npm run db:seed           # 30 ativos + usuário demo (demo@cryptoscanner.local / Demo12345!)
 
 npm run dev               # http://localhost:3000
 ```

@@ -127,6 +127,8 @@ export function CandlestickChart({
     const el = containerRef.current;
     if (!el) return;
     const dark = theme === "dark";
+    // Tela estreita: sem títulos nas linhas/eixo (os rótulos se sobrepõem abaixo de ~640 px); as legendas ficam nos botões.
+    const compact = el.clientWidth < 640;
     const chart = createChart(el, {
       height,
       layout: {
@@ -157,7 +159,7 @@ export function CandlestickChart({
 
     const lines: ISeriesApi<"Line">[] = [];
     const addLine = (values: Array<number | null>, color: string, width: 1 | 2 = 1, style = LineStyle.Solid, pane = 0, title?: string) => {
-      const s = chart.addSeries(LineSeries, { color, lineWidth: width, lineStyle: style, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, title }, pane);
+      const s = chart.addSeries(LineSeries, { color, lineWidth: width, lineStyle: style, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, title: compact ? undefined : title }, pane);
       s.setData(lineData(candles, values));
       lines.push(s);
       return s;
@@ -215,14 +217,14 @@ export function CandlestickChart({
         lineWidth: 1,
         lineStyle: l.style === "dashed" ? LineStyle.Dashed : l.style === "dotted" ? LineStyle.Dotted : LineStyle.Solid,
         axisLabelVisible: true,
-        title: l.label,
+        title: compact ? "" : l.label,
       }),
     );
 
     // Segmentos (linhas de tendência): série de linha com dois pontos no painel principal
     for (const seg of segments) {
       if (seg.to.time <= seg.from.time) continue;
-      const s = chart.addSeries(LineSeries, { color: seg.color, lineWidth: 2, lineStyle: seg.dashed ? LineStyle.Dashed : LineStyle.Solid, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, title: seg.label }, 0);
+      const s = chart.addSeries(LineSeries, { color: seg.color, lineWidth: 2, lineStyle: seg.dashed ? LineStyle.Dashed : LineStyle.Solid, priceLineVisible: false, lastValueVisible: !compact, crosshairMarkerVisible: false, title: compact ? undefined : seg.label }, 0);
       s.setData([
         { time: toTime(seg.from.time), value: seg.from.price },
         { time: toTime(seg.to.time), value: seg.to.price },

@@ -23,7 +23,7 @@ interface Payload {
   fearGreed: { value: number; classificationPt: string; timestamp: number; source: string; stale: boolean; history: Array<{ value: number; timestamp: number }> } | null;
 }
 
-/** Panorama diário: dados globais (CoinGecko), Medo & Ganância, câmbio e ranking dos 21 ativos. */
+/** Panorama diário: dados globais (CoinGecko), Medo & Ganância, câmbio e ranking dos 30 ativos. */
 export function PanoramaView() {
   const { data, error, isLoading } = useSWR<Payload>("/api/market/global", { refreshInterval: 120_000 });
   const { bySymbol, data: tickers } = useTickers(true);
@@ -39,7 +39,7 @@ export function PanoramaView() {
       <PageTitle
         icon="🌐"
         title="Panorama Diário"
-        description="Visão geral do mercado com fontes públicas: capitalização total e dominância (CoinGecko), índice Medo & Ganância (alternative.me) e os 21 ativos monitorados."
+        description="Visão geral do mercado com fontes públicas: capitalização total e dominância (CoinGecko), índice Medo & Ganância (alternative.me) e os 30 ativos monitorados."
       />
       {error ? <Alert variant="danger">Não foi possível carregar o panorama. Tente novamente em instantes.</Alert> : null}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
@@ -71,7 +71,7 @@ export function PanoramaView() {
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_320px]">
         <Card>
           <CardHeader>
-            <CardTitle>Os 21 ativos monitorados</CardTitle>
+            <CardTitle>Os 30 ativos monitorados</CardTitle>
             <CardDescription>
               Preço e variação ao vivo ({tickers?.source ?? "…"}); capitalização e ranking via CoinGecko{data?.markets?.stale ? " (defasado)" : ""}.
             </CardDescription>
@@ -250,7 +250,7 @@ function ExecutiveReport() {
             </CardHeader>
             <CardContent className="flex flex-col gap-1 text-sm">
               {d.news.top.map((n) => (
-                <a key={n.link} href={n.link} target="_blank" rel="noopener noreferrer" className="flex items-start justify-between gap-3 rounded px-2 py-1 hover:bg-muted">
+                <a key={n.link} href={n.link} target="_blank" rel="noopener noreferrer" className="flex min-h-10 items-center justify-between gap-3 rounded px-2 py-1 hover:bg-muted">
                   <span className="min-w-0 truncate">{n.title}</span>
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {n.source} · {n.score === null ? "—" : n.score > 0.1 ? "▲" : n.score < -0.1 ? "▼" : "•"}

@@ -8,7 +8,7 @@ import { formatCompact, formatPct, formatPrice } from "@/lib/format";
 import { Skeleton } from "@/components/ui/misc";
 import { cn } from "@/lib/utils";
 
-/** Bloco "Os 21 ativos mais negociados" da home: preço (USD/BRL) e variação 24h ao vivo. */
+/** Bloco "Os 30 ativos mais negociados" da home: preço (USD/BRL) e variação 24h ao vivo. */
 export function HomeMarket() {
   const { data, bySymbol, connected } = useTickers(true);
   const [currency, setCurrency] = useLocalStorage<"USD" | "BRL">("cs-currency", "USD");
@@ -16,7 +16,7 @@ export function HomeMarket() {
   return (
     <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm font-semibold">Os 21 ativos monitorados</div>
+        <div className="text-sm font-semibold">Os 30 ativos monitorados</div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className={cn("h-2 w-2 rounded-full", connected ? "bg-success live-dot" : "bg-warning")} />
           {data?.source ?? "…"}

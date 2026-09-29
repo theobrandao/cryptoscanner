@@ -6,7 +6,7 @@ export const maxDuration = 60;
 const STREAM_MAX_MS = 50_000;
 
 /**
- * Server-Sent Events com os tickers dos 21 ativos. Fonte: cache alimentado pelo worker
+ * Server-Sent Events com os tickers dos 30 ativos. Fonte: cache alimentado pelo worker
  * (WebSocket Binance) ou REST com fallback; intervalo de 3 s; encerra quando o cliente desconecta
  * ou após STREAM_MAX_MS (o navegador reabre a conexão automaticamente).
  */

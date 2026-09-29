@@ -13,6 +13,7 @@ import { useSession } from "@/hooks/use-session";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useToast } from "@/components/providers/toast-provider";
+import { PushCard } from "@/components/account/push-card";
 import { ApiClientError, postJson } from "@/lib/client-api";
 
 interface PrefPayload {
@@ -52,13 +53,16 @@ export function PreferencesView() {
       {!data ? (
         <Skeleton className="h-64 max-w-2xl" />
       ) : (
-        <PreferencesForm
-          key={JSON.stringify(data)}
-          data={data}
-          onSaved={async () => {
-            await Promise.all([mutate(), refresh()]);
-          }}
-        />
+        <div className="flex flex-col gap-4">
+          <PreferencesForm
+            key={JSON.stringify(data)}
+            data={data}
+            onSaved={async () => {
+              await Promise.all([mutate(), refresh()]);
+            }}
+          />
+          <PushCard />
+        </div>
       )}
     </PageShell>
   );

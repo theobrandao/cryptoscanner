@@ -141,3 +141,34 @@ body {
   background-size: 800px 100%;
   animation: shimmer 1.4s infinite linear;
 }
+
+/* ---------------------------------------------------------------- Responsividade */
+@layer base {
+  /* Itens de grid podem encolher abaixo do conteúdo intrínseco (tabelas, textos longos, abas);
+     sem isso uma coluna única no celular cresce além da tela. Utilitários min-w-* continuam prevalecendo. */
+  .grid > * {
+    min-width: 0;
+  }
+
+  /* Telas de toque: alvos com pelo menos 40 px de altura (padrão iOS/Android 44/48 px; WCAG 2.5.8 ≥ 24 px). */
+  @media (pointer: coarse) {
+    button,
+    [role="tab"],
+    [role="button"],
+    [role="menuitem"],
+    [role="option"],
+    summary {
+      min-height: 40px;
+    }
+    input[type="checkbox"],
+    input[type="radio"] {
+      width: 20px;
+      height: 20px;
+    }
+    input,
+    select,
+    textarea {
+      font-size: 16px; /* evita o zoom automático do Safari iOS ao focar um campo */
+    }
+  }
+}

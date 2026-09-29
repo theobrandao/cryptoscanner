@@ -13,6 +13,8 @@ import { formatCompact, formatDateTime, formatPct, formatPrice } from "@/lib/for
 import { TIMEFRAME_LABEL } from "@/lib/timeframes";
 import { cn } from "@/lib/utils";
 import type { Timeframe } from "@/types/market";
+import useSWR from "swr";
+import type { PatternStatRow, PatternStatsReport } from "@/services/pattern-stats-service";
 
 /** Mini-gráfico de fechamentos (SVG puro) para os cartões. */
 export function Sparkline({ values, tone, className }: { values: number[]; tone: "success" | "danger" | "muted"; className?: string }) {
@@ -47,6 +49,8 @@ function strategyForPattern(key: string): string {
 }
 
 export function PatternResults({ rows, timeframe, scanned, currency, usdBrl }: { rows: ScannerRow[] | null; timeframe: Timeframe; scanned: boolean; currency: "USD" | "BRL"; usdBrl: number | null }) {
+  const statsTf = timeframe === "4h" || timeframe === "1d" ? timeframe : null;
+  const { data: stats } = useSWR<PatternStatsReport>(scanned && statsTf ? `/api/patterns/stats?timeframe=${statsTf}` : null, { revalidateOnFocus: false });
   if (!scanned) {
     return (
       <EmptyState icon="📡" title="Nenhum scan realizado" description="Selecione o timeframe e o tipo de padrão e clique em “Escanear Agora”. Dica: padrões gráficos são mais frequentes em 1D e 7D." />
@@ -62,6 +66,7 @@ export function PatternResults({ rows, timeframe, scanned, currency, usdBrl }: {
       />
     );
   }
+  const statsByKey = new Map((stats?.rows ?? []).map((r) => [r.key, r]));
   const items = withPatterns.flatMap((r) => r.patterns.map((p) => ({ row: r, p }))).sort((a, b) => b.p.confidence - a.p.confidence);
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -106,6 +111,7 @@ export function PatternResults({ rows, timeframe, scanned, currency, usdBrl }: {
                 </div>
                 <Progress value={p.confidence} tone={p.confidence >= 75 ? "success" : p.confidence >= 60 ? "primary" : "warning"} className="mt-1" />
               </div>
+              <HitRateLine stat={statsByKey.get(p.key)} timeframe={statsTf} />
               {p.context ? <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 px-2 py-1 text-[11px] text-warning">⚠️ {p.context.note}</p> : null}
               <p className="mt-3 text-xs text-muted-foreground">{p.summary}</p>
               <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
@@ -198,5 +204,25 @@ export function VolumeAlerts({ alerts, assets, checkedAt, loading }: { alerts: V
         </div>
       )}
     </div>
+  );
+}
+
+/** Taxa de acerto histórica do padrão (backtest walk-forward) — base real para ler a confiança geométrica. */
+function HitRateLine({ stat, timeframe }: { stat: PatternStatRow | undefined; timeframe: "4h" | "1d" | null }) {
+  if (!timeframe) return <p className="mt-2 text-[11px] text-muted-foreground">Taxa de acerto histórica disponível em 4H e 1D.</p>;
+  if (!stat) return null;
+  const resolved = stat.wins + stat.losses;
+  const hr = stat.hitRate;
+  const tone = hr == null || resolved < 10 ? "text-muted-foreground" : hr >= 0.55 ? "text-success" : hr >= 0.4 ? "text-warning" : "text-danger";
+  return (
+    <Link href={`/estatisticas?timeframe=${timeframe}#${stat.key}`} className="mt-2 flex flex-wrap items-center gap-x-2 rounded-md border border-border/60 px-2 py-1 text-[11px] hover:bg-muted/40">
+      <span className="text-muted-foreground">Histórico ({timeframe.toUpperCase()}):</span>
+      <span className={cn("font-semibold tabular", tone)}>{hr == null ? "—" : `${Math.round(hr * 100)}% de acerto`}</span>
+      <span className="text-muted-foreground tabular">
+        n={resolved}
+        {stat.avgReturnPct != null ? ` · retorno médio ${stat.avgReturnPct >= 0 ? "+" : ""}${stat.avgReturnPct.toFixed(2)}%` : ""}
+        {resolved < 10 ? " · amostra pequena" : ""}
+      </span>
+    </Link>
   );
 }

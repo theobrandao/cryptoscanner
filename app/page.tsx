@@ -9,7 +9,7 @@ import { DISCLAIMER_TEXT } from "@/components/layout/nav-config";
 export const metadata: Metadata = { title: "CryptoScanner — Scanner de padrões e agentes de IA para cripto" };
 
 const FEATURES = [
-  { icon: "📊", title: "Scanner de Padrões Gráficos", text: "17 padrões detectados por pivôs fractais e ATR em 21 ativos, com alvo, stop e confiança.", href: "/scanner" },
+  { icon: "📊", title: "Scanner de Padrões Gráficos", text: "17 padrões detectados por pivôs fractais e ATR em 30 ativos, com alvo, stop e confiança.", href: "/scanner" },
   { icon: "🤖", title: "Agentes de IA Autônomos", text: "Agentes configuráveis que verificam estratégias a cada 5 minutos e alertam no painel ou no Telegram.", href: "/agentes" },
   { icon: "🔔", title: "Alertas Inteligentes", text: "Volume anômalo (≥100% sobre a média), preço, RSI e padrões — com cooldown e histórico.", href: "/scanner" },
   { icon: "📈", title: "Gráficos com indicadores", text: "Candles com EMA 8/25/100/200, Bollinger, StochRSI, MACD, suportes/resistências e Fibonacci.", href: "/graficos" },

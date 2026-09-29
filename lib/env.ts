@@ -46,6 +46,19 @@ const schema = z.object({
     .string()
     .default("true")
     .transform((v) => v === "true"),
+  /** Uso pessoal: se definido, o cadastro exige este código de convite. */
+  REGISTRATION_INVITE_CODE: z.string().min(8).optional(),
+  /** E-mails do dono (vírgula): recebem ADMIN + PLATINUM no cadastro e no login. */
+  OWNER_EMAILS: z.string().default(""),
+  /** Aceita o segredo do cron em ?secret= (legado). Desligar depois de migrar os agendamentos para cabeçalho. */
+  CRON_ALLOW_QUERY_SECRET: z
+    .string()
+    .default("true")
+    .transform((v) => v === "true"),
+  /** Web Push (VAPID). Gerar com: npx web-push generate-vapid-keys */
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default("mailto:admin@example.com"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 
@@ -88,4 +101,16 @@ export function getMarketProviderOrder(): Array<"binance" | "kraken"> {
     .map((s) => s.trim().toLowerCase());
   const order = raw.filter((p): p is "binance" | "kraken" => p === "binance" || p === "kraken");
   return order.length > 0 ? order : ["binance", "kraken"];
+}
+
+export function isOwnerEmail(email: string): boolean {
+  return getEnv()
+    .OWNER_EMAILS.split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email.trim().toLowerCase());
+}
+
+export function isInviteRequired(): boolean {
+  return Boolean(getEnv().REGISTRATION_INVITE_CODE);
 }

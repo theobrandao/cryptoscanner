@@ -6,6 +6,7 @@ import { createLogger } from "@/lib/logger";
 import { detectPatterns } from "@/lib/patterns/detect";
 import { detectVolumeAnomaly } from "@/lib/scanner/volume";
 import { getCandles, getTickers } from "@/services/market/market-service";
+import { sendPushToUser } from "@/services/push-service";
 import { escapeHtml, sendTelegramMessage } from "@/services/telegram";
 import type { Timeframe } from "@/types/market";
 
@@ -99,6 +100,7 @@ export async function evaluateAlerts(): Promise<{ evaluated: number; triggered: 
           },
         }),
       ]);
+      await sendPushToUser(a.userId, { title: `Alerta ${symbol}`, body: message, url: "/scanner", tag: `alert-${a.id}` }).catch(() => undefined);
       if ((a.channel === "telegram" || a.channel === "both") && a.user.telegramChatId && isTelegramConfigured()) {
         await sendTelegramMessage(a.user.telegramChatId, `🔔 <b>Alerta</b>\n${escapeHtml(message)}`);
       }

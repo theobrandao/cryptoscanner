@@ -4,6 +4,7 @@ import type { AssetDefinition } from "@/types/market";
  * Universo de ativos monitorados pelo scanner (21).
  * A referência pública menciona "20 ativos" e lista 10 na home; os demais foram escolhidos entre os
  * pares USDT de maior liquidez que também existem na Kraken (fallback). ZEC adicionado a pedido (ZECUSDT / Kraken XZECZUSD).
+ * 22–30: ampliação por volume 24h na Binance com par USD confirmado na Kraken e id confirmado na CoinGecko (set/2026).
  * Os glifos são caracteres Unicode próprios, não logotipos de terceiros.
  */
 export const ASSETS: readonly AssetDefinition[] = [
@@ -28,6 +29,15 @@ export const ASSETS: readonly AssetDefinition[] = [
   { symbol: "OP", name: "Optimism", binancePair: "OPUSDT", krakenPair: "OPUSD", coingeckoId: "optimism", glyph: "◓", sortOrder: 19 },
   { symbol: "SUI", name: "Sui", binancePair: "SUIUSDT", krakenPair: "SUIUSD", coingeckoId: "sui", glyph: "◔", sortOrder: 20 },
   { symbol: "ZEC", name: "Zcash", binancePair: "ZECUSDT", krakenPair: "ZECUSD", coingeckoId: "zcash", glyph: "ⓩ", sortOrder: 21 },
+  { symbol: "BCH", name: "Bitcoin Cash", binancePair: "BCHUSDT", krakenPair: "BCHUSD", coingeckoId: "bitcoin-cash", glyph: "Ƀ", sortOrder: 22 },
+  { symbol: "XLM", name: "Stellar", binancePair: "XLMUSDT", krakenPair: "XLMUSD", coingeckoId: "stellar", glyph: "✶", sortOrder: 23 },
+  { symbol: "HBAR", name: "Hedera", binancePair: "HBARUSDT", krakenPair: "HBARUSD", coingeckoId: "hedera-hashgraph", glyph: "ℏ", sortOrder: 24 },
+  { symbol: "AAVE", name: "Aave", binancePair: "AAVEUSDT", krakenPair: "AAVEUSD", coingeckoId: "aave", glyph: "◈", sortOrder: 25 },
+  { symbol: "TAO", name: "Bittensor", binancePair: "TAOUSDT", krakenPair: "TAOUSD", coingeckoId: "bittensor", glyph: "τ", sortOrder: 26 },
+  { symbol: "ENA", name: "Ethena", binancePair: "ENAUSDT", krakenPair: "ENAUSD", coingeckoId: "ethena", glyph: "◕", sortOrder: 27 },
+  { symbol: "WLD", name: "Worldcoin", binancePair: "WLDUSDT", krakenPair: "WLDUSD", coingeckoId: "worldcoin-wld", glyph: "◯", sortOrder: 28 },
+  { symbol: "FIL", name: "Filecoin", binancePair: "FILUSDT", krakenPair: "FILUSD", coingeckoId: "filecoin", glyph: "⨍", sortOrder: 29 },
+  { symbol: "ALGO", name: "Algorand", binancePair: "ALGOUSDT", krakenPair: "ALGOUSD", coingeckoId: "algorand", glyph: "Ⱥ", sortOrder: 30 },
 ] as const;
 
 const BY_SYMBOL = new Map(ASSETS.map((a) => [a.symbol, a]));

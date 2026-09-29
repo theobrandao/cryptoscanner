@@ -131,7 +131,7 @@ export function ScannerView() {
       <PageTitle
         icon="📊"
         title="Scanner de Padrões Gráficos"
-        description="O scanner identifica padrões técnicos em formação em tempo real nos 21 ativos monitorados. A detecção é algorítmica (pivôs fractais, ATR, suportes e resistências) — combine-a com a sua própria estratégia e gestão de risco."
+        description="O scanner identifica padrões técnicos em formação em tempo real nos 30 ativos monitorados. A detecção é algorítmica (pivôs fractais, ATR, suportes e resistências) — combine-a com a sua própria estratégia e gestão de risco."
         actions={
           <div className="flex items-center gap-1 rounded-md border border-border p-0.5 text-xs">
             {(["USD", "BRL"] as const).map((c) => (

@@ -11,6 +11,7 @@
 
 const BASE = (process.env.BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const CRON_SECRET = process.env.CRON_SECRET ?? "";
+const INVITE = process.env.INVITE_CODE ?? "";
 const SKIP_RATE_LIMIT = process.env.SKIP_RATE_LIMIT === "1";
 
 const results = [];
@@ -108,7 +109,7 @@ await test("Mercado", "GET /api/market/assets (universo inclui ZEC)", async () =
   const r = await call("GET", "/api/market/assets", { auth: false });
   expectStatus(r, 200);
   state.nAssets = r.json.data.assets.length;
-  expect(state.nAssets >= 21 && r.json.data.assets.some((a) => a.symbol === "ZEC"), `${state.nAssets} ativos, ZEC ausente`);
+  expect(state.nAssets >= 30 && r.json.data.assets.some((a) => a.symbol === "ZEC") && r.json.data.assets.some((a) => a.symbol === "ALGO"), `${state.nAssets} ativos, ZEC ou ALGO ausente`);
   return `${r.json.data.assets.length} ativos`;
 });
 
@@ -413,6 +414,44 @@ await test("Mentor", "POST /api/mentor — ativo, SOS, padrão, conceito, fora d
   return `5 respostas corretas (${out.join(",")})`;
 });
 
+await test("Estatística", "POST /api/cron/backtest (segredo errado → 401; correto → 200)", async () => {
+  const bad = await call("POST", "/api/cron/backtest", { auth: false, headers: { authorization: "Bearer errado" } });
+  expectStatus(bad, 401);
+  if (!CRON_SECRET) return "sem CRON_SECRET: só o 401 foi verificado";
+  const r = await call("POST", "/api/cron/backtest", { auth: false, headers: { authorization: `Bearer ${CRON_SECRET}` } });
+  expectStatus(r, 200);
+  const res = r.json.data.result;
+  expect(res["4h"]?.trades > 0 && res["1d"]?.trades > 0, `backtest sem operações: ${JSON.stringify(res)}`);
+  return `4H ${res["4h"].trades} op. · 1D ${res["1d"].trades} op. · ${r.json.data.durationMs} ms`;
+});
+
+await test("Estatística", "GET /api/patterns/stats 4h e 1d (taxa, IC 95%, ao vivo)", async () => {
+  const out = [];
+  for (const tf of ["4h", "1d"]) {
+    const r = await call("GET", `/api/patterns/stats?timeframe=${tf}`, { auth: false });
+    expectStatus(r, 200);
+    const d = r.json.data;
+    expect(d.rows.length >= 5 && d.assets >= 20, `${tf}: ${d.rows.length} padrões / ${d.assets} ativos`);
+    for (const row of d.rows) {
+      expect(row.wins + row.losses + row.expired === row.samples, `${tf} ${row.key}: contagem inconsistente`);
+      if (row.hitRate != null) expect(row.ci && row.ci.low <= row.hitRate && row.hitRate <= row.ci.high, `${tf} ${row.key}: IC não contém a taxa`);
+    }
+    out.push(`${tf}: ${d.totalTrades} op./${d.rows.length} padrões`);
+  }
+  const inv = await call("GET", "/api/patterns/stats?timeframe=15m", { auth: false });
+  expectStatus(inv, 400);
+  return out.join(" · ") + " · 15m → 400";
+});
+
+await test("Operação", "GET /api/status (banco, provedores, jobs)", async () => {
+  const r = await call("GET", "/api/status", { auth: false });
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(["ok", "degraded", "down"].includes(d.overall), `overall ${d.overall}`);
+  expect(Array.isArray(d.jobs) && d.jobs.some((j) => j.job === "cycle"), "job cycle ausente");
+  return `${d.overall} · ${d.jobs.map((j) => `${j.job}:${j.state}`).join(", ")} · push ${d.integrations.push}`;
+});
+
 await test("On-chain", "GET /api/market/whales (coleta do cron) e POST /api/cron/whales", async () => {
   if (CRON_SECRET) {
     const c = await call("POST", "/api/cron/whales", { auth: false, headers: { authorization: `Bearer ${CRON_SECRET}` } });
@@ -473,8 +512,18 @@ await test("Auth", "POST /api/auth/register senha fraca → 400", async () => {
   return "400";
 });
 
+await test("Auth", "GET /api/auth/register (convite exigido?) + recusa sem convite quando exigido", async () => {
+  const g = await call("GET", "/api/auth/register", { auth: false });
+  if (g.res.status !== 200) throw new Error(`status ${g.res.status}`);
+  const required = g.json?.data?.inviteRequired === true;
+  if (!required) return "cadastro aberto (sem REGISTRATION_INVITE_CODE)";
+  const r = await call("POST", "/api/auth/register", { auth: false, body: { name: "Intruso", email: `x${EMAIL}`, password: PASSWORD, invite: "codigo-errado" } });
+  if (r.res.status !== 403) throw new Error(`esperado 403, veio ${r.res.status}`);
+  return "convite exigido; código errado → 403";
+});
+
 await test("Auth", "POST /api/auth/register → 201 + cookie", async () => {
-  const r = await call("POST", "/api/auth/register", { body: { name: "Smoke Test", email: EMAIL, password: PASSWORD } });
+  const r = await call("POST", "/api/auth/register", { body: { name: "Smoke Test", email: EMAIL, password: PASSWORD, ...(INVITE ? { invite: INVITE } : {}) } });
   expectStatus(r, 201);
   expect(cookie.startsWith("cs_session="), "cookie de sessão ausente");
   state.userId = r.json.data.user.id;
@@ -482,7 +531,7 @@ await test("Auth", "POST /api/auth/register → 201 + cookie", async () => {
 });
 
 await test("Auth", "POST /api/auth/register e-mail repetido → 409", async () => {
-  const r = await call("POST", "/api/auth/register", { auth: false, body: { name: "Smoke Test", email: EMAIL, password: PASSWORD } });
+  const r = await call("POST", "/api/auth/register", { auth: false, body: { name: "Smoke Test", email: EMAIL, password: PASSWORD, ...(INVITE ? { invite: INVITE } : {}) } });
   expectStatus(r, 409, "email_taken");
   return "409";
 });
@@ -947,6 +996,29 @@ await test("Limpeza", "DELETE /api/agents (todos) + alertas + watchlist", async 
   const g = await call("GET", "/api/agents");
   expect(g.json.data.items.length === 0, "agentes restantes");
   return "agentes, alertas e watchlist do usuário de teste removidos";
+});
+
+await test("Push", "GET/POST/DELETE /api/push/subscribe e POST /api/push/test", async () => {
+  const anon = await call("GET", "/api/push/subscribe", { auth: false });
+  expectStatus(anon, 401);
+  const g = await call("GET", "/api/push/subscribe");
+  expectStatus(g, 200);
+  const endpoint = `https://push.invalid/smoke/${Date.now()}`;
+  const bad = await call("POST", "/api/push/subscribe", { body: { endpoint: "nao-e-url", keys: { p256dh: "x", auth: "y" } } });
+  expectStatus(bad, 400);
+  const p = await call("POST", "/api/push/subscribe", { body: { endpoint, keys: { p256dh: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U", auth: "tBHItJI5svbpez7KI4CCXg" } } });
+  expectStatus(p, 201);
+  const g2 = await call("GET", "/api/push/subscribe");
+  expect(g2.json.data.subscriptions >= 1, "inscrição não contada");
+  let testMsg = "push não configurado";
+  if (g2.json.data.configured) {
+    const t = await call("POST", "/api/push/test", { body: {} });
+    expectStatus(t, 200);
+    testMsg = `teste: enviados ${t.json.data.sent}, removidos ${t.json.data.removed} (endpoint fictício)`;
+  }
+  const d = await call("DELETE", "/api/push/subscribe", { body: { endpoint } });
+  expectStatus(d, 200);
+  return `inscrição criada e removida · ${testMsg}`;
 });
 
 await test("LGPD", "DELETE /api/auth/account senha errada → 401; confirmação errada → 400", async () => {

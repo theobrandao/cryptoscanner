@@ -11,6 +11,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/panorama", label: "Panorama Diário", icon: "🌐" },
   { href: "/bubbles", label: "Bubbles", icon: "🫧" },
   { href: "/scanner", label: "Scanner", icon: "📊" },
+  { href: "/estatisticas", label: "Taxa de acerto", icon: "🎯", badge: "Novo" },
   { href: "/agentes", label: "Agentes IA", icon: "🤖", badge: "Novo" },
   { href: "/sentinela", label: "Sentinela", icon: "🛰️", badge: "Novo" },
   { href: "/graficos", label: "Gráficos", icon: "📈" },
@@ -19,6 +20,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/simulador", label: "Simulações", icon: "📜" },
   { href: "/mentor", label: "Mentor", icon: "🎓" },
   { href: "/planos", label: "Planos", icon: "💳" },
+  { href: "/status", label: "Status", icon: "🩺" },
   { href: "/suporte", label: "Suporte", icon: "🆘" },
 ];
 

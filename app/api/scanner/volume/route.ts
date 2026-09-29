@@ -10,7 +10,7 @@ import type { Timeframe } from "@/types/market";
 
 const querySchema = z.object({ timeframes: z.string().default("30m,1h"), threshold: z.coerce.number().min(10).max(1000).default(100) });
 
-/** Monitor de volume anômalo (30M e 1H por padrão) nos 21 ativos. */
+/** Monitor de volume anômalo (30M e 1H por padrão) nos 30 ativos. */
 export const GET = withApi(async (req) => {
   await connection();
   await enforceRateLimit(req, "public");

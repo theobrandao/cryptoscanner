@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input, Label } from "@/components/ui/input";
 import { Alert } from "@/components/ui/misc";
 import { useSession } from "@/hooks/use-session";
-import { ApiClientError, postJson } from "@/lib/client-api";
+import { ApiClientError, apiFetch, postJson } from "@/lib/client-api";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
@@ -21,13 +21,28 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [invite, setInvite] = React.useState("");
+  const [inviteRequired, setInviteRequired] = React.useState(false);
+
+  React.useEffect(() => {
+    if (mode !== "register") return;
+    let alive = true;
+    apiFetch<{ inviteRequired: boolean }>("/api/auth/register")
+      .then((d) => {
+        if (alive) setInviteRequired(d.inviteRequired);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [mode]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      if (mode === "register") await postJson("/api/auth/register", { name, email, password });
+      if (mode === "register") await postJson("/api/auth/register", { name, email, password, ...(invite ? { invite } : {}) });
       else await postJson("/api/auth/login", { email, password });
       await refresh();
       router.push(next.startsWith("/") ? next : "/scanner");
@@ -76,6 +91,13 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             />
             {mode === "register" ? <span className="text-xs text-muted-foreground">Mínimo de 8 caracteres com letras e números.</span> : null}
           </div>
+          {mode === "register" && inviteRequired ? (
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="invite">Código de convite</Label>
+              <Input id="invite" value={invite} onChange={(e) => setInvite(e.target.value)} required autoComplete="off" />
+              <span className="text-xs text-muted-foreground">Uso pessoal: o cadastro é restrito a quem tem o código.</span>
+            </div>
+          ) : null}
           {error ? <Alert variant="danger">{error}</Alert> : null}
           <Button type="submit" loading={loading}>
             {mode === "login" ? "Entrar" : "Criar conta"}

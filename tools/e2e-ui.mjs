@@ -71,10 +71,10 @@ await step("Home carrega com tickers ao vivo e top 20 por volume", async () => {
   return `${priceCells} preços · ${await shot("home")}`;
 });
 
-await step("Scanner: tabela em tempo real com 21 linhas (inclui ZEC) e RSI", async () => {
+await step("Scanner: tabela em tempo real com 30 linhas (inclui ZEC e ALGO) e RSI", async () => {
   await goto("/scanner");
   await page.waitForSelector("table tbody tr", { timeout: 30_000 });
-  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 21, null, { timeout: 30_000 });
+  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 30, null, { timeout: 30_000 });
   const rows = await page.locator("table tbody tr").count();
   const text = await page.locator("table").innerText();
   expect(/RSI/i.test(text), "coluna RSI ausente");
@@ -86,7 +86,7 @@ await step("Scanner: busca, ordenação, favoritos e filtro de tendência", asyn
   await search.fill("SOL");
   await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length === 1, null, { timeout: 10_000 });
   await search.fill("");
-  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 21, null, { timeout: 10_000 });
+  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 30, null, { timeout: 10_000 });
   await page.locator("th", { hasText: /Preço/ }).first().click();
   await page.waitForTimeout(400);
   const first = await page.locator("table tbody tr").first().innerText();
@@ -227,6 +227,8 @@ await step("Registro pela interface", async () => {
   const pw = page.locator("input[type='password']");
   await pw.first().fill(PASSWORD);
   if ((await pw.count()) > 1) await pw.nth(1).fill(PASSWORD);
+  const inviteInput = page.locator("input#invite");
+  if (await inviteInput.count()) await inviteInput.fill(process.env.INVITE_CODE ?? "");
   await page.getByRole("button", { name: /Criar conta|Cadastrar|Registrar/i }).click();
   await page.waitForFunction(() => !location.pathname.startsWith("/registro"), null, { timeout: 30_000 });
   const me = await page.evaluate(async () => (await (await fetch("/api/auth/me")).json()).data.user?.email);
@@ -336,10 +338,51 @@ await step("Planos: trocar para PLATINUM libera 15M no scanner; voltar para FREE
   await goto("/scanner?timeframe=15m");
   const tf = page.locator("button", { hasText: /15M/ }).first();
   await tf.click();
-  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 21, null, { timeout: 40_000 });
+  await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 30, null, { timeout: 40_000 });
   const file = await shot("scanner-15m-platinum");
   await page.evaluate(async () => fetch("/api/plans/change", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan: "FREE" }) }));
   return `15M liberado (${await btn.count()} CTA) · ${file}`;
+});
+
+await step("Taxa de acerto: tabela 4H/1D com amostras e IC 95%", async () => {
+  await goto("/estatisticas?timeframe=1d");
+  await page.waitForFunction(() => /Operações testadas/i.test(document.body.innerText) && /IC 95%/i.test(document.body.innerText), null, { timeout: 60_000 });
+  await page.getByRole("tab", { name: "4H" }).click();
+  await page.waitForFunction(() => location.search.includes("4h") && /Operações testadas/i.test(document.body.innerText), null, { timeout: 60_000 });
+  const n = await page.locator("table tbody tr").count();
+  expect(n >= 5, `poucos padrões (${n})`);
+  return `${n} padrões · ${await shot("estatisticas")}`;
+});
+
+await step("Status do sistema: jobs, provedores e integrações", async () => {
+  await goto("/status");
+  await page.waitForFunction(() => /Jobs agendados/i.test(document.body.innerText) && /Provedores de mercado/i.test(document.body.innerText), null, { timeout: 30_000 });
+  const overall = await page.locator("[role='alert'] .font-semibold, [role='status'] .font-semibold").first().innerText().catch(() => "");
+  return `${overall || "status exibido"} · ${await shot("status")}`;
+});
+
+await step("Preferências: cartão de notificações push visível", async () => {
+  await goto("/preferencias");
+  await page.waitForFunction(() => /Notificações no navegador/i.test(document.body.innerText), null, { timeout: 30_000 });
+  const cfg = await page.evaluate(async () => (await (await fetch("/api/push/subscribe")).json()).data);
+  expect(cfg && typeof cfg.configured === "boolean", "GET /api/push/subscribe sem dados");
+  return `push configurado no servidor: ${cfg.configured} · inscrições: ${cfg.subscriptions}`;
+});
+
+await step("Mobile 390 px: scanner, taxa de acerto e gráficos sem rolagem horizontal", async () => {
+  const m = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: "pt-BR" });
+  const mp = await m.newPage();
+  const out = [];
+  for (const r of ["/scanner", "/estatisticas", "/graficos", "/panorama", "/agentes"]) {
+    await mp.goto(BASE + r, { waitUntil: "domcontentloaded", timeout: 45_000 });
+    await mp.waitForTimeout(2500);
+    const over = await mp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(over <= 0, `${r}: ${over}px de rolagem horizontal`);
+    out.push(r);
+  }
+  await mp.screenshot({ path: path.join(OUT, "mobile-agentes.png") });
+  await m.close();
+  return `${out.length} páginas OK em 390 px`;
 });
 
 await step("Suporte logado: Meus chamados + exclusão da conta (LGPD) pela interface", async () => {

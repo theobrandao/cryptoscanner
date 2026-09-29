@@ -9,6 +9,7 @@ import { computeSnapshot } from "@/lib/indicators/snapshot";
 import { createLogger } from "@/lib/logger";
 import { detectPatterns } from "@/lib/patterns/detect";
 import { getCandles } from "@/services/market/market-service";
+import { sendPushToUser } from "@/services/push-service";
 import { escapeHtml, sendTelegramMessage } from "@/services/telegram";
 import type { Timeframe } from "@/types/market";
 
@@ -84,6 +85,13 @@ export async function runUserAgent(agent: Agent, options: { force?: boolean; now
         },
       });
     } else {
+      const push = await sendPushToUser(agent.userId, {
+        title: `${agent.icon} ${agent.name}`,
+        body: summary.signals.map((s) => `${s.side === "buy" ? "COMPRA" : "VENDA"} ${s.strategy} ${s.timeframe} · ${s.confidence}%`).join(" | ") + ` — ${agent.symbols.join(", ")}`,
+        url: agent.kind === "sentinel" ? "/sentinela" : "/agentes",
+        tag: `agent-${agent.id}`,
+      }).catch(() => ({ sent: 0, removed: 0 }));
+      if (push.sent > 0) summary.alertsSent++;
       const wantsTelegram = agent.notification === "telegram" || agent.notification === "both";
       if (wantsTelegram) {
         const user = await prisma.user.findUnique({ where: { id: agent.userId }, select: { telegramChatId: true } });

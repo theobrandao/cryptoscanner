@@ -62,7 +62,7 @@ export function ScannerTable({
   const [onlyFavorites, setOnlyFavorites] = React.useState(false);
   const [onlyPatterns, setOnlyPatterns] = React.useState(false);
   const [page, setPage] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(25);
+  const [pageSize, setPageSize] = React.useState(50);
 
   React.useEffect(() => {
     if (data && onSourcesChange) onSourcesChange({ sources: data.sources, stale: data.staleCount > 0, scannedAt: data.scannedAt });

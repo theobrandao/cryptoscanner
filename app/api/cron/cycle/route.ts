@@ -1,6 +1,6 @@
 import { connection } from "next/server";
-import { ApiError, ok, withApi } from "@/lib/api";
-import { getEnv } from "@/lib/env";
+import { ok, withApi } from "@/lib/api";
+import { assertCronAuth, recordCronRun } from "@/lib/cron";
 import { createLogger } from "@/lib/logger";
 import { evaluateAlerts } from "@/services/alert-service";
 import { runScan } from "@/services/scanner-service";
@@ -15,16 +15,12 @@ export const maxDuration = 60;
 /**
  * Ciclo do worker exposto como endpoint HTTP — para hospedagens serverless (Vercel) sem processo
  * de longa duração. Deve ser chamado a cada 5 min por um agendador externo (QStash, cron-job.org,
- * Vercel Cron) com `Authorization: Bearer <CRON_SECRET>` ou `?secret=<CRON_SECRET>`.
- * Etapas: scan 4H/1D → snapshot de mercado → agentes do usuário → alertas.
+ * Vercel Cron) com `Authorization: Bearer <CRON_SECRET>` (QStash: Upstash-Forward-Authorization).
+ * Etapas: scan 4H/1D → snapshot de mercado → agentes do usuário → alertas → sinais de padrão ao vivo.
  */
 async function handle(req: Request) {
   await connection();
-  const secret = getEnv().CRON_SECRET;
-  if (!secret) throw new ApiError(503, "CRON_SECRET não configurado", "cron_disabled");
-  const url = new URL(req.url);
-  const provided = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? url.searchParams.get("secret") ?? "";
-  if (provided !== secret) throw new ApiError(401, "Segredo inválido", "unauthorized");
+  assertCronAuth(req);
 
   const t0 = Date.now();
   const steps: Record<string, unknown> = {};
@@ -38,10 +34,12 @@ async function handle(req: Request) {
     }
   };
 
+  const scans: Awaited<ReturnType<typeof runScan>>[] = [];
   await step("scan", async () => {
     const out: Record<string, unknown> = {};
     for (const tf of ["4h", "1d"] as const) {
       const r = await runScan({ timeframe: tf, includeVolume: tf === "4h", refresh: true });
+      scans.push(r);
       out[tf] = { rows: r.rows.length, patterns: r.rows.reduce((s, x) => s + x.patterns.length, 0), volumeAlerts: r.volumeAlerts.length, sources: r.sources };
     }
     return out;
@@ -53,7 +51,15 @@ async function handle(req: Request) {
   });
   await step("alerts", () => evaluateAlerts());
 
+  await step("pattern-signals", async () => {
+    const { trackLiveSignals } = await import("@/services/pattern-stats-service");
+    return trackLiveSignals(scans);
+  });
+
   log.info("ciclo via HTTP concluído", { ms: Date.now() - t0 });
+  const failed = Object.entries(steps).filter(([, v]) => !(v as { ok: boolean }).ok).map(([k]) => k);
+  // o ciclo só é considerado falho se o scan (etapa principal) falhar ou se 2+ etapas falharem
+  await recordCronRun("cycle", t0, { ok: !failed.includes("scan") && failed.length < 2, detail: { failed, durationMs: Date.now() - t0 } });
   return ok({ ranAt: new Date(t0).toISOString(), durationMs: Date.now() - t0, steps });
 }
 
