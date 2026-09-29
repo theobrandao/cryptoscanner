@@ -26,6 +26,9 @@ page.on("console", (m) => {
   if (m.type() === "error") consoleErrors.push({ url: page.url(), text: m.text().slice(0, 200) });
 });
 page.on("pageerror", (e) => consoleErrors.push({ url: page.url(), text: `pageerror: ${e.message.slice(0, 200)}` }));
+page.on("response", (r) => {
+  if (r.status() >= 500) consoleErrors.push({ url: page.url(), text: `HTTP ${r.status()} ${r.request().method()} ${r.url()}` });
+});
 
 async function step(name, fn) {
   const t0 = Date.now();
