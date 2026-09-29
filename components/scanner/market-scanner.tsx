@@ -108,7 +108,7 @@ function ScannerInner() {
   return (
     <PageShell className="max-w-[1600px]">
       <PageTitle
-        title="Market Scanner"
+        title="Scanner de setups"
         description="30 ativos × timeframe: estado do setup, Confluence Score (0–100), regime, R:R e distância da zona. Binance spot, candles fechados. Ranking técnico — não é recomendação."
         actions={
           <>
@@ -204,7 +204,7 @@ function ScannerInner() {
                 return (
                   <tr key={r.symbol} className="border-t border-border/60 hover:bg-muted/40">
                     <td className="px-2 py-1.5">
-                      <Link href={`/?symbol=${r.symbol}&tf=${tf}&exchange=binance&instrument=spot`} className="font-semibold hover:underline">
+                      <Link href={`/charts/${r.symbol}?tf=${tf}&exchange=binance&instrument=spot`} className="font-semibold hover:underline">
                         {r.symbol}/USDT
                       </Link>
                       <span className="ml-2 text-muted-foreground">{px(r.price)}</span>
@@ -247,7 +247,7 @@ function ScannerInner() {
 
 export function MarketScanner() {
   return (
-    <AccessGate feature="Market Scanner">
+    <AccessGate feature="Scanner de setups">
       <ScannerInner />
     </AccessGate>
   );

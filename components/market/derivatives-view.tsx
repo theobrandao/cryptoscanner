@@ -26,7 +26,7 @@ export function DerivativesView() {
   const { data, error } = useSWR<{ items: Row[]; errors: Array<{ symbol: string; error: string }>; source: string }>(`/api/market/derivatives?symbols=${SYMBOLS}`, { refreshInterval: 60_000 });
   return (
     <PageShell>
-      <PageTitle title="Derivatives" description="Perpétuos USDT: comparativo Binance/Bybit/OKX (OI, funding, basis), histórico de funding, open interest e CVD aproximado. Fonte e horário em cada linha." />
+      <PageTitle title="Derivativos" description="Perpétuos USDT: comparativo Binance/Bybit/OKX (OI, funding, basis), histórico de funding, open interest e CVD aproximado. Fonte e horário em cada linha." />
       <DerivativesDetailSection />
       <h2 className="mb-2 text-[15px] font-semibold">Universo · Binance USDⓈ-M</h2>
       {error ? <Alert variant="danger">Derivativos indisponíveis no momento.</Alert> : null}

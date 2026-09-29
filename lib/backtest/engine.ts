@@ -56,7 +56,7 @@ export function resolveTrailing(candles: readonly Candle[], entryIndex: number, 
       const exit = long ? Math.min(stop, c.open) : Math.max(stop, c.open);
       mae = Math.max(mae, long ? entry - exit : exit - entry);
       const pnl = long ? exit - entry : entry - exit;
-      return { outcome: pnl > 0 ? ("win" as const) : ("loss" as const), bars: j - entryIndex, exit, mfe, mae: Math.max(0, mae) };
+      return { outcome: pnl > 0 ? ("win" as const) : ("loss" as const), bars: j - entryIndex, exit, mfe, mae: Math.max(0, mae), stop };
     }
     mfe = Math.max(mfe, long ? c.high - entry : entry - c.low);
     mae = Math.max(mae, long ? entry - c.low : c.high - entry);
@@ -68,7 +68,7 @@ export function resolveTrailing(candles: readonly Candle[], entryIndex: number, 
     stop = long ? Math.max(stop, ext) : Math.min(stop, ext);
   }
   const last = candles[end] ?? candles[entryIndex];
-  return { outcome: "expired" as const, bars: end - entryIndex, exit: last?.close ?? entry, mfe, mae: Math.max(0, mae) };
+  return { outcome: "expired" as const, bars: end - entryIndex, exit: last?.close ?? entry, mfe, mae: Math.max(0, mae), stop };
 }
 
 export interface BtTrade {
@@ -90,6 +90,8 @@ export interface BtTrade {
   /** excursão a favor até o stop ou o horizonte, sem sair no alvo (base do Hit 1R/2R/3R) */
   runR: number;
   regime: TrendRegime;
+  /** trailing: nível do stop móvel na saída (ou no último candle, se a posição segue aberta) */
+  trailStop?: number;
 }
 
 export interface EquityPoint {
@@ -166,6 +168,7 @@ export function runSignals(candles: readonly Candle[], signals: readonly Signal[
       maeR: r.mae / risk,
       runR,
       regime: regimes.trend[ei] ?? "range",
+      ...(trail && "stop" in r ? { trailStop: r.stop as number } : {}),
     });
     busyUntil = ei + r.bars;
   }

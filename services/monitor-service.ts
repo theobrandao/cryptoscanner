@@ -204,7 +204,7 @@ export async function evaluateMonitors(opts: { budgetMs?: number; batch?: number
           const created = await emit(m.userId, m.id, fp, "STRATEGY_PASS", title, body, { strategyId: m.strategy.id, price: ev.price, lastClosedAt: ev.lastClosedAt });
           if (created) {
             events++;
-            await deliver({ id: created.id, userId: m.userId, title, body, url: `/?symbol=${m.symbol}&tf=${ev.executionTf}&exchange=${m.exchange}&instrument=${m.instrument}` }, m, m.user.telegramChatId);
+            await deliver({ id: created.id, userId: m.userId, title, body, url: `/charts/${m.symbol}?tf=${ev.executionTf}&exchange=${m.exchange}&instrument=${m.instrument}` }, m, m.user.telegramChatId);
             await track("monitor_event", { userId: m.userId, props: { kind: "STRATEGY_PASS" } });
           }
         }
@@ -226,7 +226,7 @@ export async function evaluateMonitors(opts: { budgetMs?: number; batch?: number
         const created = await emit(m.userId, m.id, hit.fingerprint, `SETUP_${f.state}`, title, body, { state: f.state, score: f.score, direction: f.direction, contextKey: c.contextKey });
         if (created) {
           events++;
-          await deliver({ id: created.id, userId: m.userId, title, body, url: `/?symbol=${m.symbol}&tf=${m.timeframe}&exchange=${m.exchange}&instrument=${m.instrument}` }, m, m.user.telegramChatId);
+          await deliver({ id: created.id, userId: m.userId, title, body, url: `/charts/${m.symbol}?tf=${m.timeframe}&exchange=${m.exchange}&instrument=${m.instrument}` }, m, m.user.telegramChatId);
           await track("monitor_event", { userId: m.userId, props: { kind: `SETUP_${f.state}` } });
         }
       }

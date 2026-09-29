@@ -3,7 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Activity, Bot, CandlestickChart, Check, FlaskConical, Gauge, Layers, Radar, ShieldCheck, Workflow } from "lucide-react";
+import { Check, ShieldCheck } from "lucide-react";
+import { ToolIconView } from "@/components/layout/tool-icon";
+import { ASSETS } from "@/lib/assets";
+import { postJson } from "@/lib/client-api";
+import { MAIN_TOOLS } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 
 interface Prices {
@@ -13,139 +17,258 @@ interface Prices {
   limits: Record<"PRO" | "ELITE", { alerts: number; monitors: number; strategies: number; historyDays: number }>;
 }
 
-const FEATURES = [
-  { icon: CandlestickChart, title: "Dashboard de contexto", text: "Gráfico com estrutura (HH/HL, BOS, CHoCH), liquidez, suporte e resistência, EMAs, RSI, MACD, ATR e VWAP no mesmo contexto de ativo, exchange e timeframe." },
-  { icon: Gauge, title: "Confluence Score auditável", text: "Oito componentes com pesos fixos somando 100, penalidades listadas e a conta exibida: bruto, penalidades e nota final. Mede qualidade da confluência, não probabilidade." },
-  { icon: Layers, title: "Binance, Bybit e OKX", text: "Spot e perpétuo. Funding, próximo funding, open interest, basis e CVD aproximado por exchange, com a fonte e o horário de cada número." },
-  { icon: Radar, title: "Market Scanner", text: "30 ativos por estado do setup, score, regime, R:R e distância da zona. Filtros combináveis e estratégia salva como filtro." },
-  { icon: Activity, title: "Market Monitor no servidor", text: "Monitores de setup e de estratégia avaliados a cada ciclo, com o navegador fechado. Cada fato notifica uma vez: in-app, push e Telegram." },
-  { icon: Workflow, title: "Strategy Builder multi-timeframe", text: "Regras AND/OR com timeframe por condição. A mesma estratégia roda no scanner, no monitor e no backtest." },
-  { icon: FlaskConical, title: "Backtest com custos", text: "Walk-forward causal com taxas, slippage, funding e atraso de entrada. Curva de capital, drawdown e métricas em R líquido." },
-  { icon: Bot, title: "AI Analyst verificado", text: "Resumo do contexto exibido. Interpretação com número fora do contexto é descartada antes de chegar a você." },
-];
-
-const WEIGHTS = [
-  ["Market Structure", 20],
-  ["Liquidity", 15],
-  ["HTF Alignment", 15],
-  ["Volume", 10],
-  ["Momentum", 10],
-  ["Derivatives", 10],
-  ["Historical Performance", 10],
-  ["Risk Quality", 10],
-] as const;
+/** Dados estáticos vindos do servidor (evita levar zod e o conteúdo das aulas para o bundle da página de venda). */
+export interface LandingData {
+  validated: Array<{ name: string; description: string; validation: { label: string; summary: string; caveats: string } }>;
+  lessonTitles: string[];
+}
 
 const FAQ = [
-  ["O CryptoScanner recomenda compra ou venda?", "Não. A plataforma calcula e organiza leitura técnica com regras determinísticas e mostra de onde vem cada número. A decisão é sua. Não é recomendação de investimento."],
+  ["O CryptoScanner recomenda compra ou venda?", "Não. As ferramentas calculam padrões, níveis e sinais com regras fixas e mostram de onde vem cada número. A decisão é sua. Não é recomendação de investimento."],
+  ["O que quer dizer \"validado fora da amostra\"?", "As regras do modelo foram escolhidas com dados de um período e medidas em outro período, que não foi usado na escolha. Só publicamos o modelo porque o resultado nesse segundo período foi positivo, com taxas e slippage. O setup que não passou nesse teste não é vendido como estratégia."],
   ["Preciso conectar minha corretora ou informar chaves de API?", "Não. Usamos apenas dados públicos de mercado. O CryptoScanner nunca pede chaves de API nem executa ordens."],
   ["O teste de 7 dias pede cartão?", "Não. O teste libera as funções do PRO por 7 dias. Ao final, o acesso é pausado até você escolher um plano; seus dados ficam salvos."],
-  ["Como cancelo?", "Em Plans & Billing, a qualquer momento, sem multa. O acesso segue até o fim do período pago. Na primeira contratação, o pedido em até 7 dias garante reembolso integral."],
-  ["Backtest positivo garante resultado?", "Não. O backtest é uma simulação sobre o passado, com custos e sem olhar dados futuros. O próprio sistema mostra quando a amostra é pequena ou a expectativa é negativa."],
-  ["Com que frequência os dados atualizam?", "Preços por stream ou a cada poucos segundos; o contexto do Dashboard a cada 30 segundos; monitores a cada ciclo do servidor (5 minutos). O estado de cada dado aparece na tela: LIVE, DELAYED, DEGRADED, FALLBACK ou OFFLINE."],
-  ["Funciona no celular?", "Sim. O workspace é responsivo e os avisos chegam por push no navegador e pelo Telegram."],
+  ["Como cancelo?", "Em Planos, a qualquer momento, sem multa. O acesso segue até o fim do período pago. Na primeira contratação, o pedido em até 7 dias garante reembolso integral."],
+  ["Funciona no celular?", "Sim. O site é responsivo e os avisos chegam por push no navegador e pelo Telegram."],
 ] as const;
 
-export function Landing() {
+interface SimResult {
+  result: { totalInvested: number; finalValue: number; profitPct: number; maxDrawdownPct: number; startDate: number; endDate: number; contributions: number; input: { currency: string } };
+}
+
+function brl(v: number, currency = "BRL") {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency, maximumFractionDigits: 0 }).format(v);
+}
+
+/** Simulador compacto (API pública, não salva nada). */
+function MiniSimulator() {
+  const [symbol, setSymbol] = React.useState("BTC");
+  const [strategy, setStrategy] = React.useState<"dca" | "lump_sum">("dca");
+  const [amount, setAmount] = React.useState(500);
+  const [months, setMonths] = React.useState<6 | 12 | 24 | 36>(24);
+  const [busy, setBusy] = React.useState(false);
+  const [res, setRes] = React.useState<SimResult["result"] | null>(null);
+  const [err, setErr] = React.useState<string | null>(null);
+  const run = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const body = strategy === "dca" ? { symbol, strategy, currency: "BRL", initialCapital: 0, monthlyContribution: amount, months, riskProfile: "arrojado" } : { symbol, strategy, currency: "BRL", initialCapital: amount, monthlyContribution: 0, months, riskProfile: "arrojado" };
+      const r = await postJson<SimResult>("/api/simulations/run", body);
+      setRes(r.result);
+    } catch (e) {
+      setErr((e as Error).message || "Falha na simulação");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const sel = "h-10 rounded-md border border-input bg-background px-2 text-sm";
+  return (
+    <div className="grid gap-4 rounded-xl border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-2 gap-2 text-[13px]">
+        <label className="flex flex-col gap-1">
+          Ativo
+          <select className={sel} value={symbol} onChange={(e) => setSymbol(e.target.value)}>
+            {ASSETS.slice(0, 12).map((a) => (
+              <option key={a.symbol} value={a.symbol}>
+                {a.symbol} · {a.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          Forma
+          <select className={sel} value={strategy} onChange={(e) => setStrategy(e.target.value as "dca" | "lump_sum")}>
+            <option value="dca">Aporte mensal (DCA)</option>
+            <option value="lump_sum">Aporte único</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          {strategy === "dca" ? "Valor por mês (R$)" : "Valor (R$)"}
+          <input type="number" min={50} step={50} className={sel} value={amount} onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))} />
+        </label>
+        <label className="flex flex-col gap-1">
+          Período
+          <select className={sel} value={months} onChange={(e) => setMonths(Number(e.target.value) as 6 | 12 | 24 | 36)}>
+            {[6, 12, 24, 36].map((m) => (
+              <option key={m} value={m}>
+                {m} meses
+              </option>
+            ))}
+          </select>
+        </label>
+        <button onClick={() => void run()} disabled={busy || amount <= 0} className="col-span-2 mt-1 h-10 rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50">
+          {busy ? "Calculando…" : "Simular com preços reais"}
+        </button>
+      </div>
+      <div className="flex flex-col justify-center rounded-lg bg-muted/40 p-4 text-[13.5px]" aria-live="polite">
+        {err ? <p className="text-danger">{err}</p> : null}
+        {res ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-[12px] text-muted-foreground">Investido</div>
+                <div className="tabular text-xl font-bold">{brl(res.totalInvested)}</div>
+              </div>
+              <div>
+                <div className="text-[12px] text-muted-foreground">Valor final</div>
+                <div className="tabular text-xl font-bold">{brl(res.finalValue)}</div>
+              </div>
+              <div>
+                <div className="text-[12px] text-muted-foreground">Resultado</div>
+                <div className={cn("tabular text-xl font-bold", res.profitPct >= 0 ? "text-success" : "text-danger")}>
+                  {res.profitPct >= 0 ? "+" : ""}
+                  {res.profitPct.toFixed(1)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-[12px] text-muted-foreground">Maior queda no caminho</div>
+                <div className="tabular text-xl font-bold text-danger">−{res.maxDrawdownPct.toFixed(1)}%</div>
+              </div>
+            </div>
+            <p className="mt-3 text-[11.5px] text-muted-foreground">
+              {new Date(res.startDate).toLocaleDateString("pt-BR")} a {new Date(res.endDate).toLocaleDateString("pt-BR")} · fechamentos diários reais · simulação histórica, não projeção.
+            </p>
+          </>
+        ) : !err ? (
+          <p className="text-muted-foreground">Escolha o ativo, a forma de aporte e o período. O cálculo usa os preços diários reais do período, convertidos para reais pelo câmbio de cada dia.</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function Landing({ content }: { content: LandingData }) {
+  const VALIDATED = content.validated;
   const { data } = useSWR<Prices>("/api/billing/prices", { revalidateOnFocus: false });
   const [open, setOpen] = React.useState<number | null>(0);
+  const trial = data?.trialDays ?? 7;
+  const tools = MAIN_TOOLS.filter((t) => t.href !== "/");
   return (
     <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-16 px-4 py-10 sm:py-14">
       <section className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div>
-          <p className="text-[13px] font-semibold text-primary">Crypto Market Intelligence</p>
-          <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight sm:text-[42px] sm:leading-[1.1]">Contexto de mercado cripto completo, em um único workspace.</h1>
+          <p className="text-[13px] font-semibold text-primary">Scanner cripto · 30 ativos · dados públicos</p>
+          <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight sm:text-[42px] sm:leading-[1.1]">Ferramentas claras para operar cripto, e um modelo testado fora da amostra.</h1>
           <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-            Estrutura, liquidez, suporte e resistência, derivativos de Binance, Bybit e OKX, Confluence Score com a conta aberta, monitores no servidor e backtest com custos. Cada número com fonte e horário.
+            Scanner de padrões gráficos, agentes com alertas, Sentinela 24h, gráficos, Fibonacci, simulador e aulas. Na tela inicial, os sinais do modelo de rompimento com o resultado medido em um período que não foi usado para criá-lo.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <Link href="/registro?next=/" className="inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-semibold text-primary-foreground hover:brightness-110">
-              Começar teste de {data?.trialDays ?? 7} dias
+              Começar teste de {trial} dias
             </Link>
-            <Link href="#planos" className="inline-flex h-11 items-center rounded-md border border-border px-6 text-sm font-semibold hover:bg-muted">
-              Ver planos
+            <Link href="#ferramentas" className="inline-flex h-11 items-center rounded-md border border-border px-6 text-sm font-semibold hover:bg-muted">
+              Ver ferramentas
             </Link>
           </div>
           <p className="mt-3 text-[12px] text-muted-foreground">Sem cartão no teste. Sem chaves de API. Cancele quando quiser.</p>
         </div>
         <figure className="overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-black/30">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/marketing/dashboard.jpg" alt="Dashboard do CryptoScanner com gráfico, estrutura de mercado, liquidez e Confluence Score" width={1600} height={1000} className="h-auto w-full" />
+          <img src="/marketing/inicio.jpg" alt="Tela inicial do CryptoScanner com mercado agora, sinais ativos do modelo validado e atalhos das ferramentas" width={1600} height={1000} className="h-auto w-full" />
           <figcaption className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">Captura da aplicação com dados reais do momento da captura.</figcaption>
         </figure>
       </section>
 
-      <section aria-labelledby="features">
-        <h2 id="features" className="text-2xl font-bold tracking-tight">O que você tem no workspace</h2>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="rounded-lg border border-border bg-card p-4">
-              <f.icon className="h-5 w-5 text-primary" aria-hidden />
-              <h3 className="mt-3 text-[15px] font-semibold">{f.title}</h3>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{f.text}</p>
+      <section id="ferramentas" aria-labelledby="tools" className="scroll-mt-20">
+        <h2 id="tools" className="text-2xl font-bold tracking-tight">Uma ferramenta para cada tarefa</h2>
+        <p className="mt-2 text-[14px] text-muted-foreground">Cada item do menu faz uma coisa. As análises profundas ficam separadas, no grupo Avançado.</p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {tools.map((t) => (
+            <div key={t.href} className="rounded-lg border border-border bg-card p-4">
+              <ToolIconView icon={t.icon} className="h-5 w-5 text-primary" />
+              <h3 className="mt-3 text-[15px] font-semibold">{t.name}</h3>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{t.purpose}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="grid gap-8 lg:grid-cols-2" aria-labelledby="score">
-        <div>
-          <h2 id="score" className="text-2xl font-bold tracking-tight">Um score que fecha a conta</h2>
-          <p className="mt-3 text-[14px] leading-relaxed text-muted-foreground">
-            O Confluence Score soma oito componentes com pesos fixos. Evidência contrária entra como penalidade listada item a item. Componente sem dado vale zero. A tela mostra bruto, penalidades e nota final, e o motivo de cada ponto.
-          </p>
-          <ul className="mt-4 space-y-1.5 text-[13.5px]">
-            {["Faixas: Low < 40 ≤ Moderate < 60 ≤ Good < 75 ≤ Strong < 90 ≤ Exceptional", "NO TRADE explícito: sem direção, R:R abaixo de 1, dados atrasados ou timeframes fortemente contra", "Histórico do próprio setup com amostra, expectativa em R e aviso de amostra pequena"].map((t) => (
-              <li key={t} className="flex gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> {t}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          {WEIGHTS.map(([k, w]) => (
-            <div key={k} className="grid grid-cols-[minmax(0,1fr)_minmax(80px,2fr)_40px] items-center gap-3 py-1.5 text-[13px]">
-              <span className="truncate text-muted-foreground">{k}</span>
-              <span className="h-2 overflow-hidden rounded-full bg-muted">
-                <span className="block h-full rounded-full bg-primary" style={{ width: `${(w / 20) * 100}%` }} />
-              </span>
-              <span className="tabular text-right font-semibold">{w}</span>
+      <section aria-labelledby="validado">
+        <h2 id="validado" className="text-2xl font-bold tracking-tight">Modelo de rompimento: números fora da amostra</h2>
+        <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-muted-foreground">
+          Regras escolhidas em um período e medidas em outro, com taxa e slippage, em 30 criptos. O setup de pullback que testamos junto não passou nesse teste e por isso não é oferecido como estratégia.
+        </p>
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          {VALIDATED.map((m) => (
+            <div key={m.name} className="rounded-xl border border-border bg-card p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-[16px] font-semibold">{m.name}</h3>
+                <span className="rounded bg-success/15 px-1.5 py-px text-[11px] font-semibold text-success">{m.validation.label}</span>
+              </div>
+              <p className="mt-2 text-[13px] text-muted-foreground">{m.description}</p>
+              <p className="mt-3 text-[13px] leading-relaxed">{m.validation.summary}</p>
+              <p className="mt-2 text-[12.5px] leading-relaxed text-warning">{m.validation.caveats}</p>
             </div>
           ))}
-          <div className="mt-2 flex justify-between border-t border-border pt-2 text-[13px] font-semibold">
-            <span>Total</span>
-            <span className="tabular">100</span>
-          </div>
         </div>
+      </section>
+
+      <section aria-labelledby="simulador">
+        <h2 id="simulador" className="text-2xl font-bold tracking-tight">Simulador de aportes</h2>
+        <p className="mt-2 text-[14px] text-muted-foreground">Quanto teria rendido aportar em cripto, com os preços reais do período.</p>
+        <div className="mt-6">
+          <MiniSimulator />
+        </div>
+      </section>
+
+      <section aria-labelledby="ativos">
+        <h2 id="ativos" className="text-2xl font-bold tracking-tight">{ASSETS.length} ativos monitorados</h2>
+        <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-10">
+          {ASSETS.map((a) => (
+            <div key={a.symbol} className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1.5 text-[12.5px]">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-[12px]">{a.glyph}</span>
+              <span className="min-w-0">
+                <span className="block font-semibold leading-tight">{a.symbol}</span>
+                <span className="block truncate text-[10.5px] text-muted-foreground">{a.name}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="jornada" className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <div>
+          <h2 id="jornada" className="text-2xl font-bold tracking-tight">Jornada: {content.lessonTitles.length} aulas</h2>
+          <p className="mt-2 text-[14px] leading-relaxed text-muted-foreground">Do funcionamento do Bitcoin à automação com agentes. Cada aula tem teste e uma prática dentro do próprio app, e o progresso fica salvo na sua conta.</p>
+        </div>
+        <ol className="grid gap-1.5 text-[13px] sm:grid-cols-2">
+          {content.lessonTitles.map((title, i) => (
+            <li key={title} className="flex gap-2 rounded-md border border-border bg-card px-3 py-2">
+              <span className="tabular w-5 shrink-0 text-muted-foreground">{i + 1}.</span>
+              {title}
+            </li>
+          ))}
+        </ol>
       </section>
 
       <section id="planos" aria-labelledby="pricing" className="scroll-mt-20">
         <h2 id="pricing" className="text-2xl font-bold tracking-tight">Planos</h2>
-        <p className="mt-2 text-[14px] text-muted-foreground">Comece com {data?.trialDays ?? 7} dias de teste completo. Depois, escolha o plano.</p>
+        <p className="mt-2 text-[14px] text-muted-foreground">Comece com {trial} dias de teste completo. Depois, escolha o plano.</p>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           {(["PRO", "ELITE"] as const).map((p) => {
             const l = data?.limits[p];
             const items =
               p === "PRO"
                 ? [
-                    "Dashboard, Scanner e Derivatives completos",
-                    "Binance, Bybit e OKX · spot e perpétuo · 1m a 1W",
+                    "Todas as ferramentas do menu principal",
+                    "Sinais do modelo de rompimento validado (4H e 1D)",
                     `${l?.monitors ?? "—"} monitores no servidor · ${l?.alerts ?? "—"} alertas`,
-                    `${l?.strategies ?? "—"} estratégias · backtest de 1 timeframe`,
+                    `${l?.strategies ?? "—"} estratégias próprias · backtest de 1 timeframe`,
                     `${l ? Math.round(l.historyDays / 30) : "—"} meses de histórico no backtest`,
-                    "AI Analyst: 100 consultas/dia",
+                    "Análise por IA: 100 consultas/dia",
                   ]
                 : [
                     "Tudo do PRO",
                     "Backtest multi-timeframe",
                     `${l ? Math.round(l.historyDays / 365) : "—"} anos de histórico no backtest`,
                     `${l?.monitors ?? "—"} monitores · ${l?.alerts ?? "—"} alertas · ${l?.strategies ?? "—"} estratégias`,
-                    "AI Analyst: 500 consultas/dia",
+                    "Análise por IA: 500 consultas/dia",
                   ];
             return (
               <div key={p} className={cn("flex flex-col rounded-xl border bg-card p-5", p === "ELITE" ? "border-primary/40" : "border-border")}>
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold">{p}</h3>
-                  {p === "PRO" ? <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">Mais escolhido</span> : null}
                 </div>
                 <div className="mt-2">
                   <span className="tabular text-3xl font-bold">{data ? `R$ ${data.prices[p]}` : "—"}</span>
@@ -159,7 +282,7 @@ export function Landing() {
                   ))}
                 </ul>
                 <Link href="/registro?next=/planos" className="mt-5 flex h-10 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110">
-                  Começar teste de {data?.trialDays ?? 7} dias
+                  Começar teste de {trial} dias
                 </Link>
               </div>
             );
@@ -187,7 +310,7 @@ export function Landing() {
 
       <section className="rounded-xl border border-border bg-card p-6 text-center">
         <ShieldCheck className="mx-auto h-6 w-6 text-primary" aria-hidden />
-        <h2 className="mt-2 text-xl font-bold">Teste o workspace por {data?.trialDays ?? 7} dias</h2>
+        <h2 className="mt-2 text-xl font-bold">Teste todas as ferramentas por {trial} dias</h2>
         <p className="mt-1 text-[13.5px] text-muted-foreground">Sem cartão, sem chaves de API.</p>
         <Link href="/registro?next=/" className="mt-4 inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-semibold text-primary-foreground hover:brightness-110">
           Criar conta

@@ -311,8 +311,8 @@ function BuilderInner() {
   return (
     <PageShell className="max-w-[1500px]">
       <PageTitle
-        title="Strategies"
-        description="Regras AND/OR com timeframe por condição (multi-timeframe nativo). A mesma estratégia roda no Market Scanner, no Market Monitor e no Backtest. Tudo sobre candles fechados."
+        title="Construtor de estratégias"
+        description="Regras AND/OR com timeframe por condição (multi-timeframe nativo). A mesma estratégia roda no Scanner de setups, nos Monitores e no Backtest. Tudo sobre candles fechados."
       />
       {error ? <Alert variant="danger">{(error as Error).message}</Alert> : null}
       <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -434,7 +434,7 @@ function BuilderInner() {
                     {scan.rows.map((r) => (
                       <tr key={r.symbol} className="border-t border-border/60">
                         <td className="px-2 py-1 font-medium">
-                          <Link href={`/?symbol=${r.symbol}&exchange=${exchange}&instrument=${instrument}`} className="hover:underline">
+                          <Link href={`/charts/${r.symbol}?exchange=${exchange}&instrument=${instrument}`} className="hover:underline">
                             {r.symbol}/USDT
                           </Link>
                         </td>

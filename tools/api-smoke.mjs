@@ -724,6 +724,22 @@ await test("R2", "Strategies: catálogo, criar, avaliar, varrer universo, editar
   return `${cat.json.data.catalog.features.length} features · BTC OKX perp ${ev.json.data.pass ? "atende" : "não atende"} · universo ${passing}/${sc.json.data.rows.length} atendem`;
 });
 
+await test("v3", "Sinais do modelo validado: posições abertas e saídas recentes (motor do backtest); anônimo → 401", async () => {
+  const anon = await call("GET", "/api/signals/breakout", { auth: false });
+  expectStatus(anon, 401);
+  const r = await call("GET", "/api/signals/breakout");
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(d.models.length >= 2 && d.models.every((m) => /Fora da amostra/.test(m.validation.summary)), "modelos validados ausentes");
+  expect(Array.isArray(d.active) && Array.isArray(d.recent), "formato inválido");
+  for (const a of d.active) {
+    expect(a.stop < a.price && a.stopDistancePct >= 0, `${a.symbol} ${a.tf}: stop acima do preço numa posição aberta`);
+    expect(a.initialStop < a.entry && a.stop >= a.initialStop, `${a.symbol} ${a.tf}: stop inicial/móvel incoerente`);
+    expect(["4h", "1d"].includes(a.tf), `timeframe ${a.tf}`);
+  }
+  return `${d.active.length} abertas (${d.active.filter((a) => a.tf === "4h").length} 4H) · ${d.recent.length} saídas em 30 dias · erros ${d.errors.length}`;
+});
+
 await test("R2", "Market Monitor: criar, duplicado → 409, listar, eventos, pausar, excluir", async () => {
   const c = await call("POST", "/api/monitors", { body: { symbol: "BTC", timeframe: "4h", exchange: "binance", instrument: "spot", kind: "SETUP" } });
   expectStatus(c, 201);

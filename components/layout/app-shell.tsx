@@ -7,15 +7,11 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
   Bell,
-  BookOpen,
   Briefcase,
   CandlestickChart,
   ChevronDown,
-  FlaskConical,
-  Gauge,
-  Globe2,
   HelpCircle,
-  LayoutDashboard,
+  Home,
   LogIn,
   LogOut,
   Menu,
@@ -25,12 +21,11 @@ import {
   Eye,
   EyeOff,
   Settings,
-  ShieldCheck,
-  Star,
   Sun,
-  Workflow,
   X,
 } from "lucide-react";
+import { ADVANCED_TOOLS, MAIN_TOOLS, type Tool } from "@/lib/tools";
+import { toolIconComponent } from "@/components/layout/tool-icon";
 import { AiAnalystButton } from "@/components/terminal/ai-analyst";
 import { useActiveSelection } from "@/hooks/use-market-selection";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -47,54 +42,39 @@ import { formatPct, formatPrice } from "@/lib/format";
 import type { VenueStatus } from "@/services/market/venues";
 import { cn } from "@/lib/utils";
 
-type NavLink = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match?: string[] };
+type NavLink = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match?: string[]; exact?: boolean };
 
-/** Navegação comercial (sidebar). Indicadores individuais vivem dentro de Charts. */
-export const PRIMARY_NAV: NavLink[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/panorama", label: "Markets", icon: Globe2, match: ["/panorama", "/bubbles"] },
-  { href: "/scanner", label: "Market Scanner", icon: Radar },
-  { href: "/monitor", label: "Market Monitor", icon: Activity, match: ["/monitor", "/sentinela"] },
-  { href: "/charts", label: "Charts", icon: CandlestickChart, match: ["/charts", "/graficos", "/terminal", "/fibonacci"] },
-  { href: "/derivatives", label: "Derivatives", icon: Gauge },
-  { href: "/strategies", label: "Strategies", icon: Workflow, match: ["/strategies", "/agentes"] },
-  { href: "/backtest", label: "Backtest", icon: FlaskConical, match: ["/backtest", "/estatisticas"] },
-  { href: "/risco", label: "Risk Management", icon: ShieldCheck },
-  { href: "/carteira", label: "Portfolio", icon: Briefcase },
-];
+const fromTool = (t: Tool): NavLink => ({ href: t.href, label: t.name, icon: toolIconComponent(t.icon), match: t.match, exact: t.exact });
 
-const SECONDARY_NAV: NavLink[] = [
-  { href: "/carteira", label: "Watchlists", icon: Star },
-  { href: "/carteira?tab=alerts", label: "Alerts", icon: Bell },
-];
+/** Menu principal: uma ferramenta por finalidade (lib/tools.ts). */
+const PRIMARY_NAV: NavLink[] = MAIN_TOOLS.map(fromTool);
+
+/** Grupo recolhido "Avançado": análise profunda. */
+const ADVANCED_NAV: NavLink[] = ADVANCED_TOOLS.map(fromTool);
 
 const FOOT_NAV: NavLink[] = [
-  { href: "/preferencias", label: "Settings", icon: Settings },
-  { href: "/suporte", label: "Help & Support", icon: HelpCircle },
+  { href: "/planos", label: "Planos", icon: Briefcase },
+  { href: "/suporte", label: "Suporte", icon: HelpCircle },
+  { href: "/preferencias", label: "Preferências", icon: Settings },
 ];
 
-/** Páginas fora da sidebar, acessíveis pela busca global. */
+/** Páginas fora do menu, acessíveis pela busca global. */
 const EXTRA_PAGES: NavLink[] = [
-  { href: "/scanner/padroes", label: "Chart Patterns Scanner", icon: Radar },
-  { href: "/agentes", label: "AI Agents (classic)", icon: Workflow },
-  { href: "/sentinela", label: "Sentinel (classic)", icon: Activity },
-  { href: "/estatisticas", label: "Pattern Statistics", icon: FlaskConical },
-  { href: "/jornada", label: "Academy", icon: BookOpen },
-  { href: "/bubbles", label: "Market Bubbles", icon: Globe2 },
-  { href: "/planos", label: "Plans & Billing", icon: Briefcase },
-  { href: "/status", label: "System Status", icon: Activity },
+  { href: "/terminal", label: "Terminal", icon: CandlestickChart },
+  { href: "/carteira?tab=alerts", label: "Alertas de preço", icon: Bell },
+  { href: "/status", label: "Estado do sistema", icon: Activity },
 ];
 
 const MOBILE_NAV: NavLink[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/scanner", label: "Scanner", icon: Radar },
-  { href: "/monitor", label: "Monitor", icon: Activity },
-  { href: "/risco", label: "Risk", icon: ShieldCheck },
+  { href: "/", label: "Início", icon: Home, exact: true },
+  { href: "/scanner/padroes", label: "Scanner", icon: Radar, match: ["/scanner/padroes"] },
+  { href: "/graficos", label: "Gráficos", icon: CandlestickChart },
+  { href: "/carteira", label: "Carteira", icon: Briefcase },
 ];
 
 function isActive(pathname: string, l: NavLink) {
   const roots = l.match ?? [l.href.split("?")[0] as string];
-  return roots.some((r) => (r === "/" ? pathname === "/" : pathname === r || pathname.startsWith(r + "/")));
+  return roots.some((r) => (r === "/" || l.exact ? pathname === r : pathname === r || pathname.startsWith(r + "/")));
 }
 
 export function BrandMark({ compact }: { compact?: boolean }) {
@@ -129,10 +109,10 @@ function TrialCard() {
   if (data.status !== "TRIALING")
     return (
       <div className="mx-3 rounded-lg border border-warning/40 bg-warning/10 p-3">
-        <div className="text-[13px] font-semibold">{data.status === "PAST_DUE" ? "Payment pending" : "Trial ended"}</div>
+        <div className="text-[13px] font-semibold">{data.status === "PAST_DUE" ? "Pagamento pendente" : "Teste encerrado"}</div>
         <div className="mt-0.5 text-[11px] text-muted-foreground">Sua conta e configurações continuam salvas.</div>
         <Link href="/planos" className="mt-2 flex h-8 items-center justify-center rounded-md bg-primary text-[12.5px] font-semibold text-primary-foreground hover:brightness-110">
-          Choose Your Plan
+          Escolher plano
         </Link>
       </div>
     );
@@ -143,9 +123,9 @@ function TrialCard() {
   return (
     <div className={cn("mx-3 rounded-lg border p-3", level === "high" ? "border-warning/40 bg-warning/5" : "border-border bg-elevated")}>
       <div className="flex items-center justify-between text-[12.5px]">
-        <span className="font-semibold">Trial</span>
+        <span className="font-semibold">Teste grátis</span>
         <span className={cn("tabular", level === "high" ? "text-warning" : "text-muted-foreground")}>
-          {left} {left === 1 ? "day" : "days"} left
+          {left} {left === 1 ? "dia" : "dias"}
         </span>
       </div>
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
@@ -158,7 +138,7 @@ function TrialCard() {
           level === "low" ? "border border-border text-muted-foreground hover:text-foreground" : "bg-primary text-primary-foreground hover:brightness-110",
         )}
       >
-        View Plans
+        Ver planos
       </Link>
     </div>
   );
@@ -186,23 +166,37 @@ function SideLink({ l, pathname, onClick, badge }: { l: NavLink; pathname: strin
 
 function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   const { selection } = useActiveSelection();
-  const nav = PRIMARY_NAV.map((l) => (l.href === "/charts" ? { ...l, href: `/charts/${selection.symbol}?tf=${selection.timeframe}&exchange=${selection.exchange}&instrument=${selection.instrument}` } : l));
+  const inAdvanced = ADVANCED_NAV.some((l) => isActive(pathname, l));
+  const [advancedOpen, setAdvancedOpen] = useLocalStorage<boolean>("cs-nav-advanced", false);
+  const open = advancedOpen || inAdvanced;
+  const advanced = ADVANCED_NAV.map((l) => (l.href === "/charts" ? { ...l, href: `/charts/${selection.symbol}?tf=${selection.timeframe}&exchange=${selection.exchange}&instrument=${selection.instrument}` } : l));
   return (
     <div className="flex h-full flex-col gap-3 py-3">
       <div className="px-4 pb-1">
         <BrandMark />
       </div>
-      <nav className="flex flex-col gap-0.5 px-2" aria-label="Principal">
-        {nav.map((l) => (
-          <SideLink key={l.label} l={l} pathname={pathname} onClick={onNavigate} />
+      <nav className="flex flex-col gap-0.5 px-2" aria-label="Ferramentas">
+        {PRIMARY_NAV.map((l) => (
+          <SideLink key={l.href} l={l} pathname={pathname} onClick={onNavigate} />
         ))}
       </nav>
-      <div className="mx-4 h-px bg-border" />
-      <nav className="flex flex-col gap-0.5 px-2" aria-label="Listas e alertas">
-        {SECONDARY_NAV.map((l) => (
-          <SideLink key={l.label} l={l} pathname={pathname} onClick={onNavigate} />
-        ))}
-      </nav>
+      <div className="px-2">
+        <button
+          onClick={() => setAdvancedOpen(!open)}
+          aria-expanded={open}
+          className="flex h-8 w-full items-center gap-2 rounded-md px-3 text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          Avançado
+          <ChevronDown className={cn("ml-auto h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+        </button>
+        {open ? (
+          <nav className="mt-0.5 flex flex-col gap-0.5" aria-label="Ferramentas avançadas">
+            {advanced.map((l) => (
+              <SideLink key={l.label} l={l} pathname={pathname} onClick={onNavigate} />
+            ))}
+          </nav>
+        ) : null}
+      </div>
       <div className="mt-auto flex flex-col gap-3">
         <TrialCard />
         <nav className="flex flex-col gap-0.5 px-2" aria-label="Conta">
@@ -230,7 +224,7 @@ function TickerStrip({ hidden, onToggle }: { hidden: boolean; onToggle: () => vo
         const t = bySymbol.get(s);
         const a = ASSETS.find((x) => x.symbol === s);
         return (
-          <Link key={s} href={`/?symbol=${s}`} className="flex items-center gap-2 text-xs hover:opacity-80">
+          <Link key={s} href={`/graficos?symbol=${s}`} className="flex items-center gap-2 text-xs hover:opacity-80">
             <span className="grid h-6 w-6 place-items-center rounded-full bg-muted text-[12px]">{a?.glyph}</span>
             <span className="leading-tight">
               <span className="block font-semibold text-muted-foreground">{s}</span>
@@ -271,15 +265,15 @@ function MarketDataStatus() {
       <DropdownMenuTrigger asChild>
         <button
           className={cn("hidden h-8 items-center gap-2 rounded-md border border-border px-3 text-xs font-semibold hover:bg-muted sm:inline-flex", live ? "text-success" : "text-warning")}
-          aria-label="Market Data Status"
+          aria-label="Estado dos dados de mercado"
         >
           <span className={cn("h-2 w-2 rounded-full", live ? "bg-success live-dot" : "bg-warning")} />
-          {live ? "Live Markets" : data ? (data.stale ? "Data from cache" : `Delayed ${age}s`) : "Connecting…"}
+          {live ? "Ao vivo" : data ? (data.stale ? "Dados em cache" : `Atraso ${age}s`) : "Conectando…"}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 p-0">
         <div className="border-b border-border px-3 py-2">
-          <div className="text-[13px] font-semibold">Market Data Status</div>
+          <div className="text-[13px] font-semibold">Estado dos dados de mercado</div>
           <div className="text-[11px] text-muted-foreground">
             Contexto ativo: {selection.symbol}/USDT · {VENUE_LABEL[selection.exchange]} {INSTRUMENT_LABEL[selection.instrument]} · {selection.timeframe.toUpperCase()}
           </div>
@@ -305,7 +299,7 @@ function MarketDataStatus() {
         <div className="border-t border-border px-3 py-2 text-[10.5px] text-muted-foreground">
           LIVE &lt; 1,5 s · DEGRADED lento · DELAYED dado antigo · OFFLINE sem resposta. Detalhes em{" "}
           <Link href="/status" className="text-primary underline">
-            System Status
+            Estado do sistema
           </Link>
           .
         </div>
@@ -351,7 +345,7 @@ function NotificationsBell() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 p-0">
         <div className="border-b border-border px-3 py-2 text-[13px] font-semibold">Notificações</div>
-        {data && data.items.length === 0 ? <p className="px-3 py-3 text-[12px] text-muted-foreground">Sem eventos. Crie monitores no Market Monitor.</p> : null}
+        {data && data.items.length === 0 ? <p className="px-3 py-3 text-[12px] text-muted-foreground">Sem eventos. Crie agentes ou monitores para receber avisos.</p> : null}
         <ul className="max-h-96 divide-y divide-border overflow-y-auto">
           {(data?.items ?? []).map((e) => (
             <li key={e.id} className={cn("px-3 py-2 text-[12px]", !e.readAt && "bg-primary/5")}>
@@ -362,7 +356,7 @@ function NotificationsBell() {
           ))}
         </ul>
         <Link href="/monitor" className="block border-t border-border px-3 py-2 text-center text-[12px] text-primary hover:bg-muted">
-          Abrir Market Monitor
+          Abrir monitores
         </Link>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -396,9 +390,9 @@ function UserMenu() {
         <DropdownMenuLabel>
           {user.email} · {user.plan}
         </DropdownMenuLabel>
-        <DropdownMenuItem onSelect={() => router.push("/preferencias")}>Settings</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => router.push("/planos")}>Plans & billing</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => router.push("/status")}>System health</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => router.push("/preferencias")}>Preferências</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => router.push("/planos")}>Planos e pagamento</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => router.push("/status")}>Estado do sistema</DropdownMenuItem>
         {user.role === "ADMIN" ? <DropdownMenuItem onSelect={() => router.push("/admin")}>Admin</DropdownMenuItem> : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -420,9 +414,8 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
   const router = useRouter();
   const term = q.trim().toLowerCase();
   const assets = ASSETS.filter((a) => !term || a.symbol.toLowerCase().includes(term) || a.name.toLowerCase().includes(term)).slice(0, 8);
-  const pages = [...PRIMARY_NAV, ...SECONDARY_NAV, ...FOOT_NAV, ...EXTRA_PAGES].filter((n) => term && n.label.toLowerCase().includes(term));
-  const STRATEGIES = ["Structure Pullback", "Breakout", "Liquidity Sweep", "EMA Trend", "Mean Reversion"].filter((i) => term && i.toLowerCase().includes(term));
-  const INDICATORS = ["EMA", "RSI", "MACD", "ATR", "Bollinger", "VWAP", "Fibonacci", "Volume Profile"].filter((i) => term && i.toLowerCase().includes(term));
+  const pages = [...PRIMARY_NAV, ...ADVANCED_NAV, ...FOOT_NAV, ...EXTRA_PAGES].filter((n) => term && n.label.toLowerCase().includes(term));
+  const INDICATORS = ["EMA", "RSI", "MACD", "ATR", "Bollinger", "StochRSI"].filter((i) => term && i.toLowerCase().includes(term));
   const go = (href: string) => {
     onOpenChange(false);
     setQ("");
@@ -439,8 +432,8 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && assets[0] && go(`/?symbol=${assets[0].symbol}`)}
-              placeholder="Search markets, pairs, strategies, indicators..."
+              onKeyDown={(e) => e.key === "Enter" && assets[0] && go(`/graficos?symbol=${assets[0].symbol}`)}
+              placeholder="Buscar ativo, ferramenta ou indicador…"
               className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-9 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
             />
             {q ? (
@@ -451,24 +444,19 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
           </div>
         </DialogHeader>
         <div className="max-h-80 overflow-y-auto p-2 text-sm">
-          {STRATEGIES.map((i) => (
-            <button key={i} onClick={() => go(`/agentes?template=${encodeURIComponent(i)}`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
-              <Workflow className="h-4 w-4 text-muted-foreground" /> {i} <span className="ml-auto text-xs text-muted-foreground">strategy</span>
-            </button>
-          ))}
           {pages.map((p) => (
             <button key={p.label} onClick={() => go(p.href)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
               <p.icon className="h-4 w-4 text-muted-foreground" /> {p.label}
             </button>
           ))}
           {INDICATORS.map((i) => (
-            <button key={i} onClick={() => go(`/?ind=${encodeURIComponent(i)}`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
-              <CandlestickChart className="h-4 w-4 text-muted-foreground" /> {i} <span className="ml-auto text-xs text-muted-foreground">indicator</span>
+            <button key={i} onClick={() => go(`/graficos`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
+              <CandlestickChart className="h-4 w-4 text-muted-foreground" /> {i} <span className="ml-auto text-xs text-muted-foreground">indicador · Gráficos</span>
             </button>
           ))}
-          <div className="px-2 pb-1 pt-2 text-[11px] uppercase tracking-wide text-muted-foreground">Markets</div>
+          <div className="px-2 pb-1 pt-2 text-[11px] uppercase tracking-wide text-muted-foreground">Ativos</div>
           {assets.map((a) => (
-            <button key={a.symbol} onClick={() => go(`/?symbol=${a.symbol}`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
+            <button key={a.symbol} onClick={() => go(`/graficos?symbol=${a.symbol}`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
               <span className="w-5 text-center text-muted-foreground">{a.glyph}</span>
               <span className="font-semibold">{a.symbol}/USDT</span>
               <span className="text-muted-foreground">{a.name}</span>
@@ -519,7 +507,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="Buscar (Ctrl+K)"
           >
             <Search className="h-4 w-4 shrink-0" />
-            <span className="truncate">Search markets, pairs, strategies, indicators...</span>
+            <span className="truncate">Buscar ativo, ferramenta ou indicador…</span>
             <kbd className="ml-auto hidden rounded border border-border px-1.5 text-[10px] sm:inline">⌘ K</kbd>
           </button>
           <TickerStrip hidden={hideTickers} onToggle={() => setHideTickers(!hideTickers)} />
@@ -568,7 +556,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         })}
         <button onClick={() => setMenu(true)} className="flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] text-muted-foreground" aria-label="Mais">
           <Menu className="h-5 w-5" />
-          More
+          Mais
         </button>
       </nav>
 

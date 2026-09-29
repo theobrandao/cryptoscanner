@@ -23,7 +23,6 @@ import { apiFetch, ApiClientError, postJson } from "@/lib/client-api";
 import type { MarketContext } from "@/services/market-context-service";
 import type { SetupRow } from "@/services/market-overview-service";
 import type { Timeframe } from "@/types/market";
-import { Landing } from "@/components/marketing/landing";
 import { OnboardingCard } from "@/components/terminal/onboarding-card";
 import { trackClient } from "@/lib/analytics-client";
 
@@ -378,13 +377,13 @@ function RightColumn({ ctx, overlays, setOverlays, onViewChart, onSwitchPerp }: 
         </Panel>
       ) : (
         <Panel title="Alerts">
-          <p className="text-[12.5px] text-muted-foreground">Alertas de preço, indicador, padrão e volume para {ctx.symbol} ficam em Portfolio → Alertas; monitores de setup contínuos no Market Monitor.</p>
+          <p className="text-[12.5px] text-muted-foreground">Alertas de preço, indicador, padrão e volume para {ctx.symbol} ficam em Carteira → Alertas; vigilância contínua na Sentinela.</p>
           <div className="mt-3 flex gap-2">
             <Link href={`/carteira?tab=alerts&symbol=${ctx.symbol}`} className="flex h-9 flex-1 items-center justify-center rounded-md bg-primary text-[13px] font-semibold text-primary-foreground">
               Create alert
             </Link>
             <Link href="/sentinela" className="flex h-9 flex-1 items-center justify-center rounded-md border border-border text-[13px]">
-              Market Monitor
+              Sentinela
             </Link>
           </div>
         </Panel>
@@ -397,7 +396,7 @@ function RightColumn({ ctx, overlays, setOverlays, onViewChart, onSwitchPerp }: 
 
 function AccessOrError({ error, sel, onReset }: { error: unknown; sel: MarketSelection; onReset: () => void }) {
   const status = error instanceof ApiClientError ? error.status : 0;
-  const next = encodeURIComponent(`/?symbol=${sel.symbol}&tf=${sel.timeframe}&exchange=${sel.exchange}&instrument=${sel.instrument}`);
+  const next = encodeURIComponent(`/charts/${sel.symbol}?tf=${sel.timeframe}&exchange=${sel.exchange}&instrument=${sel.instrument}`);
   if (status === 401)
     return (
       <div className="mx-auto mt-10 max-w-xl rounded-xl border border-border bg-card p-6 text-center">
@@ -505,7 +504,6 @@ export function TerminalWorkspace({ symbol: routeSymbol, mode = "dashboard" }: {
     if (loggedIn && mode === "dashboard") trackClient("dashboard_view");
   }, [loggedIn, mode]);
 
-  if (anon && mode === "dashboard") return <Landing />;
 
   return (
     <div className="flex flex-col gap-3 p-3">

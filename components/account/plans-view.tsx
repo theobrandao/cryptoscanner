@@ -20,21 +20,20 @@ interface SubPayload extends AccessView {
 
 const FEATURES: Record<"PRO" | "ELITE", string[]> = {
   PRO: [
-    "Dashboard completo: estrutura, liquidez, suporte/resistência, Confluence Score auditável, setup e gatilho",
-    "Binance, Bybit e OKX · spot e perpétuo · timeframes de 1m a 1W",
-    "Market Scanner com filtros e estratégias salvas",
-    "Market Monitor no servidor: 5 monitores, 50 alertas, push e Telegram",
-    "Strategy Builder: 10 estratégias",
-    "Backtest do setup e de estratégias de um timeframe, com taxas, slippage e funding · 1 ano de histórico",
-    "Derivatives: OI, funding, basis e CVD por exchange",
-    "AI Analyst com números verificados: 100 consultas/dia",
+    "Todas as ferramentas: Scanner, Agentes IA, Sentinela, Gráficos, Fibonacci, Carteira, Simulador e Jornada",
+    "Sinais do modelo de rompimento validado fora da amostra (4H e 1D)",
+    "Avançado: Análise completa, Scanner de setups, Derivativos (Binance, Bybit e OKX) e Gestão de risco",
+    "5 monitores no servidor, 50 alertas, push e Telegram",
+    "Construtor de estratégias: 10 estratégias",
+    "Backtest de um timeframe com taxas, slippage e funding · 1 ano de histórico",
+    "Análise por IA com números verificados: 100 consultas/dia",
   ],
   ELITE: [
     "Tudo do PRO",
     "Backtest multi-timeframe",
     "3 anos de histórico no backtest",
     "20 monitores, 200 alertas e 50 estratégias",
-    "AI Analyst: 500 consultas/dia",
+    "Análise por IA: 500 consultas/dia",
   ],
 };
 

@@ -1,17 +1,32 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
-import { TerminalWorkspace } from "@/components/terminal/workspace";
+import { redirect } from "next/navigation";
+import { HomeEntry } from "@/components/home/home-view";
+import { LESSONS } from "@/lib/content/lessons";
+import { STRATEGY_TEMPLATES } from "@/lib/strategies/definition";
 
 export const metadata: Metadata = {
-  title: "Dashboard — CryptoScanner Market Intelligence",
-  description: "Workspace de inteligência de mercado cripto: gráfico, estrutura, liquidez, suporte/resistência, Confluence Score, derivativos (Binance, Bybit, OKX), histórico do setup e risco no mesmo contexto.",
+  title: "CryptoScanner — scanner cripto com sinais validados",
+  description: "Padrões gráficos, agentes com alertas, sinais de rompimento validados fora da amostra, gráficos, Fibonacci, simulador e aulas. Teste grátis de 7 dias.",
 };
 
-/** Dashboard = Market Intelligence Workspace. Contexto global na URL: ?symbol=&tf=&exchange=&instrument= */
-export default function DashboardPage() {
-  return (
-    <Suspense>
-      <TerminalWorkspace mode="dashboard" />
-    </Suspense>
-  );
+/**
+ * Visitante: página de venda. Usuário logado: Início (mercado agora, sinais ativos e ferramentas).
+ * Links antigos do Dashboard (/?symbol=…) seguem para a Análise completa do ativo.
+ */
+export default async function HomePage({ searchParams }: PageProps<"/">) {
+  const sp = await searchParams;
+  const symbol = typeof sp.symbol === "string" ? sp.symbol.toUpperCase().replace(/[^A-Z0-9]/g, "") : "";
+  if (symbol) {
+    const q = new URLSearchParams();
+    for (const k of ["tf", "exchange", "instrument"]) {
+      const v = sp[k];
+      if (typeof v === "string") q.set(k, v);
+    }
+    redirect(`/charts/${symbol}${q.size ? `?${q.toString()}` : ""}`);
+  }
+  const landing = {
+    validated: STRATEGY_TEMPLATES.filter((t) => t.validation).map((t) => ({ name: t.name, description: t.description, validation: t.validation! })),
+    lessonTitles: LESSONS.map((l) => l.title),
+  };
+  return <HomeEntry landing={landing} />;
 }

@@ -26,10 +26,10 @@ export function AiAnalystButton({ className }: { className?: string }) {
           trackClient("analyst_open");
         }}
         className={cn("inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-foreground hover:border-primary/50 hover:bg-muted", className)}
-        aria-label="AI Analyst"
+        aria-label="Analista IA"
       >
         <Bot className="h-4 w-4 text-primary" />
-        <span className="hidden md:inline">AI Analyst</span>
+        <span className="hidden md:inline">Analista IA</span>
       </button>
       <AiAnalystPanel open={open} onOpenChange={setOpen} />
     </>
@@ -92,7 +92,7 @@ export function AiAnalystPanel({ open, onOpenChange }: { open: boolean; onOpenCh
       <DialogContent className="left-auto right-0 top-0 h-full max-h-screen w-full max-w-[440px] translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-l p-0 sm:rounded-none">
         <DialogHeader className="border-b border-border p-4 text-left">
           <DialogTitle className="flex items-center gap-2 text-base">
-            <Bot className="h-4 w-4 text-primary" /> AI Analyst
+            <Bot className="h-4 w-4 text-primary" /> Analista IA
           </DialogTitle>
           <DialogDescription className="text-xs">
             {selection.symbol}/USDT · {VENUE_LABEL[selection.exchange]} {INSTRUMENT_LABEL[selection.instrument]} · {selection.timeframe.toUpperCase()} — usa só os números do contexto exibido.
@@ -104,7 +104,7 @@ export function AiAnalystPanel({ open, onOpenChange }: { open: boolean; onOpenCh
               <Link href="/login" className="text-primary underline">
                 Entre
               </Link>{" "}
-              ou comece o teste de 7 dias para usar o AI Analyst.
+              ou comece o teste de 7 dias para usar o Analista IA.
             </p>
           ) : null}
           {busy && !reply ? (

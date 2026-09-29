@@ -62,15 +62,19 @@ for (let i = 0; i < 2; i++) {
 consoleErrors.length = 0;
 
 // ------------------------------------------------------------ páginas públicas
-await step("Dashboard (anônimo): landing de venda com preços, teste de 7 dias e AI Analyst neutro", async () => {
+await step("Início (anônimo): página de venda com ferramentas, números fora da amostra, simulador, preços e teste de 7 dias", async () => {
   await goto("/");
-  await page.waitForFunction(() => /Contexto de mercado cripto completo/.test(document.body.innerText) && /Começar teste de 7 dias/.test(document.body.innerText) && /R\$ \d+/.test(document.body.innerText), null, { timeout: 30_000 });
-  await page.getByRole("button", { name: "Market Data Status" }).first().waitFor({ timeout: 10_000 }).catch(() => {});
-  const analyst = await page.getByRole("button", { name: "AI Analyst" }).count();
-  expect(analyst >= 1, "botão AI Analyst ausente na barra superior");
+  await page.waitForFunction(() => /Ferramentas claras para operar cripto/.test(document.body.innerText) && /Começar teste de 7 dias/.test(document.body.innerText) && /R\$ \d+/.test(document.body.innerText) && /Fora da amostra/.test(document.body.innerText), null, { timeout: 30_000 });
+  const t = await page.locator("body").innerText();
+  for (const tool of ["Scanner", "Agentes IA", "Sentinela", "Gráficos", "Fibonacci", "Carteira", "Simulador", "Jornada"]) expect(t.includes(tool), `ferramenta ${tool} ausente na página de venda`);
+  expect(!/Depoimento|depoimento/.test(t), "depoimento na página (não há depoimentos reais)");
+  await page.getByRole("button", { name: /Simular com preços reais/ }).click();
+  await page.waitForFunction(() => /Valor final/.test(document.body.innerText) && /simulação histórica, não projeção/.test(document.body.innerText), null, { timeout: 60_000 });
+  const analyst = await page.getByRole("button", { name: "Analista IA" }).count();
+  expect(analyst >= 1, "botão Analista IA ausente na barra superior");
   const purple = await page.evaluate(() => [...document.querySelectorAll("*")].some((e) => /from-ai|to-ai/.test(e.getAttribute("class") ?? "")));
   expect(!purple, "gradiente roxo de IA ainda presente");
-  return await shot("dashboard-anonimo");
+  return await shot("inicio-anonimo");
 });
 
 await step("Scanner: tabela em tempo real com 30 linhas (inclui ZEC e ALGO) e RSI", async () => {
@@ -243,6 +247,21 @@ await step("Registro pela interface", async () => {
   const me = await page.evaluate(async () => (await (await fetch("/api/auth/me")).json()).data.user?.email);
   expect(me === EMAIL, `sessão não criada (${me})`);
   return `logado como ${me}`;
+});
+
+await step("Início (logado): mercado agora, sinais ativos do modelo validado, ferramentas; menu com uma ferramenta por finalidade", async () => {
+  await goto("/");
+  await page.waitForFunction(() => /Sinais ativos — rompimento validado/.test(document.body.innerText) && (/posições abertas pelo modelo/.test(document.body.innerText) || /Nenhuma posição aberta/.test(document.body.innerText)), null, { timeout: 120_000 });
+  const nav = await page.locator("nav[aria-label='Ferramentas']").first().innerText();
+  const items = ["Início", "Jornada", "Panorama", "Bolhas", "Scanner", "Agentes IA", "Sentinela", "Gráficos", "Fibonacci", "Carteira", "Simulador"];
+  for (const i of items) expect(nav.includes(i), `menu sem ${i}`);
+  for (const gone of ["Market Scanner", "Market Monitor", "Dashboard", "Strategies"]) expect(!nav.includes(gone), `menu principal ainda tem ${gone}`);
+  const adv = await page.locator("nav[aria-label='Ferramentas avançadas']").count();
+  expect(adv === 0, "grupo Avançado deveria começar recolhido");
+  await page.getByRole("button", { name: "Avançado" }).first().click();
+  await page.locator("nav[aria-label='Ferramentas avançadas']").first().waitFor({ timeout: 5_000 });
+  const rows = await page.locator("section[aria-label='Sinais ativos'] table tbody tr").count();
+  return `${rows} linhas de sinais · ${await shot("inicio-logado")}`;
 });
 
 await step("Tema claro/escuro e moeda BRL", async () => {
@@ -422,8 +441,9 @@ await step("Risco: tamanho de posição 10.000 × 1% com stop de 5% = 20 unidade
   return `qty 20 e liquidação 90,45 exibidas · ${await shot("risco")}`;
 });
 
-await step("Dashboard R2 BTC/USDT 4H: header, gráfico, estrutura, liquidez, confluência (Raw/Penalties/Final), setup, derivativos, histórico, watchlist, overview, scanner, risco", async () => {
+await step("Análise completa BTC/USDT 4H (link antigo /?symbol= redireciona): header, gráfico, estrutura, liquidez, confluência, setup, derivativos, histórico, risco", async () => {
   await goto("/?symbol=BTC&tf=4h&exchange=okx&instrument=perp");
+  await page.waitForFunction(() => location.pathname === "/charts/BTC", null, { timeout: 30_000 });
   const PANELS = ["Market Structure", "Liquidity", "Confluence Score", "Setup Status", "Derivatives", "Historical Performance", "Watchlist", "Market Overview", "Market Scanner", "Risk Management", "Raw", "Penalties", "Final", "Trigger Level", "Next Funding"];
   await page.waitForFunction((ps) => ps.every((t) => document.body.innerText.includes(t)), PANELS, { timeout: 90_000 });
   const canvases = await page.locator("canvas").count();
@@ -446,8 +466,8 @@ await step("Dashboard R2 BTC/USDT 4H: header, gráfico, estrutura, liquidez, con
   return `${canvases} canvas · OKX perp→spot, 4H→1D, BTC→ETH e /charts/SOL sincronizados · ${shot1}`;
 });
 
-await step("AI Analyst: painel lê o contexto ativo e só usa números do contexto", async () => {
-  await page.getByRole("button", { name: "AI Analyst" }).first().click();
+await step("Analista IA: painel lê o contexto ativo e só usa números do contexto", async () => {
+  await page.getByRole("button", { name: "Analista IA" }).first().click();
   await page.waitForFunction(() => /SOL\/USDT · Binance Spot · 1H/.test(document.body.innerText) && /Confluence Score/i.test(document.body.innerText) && /ESTRUTURA|Estrutura/.test(document.body.innerText), null, { timeout: 60_000 });
   const file = await shot("ai-analyst");
   await page.keyboard.press("Escape");
@@ -466,9 +486,9 @@ await step("Strategies: modelo → salvar → testar agora → rodar no universo
   return await shot("strategies");
 });
 
-await step("Market Scanner R2: 30 ativos com estado, score, regime, R:R; filtros", async () => {
+await step("Scanner de setups: 30 ativos com estado, score, regime, R:R; filtros", async () => {
   await goto("/scanner?tf=4h");
-  await page.waitForFunction(() => /Market Scanner/.test(document.body.innerText) && /de 30 ativos|de \d+ ativos/.test(document.body.innerText), null, { timeout: 120_000 });
+  await page.waitForFunction(() => /Scanner de setups/.test(document.body.innerText) && /de 30 ativos|de \d+ ativos/.test(document.body.innerText), null, { timeout: 120_000 });
   await page.getByLabel("Ocultar NO TRADE").uncheck();
   await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 25, null, { timeout: 30_000 });
   return await shot("market-scanner");

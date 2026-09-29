@@ -80,7 +80,7 @@ function DetailInner() {
             </button>
           ))}
         </div>
-        <Link href={`/?symbol=${symbol}&exchange=${prefer}&instrument=perp`} className="text-[12.5px] text-primary hover:underline">
+        <Link href={`/charts/${symbol}?exchange=${prefer}&instrument=perp`} className="text-[12.5px] text-primary hover:underline">
           Abrir no Dashboard →
         </Link>
       </div>
@@ -166,7 +166,7 @@ function DetailInner() {
 
 export function DerivativesDetailSection() {
   return (
-    <AccessGate feature="Derivatives — View Details">
+    <AccessGate feature="Derivativos — detalhes">
       <DetailInner />
     </AccessGate>
   );

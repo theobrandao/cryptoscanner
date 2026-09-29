@@ -103,7 +103,7 @@ function MonitorInner() {
   return (
     <PageShell className="max-w-[1400px]">
       <PageTitle
-        title="Market Monitor"
+        title="Monitores"
         description="Monitores rodam no servidor a cada ciclo (5 min): estado do setup (READY, TRIGGERED, INVALIDATED…) ou uma estratégia salva. Cada fato notifica uma única vez (deduplicação por impressão digital)."
       />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
@@ -197,7 +197,7 @@ function MonitorInner() {
               {(data?.items ?? []).map((m) => (
                 <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-[12.5px]">
                   <span className={cn("h-2 w-2 rounded-full", m.active ? (m.lastError ? "bg-warning" : "bg-success") : "bg-muted-foreground/50")} />
-                  <Link href={`/?symbol=${m.symbol}&tf=${m.timeframe}&exchange=${m.exchange}&instrument=${m.instrument}`} className="font-semibold hover:underline">
+                  <Link href={`/charts/${m.symbol}?tf=${m.timeframe}&exchange=${m.exchange}&instrument=${m.instrument}`} className="font-semibold hover:underline">
                     {m.symbol}/USDT {m.kind === "SETUP" ? m.timeframe.toUpperCase() : ""}
                   </Link>
                   <span className="text-muted-foreground">
@@ -248,7 +248,7 @@ function MonitorInner() {
 
 export function MonitorView() {
   return (
-    <AccessGate feature="Market Monitor">
+    <AccessGate feature="Monitores">
       <MonitorInner />
     </AccessGate>
   );
