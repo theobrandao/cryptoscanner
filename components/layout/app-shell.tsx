@@ -24,7 +24,7 @@ import {
   Sun,
   X,
 } from "lucide-react";
-import { ADVANCED_TOOLS, MAIN_TOOLS, type Tool } from "@/lib/tools";
+import { ADVANCED_TOOLS, MAIN_TOOLS, TOOL_CATEGORIES, type Tool } from "@/lib/tools";
 import { toolIconComponent } from "@/components/layout/tool-icon";
 import { AiAnalystButton } from "@/components/terminal/ai-analyst";
 import { useActiveSelection } from "@/hooks/use-market-selection";
@@ -42,9 +42,9 @@ import { formatPct, formatPrice } from "@/lib/format";
 import type { VenueStatus } from "@/services/market/venues";
 import { cn } from "@/lib/utils";
 
-type NavLink = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match?: string[]; exact?: boolean };
+type NavLink = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match?: string[]; exact?: boolean; badge?: string; category?: string };
 
-const fromTool = (t: Tool): NavLink => ({ href: t.href, label: t.name, icon: toolIconComponent(t.icon), match: t.match, exact: t.exact });
+const fromTool = (t: Tool): NavLink => ({ href: t.href, label: t.name, icon: toolIconComponent(t.icon), match: t.match, exact: t.exact, badge: t.badge, category: t.category });
 
 /** Menu principal: uma ferramenta por finalidade (lib/tools.ts). */
 const PRIMARY_NAV: NavLink[] = MAIN_TOOLS.map(fromTool);
@@ -160,6 +160,7 @@ function SideLink({ l, pathname, onClick, badge }: { l: NavLink; pathname: strin
       <Icon className="h-4 w-4 shrink-0" />
       <span className="truncate">{l.label}</span>
       {badge ? <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">{badge}</span> : null}
+      {!badge && l.badge ? <span className="ml-auto rounded-full bg-warning/15 px-1.5 py-px text-[10px] font-semibold text-warning">{l.badge}</span> : null}
     </Link>
   );
 }
@@ -176,9 +177,21 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
         <BrandMark />
       </div>
       <nav className="flex flex-col gap-0.5 px-2" aria-label="Ferramentas">
-        {PRIMARY_NAV.map((l) => (
+        {PRIMARY_NAV.filter((l) => l.category === "Início").map((l) => (
           <SideLink key={l.href} l={l} pathname={pathname} onClick={onNavigate} />
         ))}
+        {TOOL_CATEGORIES.map((c) => {
+          const items = PRIMARY_NAV.filter((l) => l.category === c.key);
+          if (!items.length) return null;
+          return (
+            <div key={c.key} className="mt-2 flex flex-col gap-0.5">
+              <span className="px-3 pb-0.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">{c.label}</span>
+              {items.map((l) => (
+                <SideLink key={l.href} l={l} pathname={pathname} onClick={onNavigate} />
+              ))}
+            </div>
+          );
+        })}
       </nav>
       <div className="px-2">
         <button

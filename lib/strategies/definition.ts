@@ -131,6 +131,8 @@ export interface TemplateValidation {
   summary: string;
   /** ressalvas que o usuário precisa ler antes de operar */
   caveats: string;
+  /** números fora da amostra (tools/research/validate-template.ts, motor do produto) */
+  metrics: { period: string; trades: number; expectancyR: number; profitFactor: number; winPct: number; assetsPositive: number; assetsTotal: number };
 }
 
 /** Modelos iniciais (o usuário ajusta e salva). */
@@ -155,6 +157,7 @@ export const STRATEGY_TEMPLATES: Array<{ name: string; description: string; defi
     },
     validation: {
       label: "Validado fora da amostra",
+      metrics: { period: "mar–set/2026", trades: 312, expectancyR: 0.3, profitFactor: 1.44, winPct: 30, assetsPositive: 21, assetsTotal: 30 },
       summary: "Motor do próprio app, 30 criptos (Binance spot), taxa 10 + slippage 5 bps por lado. Seleção em jun/2025–mar/2026 (290 trades, +0,37R). Fora da amostra, mar–set/2026: 312 trades, +0,30R por trade, PF 1,44, acerto 30%, 21 de 30 ativos positivos; entradas aleatórias com a mesma saída ficaram em +0,10R (p ≈ 0,04).",
       caveats: "Acerto de 30%: sequências longas de perdas. Carteira com todos os sinais a 0,5% de risco por trade: +55% e drawdown de 38% fora da amostra; limitada a 5 posições: +19% e 18%. Universo só com ativos listados hoje (viés de sobrevivência). Resultado passado não garante resultado futuro.",
     },
@@ -179,6 +182,7 @@ export const STRATEGY_TEMPLATES: Array<{ name: string; description: string; defi
     },
     validation: {
       label: "Validado com ressalva",
+      metrics: { period: "jul/2025–set/2026", trades: 64, expectancyR: 0.95, profitFactor: 3.16, winPct: 38, assetsPositive: 14, assetsTotal: 29 },
       summary: "Motor do próprio app, 30 criptos (Binance spot), taxa 10 + slippage 5 bps por lado. Seleção em abr/2024–jul/2025 (86 trades, +0,92R). Fora da amostra, jul/2025–set/2026: 64 trades, +0,95R por trade, PF 3,16, acerto 38%.",
       caveats: "Resultado fora da amostra concentrado: ZEC respondeu por 50R dos 61R; sem os 3 melhores ativos a soma é −0,3R (14 de 29 ativos positivos). Só funciona operando todos os sinais com risco pequeno por trade; amostra de 64 trades e viés de sobrevivência. Resultado passado não garante resultado futuro.",
     },

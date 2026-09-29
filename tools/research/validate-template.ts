@@ -4,7 +4,7 @@
  * Os números publicados no modelo saem daqui.
  *   npx tsx tools/research/validate-template.ts <history.json> "<nome do modelo>" [feeBps=10] [slipBps=5]
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import type { Candle, Timeframe } from "@/types/market";
 import { STRATEGY_TEMPLATES, executionTf } from "@/lib/strategies/definition";
 import { DEFAULT_COSTS, runSignals, strategySignals, type BtTrade } from "@/lib/backtest/engine";
@@ -14,7 +14,7 @@ type Hist = Record<string, Record<string, Candle[]>>;
 type T = BtTrade & { symbol: string };
 
 function main() {
-  const [, , file, name, feeArg = "10", slipArg = "5"] = process.argv;
+  const [, , file, name, feeArg = "10", slipArg = "5", curveOut] = process.argv;
   const tpl = STRATEGY_TEMPLATES.find((t) => t.name === name);
   if (!tpl) throw new Error(`modelo não encontrado: ${name}`);
   const def = tpl.definition;
@@ -48,6 +48,13 @@ function main() {
   const total = sorted.reduce((s, [, v]) => s + v, 0);
   const top3 = sorted.slice(0, 3).reduce((s, [, v]) => s + v, 0);
   console.log(`OOS amplitude: ${sorted.filter(([, v]) => v > 0).length}/${sorted.length} ativos positivos · top3 ${sorted.slice(0, 3).map(([s, v]) => `${s} ${v.toFixed(1)}`).join(", ")} · somaR sem top3 = ${(total - top3).toFixed(1)}`);
+  if (curveOut) {
+    // curva fora da amostra em R acumulado (ordem de saída), para exibir no site
+    const seq = [...oos].sort((a, b) => a.exitTime - b.exitTime);
+    let acc = 0;
+    const points = seq.map((t) => [t.exitTime, Math.round((acc += t.rNet) * 100) / 100] as const);
+    writeFileSync(curveOut, JSON.stringify({ model: name, from: seq[0]?.exitTime ?? null, to: seq[seq.length - 1]?.exitTime ?? null, trades: seq.length, points }));
+  }
   const bars = oos.map((t) => t.bars).sort((a, b) => a - b);
   console.log(`OOS duração mediana ${bars[Math.floor(bars.length / 2)]} candles · p90 ${bars[Math.floor(bars.length * 0.9)]} · custo médio ${mean(oos.map((t) => t.costR)).toFixed(3)}R`);
   // carteira: risco fixo por trade, sem limite e com limite de 5 posições; drawdown medido nas saídas

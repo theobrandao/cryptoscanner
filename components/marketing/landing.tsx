@@ -3,11 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Check, ShieldCheck } from "lucide-react";
-import { ToolIconView } from "@/components/layout/tool-icon";
-import { ASSETS } from "@/lib/assets";
+import { ArrowRight, Calculator, Check, ShieldCheck, Signal } from "lucide-react";
+import { MarketStrip, MoversCard, NewsCard } from "@/components/market/market-now";
+import { Chip, Eyebrow, LineChart, PillGroup, SectionHeading, StatTile, TickerMarquee, ToolsGrid } from "@/components/ui/showcase";
 import { postJson } from "@/lib/client-api";
-import { MAIN_TOOLS } from "@/lib/tools";
+import { MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 
 interface Prices {
@@ -17,15 +17,32 @@ interface Prices {
   limits: Record<"PRO" | "ELITE", { alerts: number; monitors: number; strategies: number; historyDays: number }>;
 }
 
+type Level = "iniciante" | "intermediario" | "avancado";
+
 /** Dados estáticos vindos do servidor (evita levar zod e o conteúdo das aulas para o bundle da página de venda). */
 export interface LandingData {
-  validated: Array<{ name: string; description: string; validation: { label: string; summary: string; caveats: string } }>;
-  lessonTitles: string[];
+  validated: Array<{
+    name: string;
+    description: string;
+    tf: string;
+    validation: { label: string; summary: string; caveats: string; metrics: { period: string; trades: number; expectancyR: number; profitFactor: number; winPct: number; assetsPositive: number; assetsTotal: number } };
+    /** R acumulado fora da amostra, em ordem de saída */
+    curve: number[];
+  }>;
+  lessons: Array<{ title: string; level: Level; minutes: number; summary: string }>;
+  patterns: number;
+  assets: number;
 }
+
+const LEVELS: Array<{ key: Level; label: string; tone: string; text: string }> = [
+  { key: "iniciante", label: "Iniciante", tone: "bg-success/15 text-success", text: "Bitcoin, candles, suportes e médias móveis." },
+  { key: "intermediario", label: "Intermediário", tone: "bg-warning/15 text-warning", text: "Indicadores, padrões do scanner, Fibonacci e gestão de risco." },
+  { key: "avancado", label: "Avançado", tone: "bg-danger/15 text-danger", text: "Derivativos, automação com agentes, psicologia e backtests." },
+];
 
 const FAQ = [
   ["O CryptoScanner recomenda compra ou venda?", "Não. As ferramentas calculam padrões, níveis e sinais com regras fixas e mostram de onde vem cada número. A decisão é sua. Não é recomendação de investimento."],
-  ["O que quer dizer \"validado fora da amostra\"?", "As regras do modelo foram escolhidas com dados de um período e medidas em outro período, que não foi usado na escolha. Só publicamos o modelo porque o resultado nesse segundo período foi positivo, com taxas e slippage. O setup que não passou nesse teste não é vendido como estratégia."],
+  ["O que quer dizer \"testado fora da amostra\"?", "As regras do modelo foram escolhidas com dados de um período e medidas em outro período, que não foi usado na escolha. Só publicamos o modelo porque o resultado nesse segundo período foi positivo, já descontando taxa e slippage. O setup que não passou nesse teste não é vendido como estratégia."],
   ["Preciso conectar minha corretora ou informar chaves de API?", "Não. Usamos apenas dados públicos de mercado. O CryptoScanner nunca pede chaves de API nem executa ordens."],
   ["O teste de 7 dias pede cartão?", "Não. O teste libera as funções do PRO por 7 dias. Ao final, o acesso é pausado até você escolher um plano; seus dados ficam salvos."],
   ["Como cancelo?", "Em Planos, a qualquer momento, sem multa. O acesso segue até o fim do período pago. Na primeira contratação, o pedido em até 7 dias garante reembolso integral."],
@@ -33,15 +50,14 @@ const FAQ = [
 ] as const;
 
 interface SimResult {
-  result: { totalInvested: number; finalValue: number; profitPct: number; maxDrawdownPct: number; startDate: number; endDate: number; contributions: number; input: { currency: string } };
+  result: { totalInvested: number; finalValue: number; profitPct: number; maxDrawdownPct: number; startDate: number; endDate: number; curve: Array<{ time: number; invested: number; value: number }> };
 }
 
-function brl(v: number, currency = "BRL") {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency, maximumFractionDigits: 0 }).format(v);
-}
+const brl = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(v);
+const R = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2).replace(".", ",")}R`;
 
-/** Simulador compacto (API pública, não salva nada). */
-function MiniSimulator() {
+/** Simulador de aportes (API pública, não salva nada): pílulas, controle deslizante e curva. */
+function Simulator() {
   const [symbol, setSymbol] = React.useState("BTC");
   const [strategy, setStrategy] = React.useState<"dca" | "lump_sum">("dca");
   const [amount, setAmount] = React.useState(500);
@@ -53,85 +69,71 @@ function MiniSimulator() {
     setBusy(true);
     setErr(null);
     try {
-      const body = strategy === "dca" ? { symbol, strategy, currency: "BRL", initialCapital: 0, monthlyContribution: amount, months, riskProfile: "arrojado" } : { symbol, strategy, currency: "BRL", initialCapital: amount, monthlyContribution: 0, months, riskProfile: "arrojado" };
-      const r = await postJson<SimResult>("/api/simulations/run", body);
-      setRes(r.result);
+      const body = { symbol, strategy, currency: "BRL", initialCapital: strategy === "dca" ? 0 : amount, monthlyContribution: strategy === "dca" ? amount : 0, months, riskProfile: "arrojado" };
+      setRes((await postJson<SimResult>("/api/simulations/run", body)).result);
     } catch (e) {
       setErr((e as Error).message || "Falha na simulação");
     } finally {
       setBusy(false);
     }
   };
-  const sel = "h-10 rounded-md border border-input bg-background px-2 text-sm";
+  const label = "mb-1.5 block text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground";
   return (
-    <div className="grid gap-4 rounded-xl border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <div className="grid grid-cols-2 gap-2 text-[13px]">
-        <label className="flex flex-col gap-1">
-          Ativo
-          <select className={sel} value={symbol} onChange={(e) => setSymbol(e.target.value)}>
-            {ASSETS.slice(0, 12).map((a) => (
-              <option key={a.symbol} value={a.symbol}>
-                {a.symbol} · {a.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          Forma
-          <select className={sel} value={strategy} onChange={(e) => setStrategy(e.target.value as "dca" | "lump_sum")}>
-            <option value="dca">Aporte mensal (DCA)</option>
-            <option value="lump_sum">Aporte único</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          {strategy === "dca" ? "Valor por mês (R$)" : "Valor (R$)"}
-          <input type="number" min={50} step={50} className={sel} value={amount} onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))} />
-        </label>
-        <label className="flex flex-col gap-1">
-          Período
-          <select className={sel} value={months} onChange={(e) => setMonths(Number(e.target.value) as 6 | 12 | 24 | 36)}>
-            {[6, 12, 24, 36].map((m) => (
-              <option key={m} value={m}>
-                {m} meses
-              </option>
-            ))}
-          </select>
-        </label>
-        <button onClick={() => void run()} disabled={busy || amount <= 0} className="col-span-2 mt-1 h-10 rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50">
-          {busy ? "Calculando…" : "Simular com preços reais"}
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="card-glow flex flex-col gap-4 rounded-2xl border border-border p-5">
+        <div>
+          <span className={label}>Ativo</span>
+          <PillGroup label="Ativo" value={symbol} onChange={setSymbol} options={[{ value: "BTC", label: "₿ Bitcoin" }, { value: "ETH", label: "Ξ Ethereum" }, { value: "SOL", label: "◎ Solana" }, { value: "BNB", label: "⬡ BNB" }]} />
+        </div>
+        <div>
+          <span className={label}>Forma de aporte</span>
+          <PillGroup label="Forma de aporte" value={strategy} onChange={setStrategy} options={[{ value: "dca", label: "Mensal (DCA)" }, { value: "lump_sum", label: "Aporte único" }]} />
+        </div>
+        <div>
+          <label htmlFor="sim-amount" className={label}>
+            {strategy === "dca" ? "Valor por mês" : "Valor"}: <span className="text-foreground">{brl(amount)}</span>
+          </label>
+          <input id="sim-amount" type="range" min={100} max={strategy === "dca" ? 5000 : 50000} step={100} value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="w-full accent-[var(--primary)]" />
+        </div>
+        <div>
+          <span className={label}>Período</span>
+          <PillGroup label="Período" value={months} onChange={setMonths} options={[6, 12, 24, 36].map((m) => ({ value: m as 6 | 12 | 24 | 36, label: m < 12 ? `${m} meses` : `${m / 12} ${m === 12 ? "ano" : "anos"}` }))} />
+        </div>
+        <button onClick={() => void run()} disabled={busy} className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-60">
+          {busy ? "Calculando…" : "Simular com preços reais"} <ArrowRight className="h-4 w-4" />
         </button>
       </div>
-      <div className="flex flex-col justify-center rounded-lg bg-muted/40 p-4 text-[13.5px]" aria-live="polite">
-        {err ? <p className="text-danger">{err}</p> : null}
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5" aria-live="polite">
+        {err ? <p className="text-[13px] text-danger">{err}</p> : null}
         {res ? (
           <>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="text-[12px] text-muted-foreground">Investido</div>
-                <div className="tabular text-xl font-bold">{brl(res.totalInvested)}</div>
-              </div>
-              <div>
-                <div className="text-[12px] text-muted-foreground">Valor final</div>
-                <div className="tabular text-xl font-bold">{brl(res.finalValue)}</div>
-              </div>
-              <div>
-                <div className="text-[12px] text-muted-foreground">Resultado</div>
-                <div className={cn("tabular text-xl font-bold", res.profitPct >= 0 ? "text-success" : "text-danger")}>
-                  {res.profitPct >= 0 ? "+" : ""}
-                  {res.profitPct.toFixed(1)}%
-                </div>
-              </div>
-              <div>
-                <div className="text-[12px] text-muted-foreground">Maior queda no caminho</div>
-                <div className="tabular text-xl font-bold text-danger">−{res.maxDrawdownPct.toFixed(1)}%</div>
-              </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <StatTile label="Investido" value={brl(res.totalInvested)} className="px-3" />
+              <StatTile label="Valor final" value={brl(res.finalValue)} className="px-3" />
+              <StatTile label="Resultado" value={`${res.profitPct >= 0 ? "+" : ""}${res.profitPct.toFixed(1)}%`} tone={res.profitPct >= 0 ? "up" : "down"} className="px-3" />
+              <StatTile label="Maior queda" value={`−${res.maxDrawdownPct.toFixed(1)}%`} tone="down" className="px-3" />
             </div>
-            <p className="mt-3 text-[11.5px] text-muted-foreground">
-              {new Date(res.startDate).toLocaleDateString("pt-BR")} a {new Date(res.endDate).toLocaleDateString("pt-BR")} · fechamentos diários reais · simulação histórica, não projeção.
+            <LineChart values={res.curve.map((p) => p.value)} compare={res.curve.map((p) => p.invested)} height={170} tone={res.profitPct >= 0 ? "up" : "down"} label="Patrimônio simulado e total aportado" />
+            <div className="flex gap-4 text-[11.5px] text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className={cn("h-0.5 w-4", res.profitPct >= 0 ? "bg-success" : "bg-danger")} /> Patrimônio
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-0 w-4 border-t border-dashed border-muted-foreground" /> Total aportado
+              </span>
+            </div>
+            <p className="text-[11.5px] text-muted-foreground">
+              {new Date(res.startDate).toLocaleDateString("pt-BR")} a {new Date(res.endDate).toLocaleDateString("pt-BR")} · fechamentos diários reais convertidos pelo câmbio de cada dia · simulação histórica, não projeção.
             </p>
           </>
         ) : !err ? (
-          <p className="text-muted-foreground">Escolha o ativo, a forma de aporte e o período. O cálculo usa os preços diários reais do período, convertidos para reais pelo câmbio de cada dia.</p>
+          <div className="grid flex-1 place-items-center text-center text-[13.5px] text-muted-foreground">
+            <div>
+              <Calculator className="mx-auto mb-2 h-7 w-7 text-primary" />
+              Escolha o ativo, a forma de aporte, o valor e o período.
+              <br />O resultado aparece aqui, com a curva do patrimônio.
+            </div>
+          </div>
         ) : null}
       </div>
     </div>
@@ -139,189 +141,231 @@ function MiniSimulator() {
 }
 
 export function Landing({ content }: { content: LandingData }) {
-  const VALIDATED = content.validated;
   const { data } = useSWR<Prices>("/api/billing/prices", { revalidateOnFocus: false });
   const [open, setOpen] = React.useState<number | null>(0);
   const trial = data?.trialDays ?? 7;
-  const tools = MAIN_TOOLS.filter((t) => t.href !== "/");
+  const main = content.validated[0];
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-16 px-4 py-10 sm:py-14">
-      <section className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-        <div>
-          <p className="text-[13px] font-semibold text-primary">Scanner cripto · 30 ativos · dados públicos</p>
-          <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight sm:text-[42px] sm:leading-[1.1]">Ferramentas claras para operar cripto, e um modelo testado fora da amostra.</h1>
-          <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-            Scanner de padrões gráficos, agentes com alertas, Sentinela 24h, gráficos, Fibonacci, simulador e aulas. Na tela inicial, os sinais do modelo de rompimento com o resultado medido em um período que não foi usado para criá-lo.
+    <div className="flex w-full flex-col">
+      <TickerMarquee />
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-20 px-4 py-12 sm:py-16">
+        {/* HERO */}
+        <section className="flex flex-col items-center text-center">
+          <Eyebrow tone="warning">Modelo testado fora da amostra</Eyebrow>
+          <h1 className="mt-5 max-w-4xl text-balance text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
+            Cripto com ferramentas claras e <span className="text-gradient">sinais testados</span>
+          </h1>
+          <p className="mt-5 max-w-2xl text-[15.5px] leading-relaxed text-muted-foreground">
+            Scanner de padrões gráficos, agentes que avisam no celular, Sentinela 24h, gráficos, Fibonacci, simulador e aulas. Cada ferramenta faz uma coisa, e o modelo de sinais mostra o resultado medido em um período que não foi usado para criá-lo.
           </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Link href="/registro?next=/" className="inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-semibold text-primary-foreground hover:brightness-110">
-              Começar teste de {trial} dias
+          <div className="mt-7 flex flex-wrap justify-center gap-2.5">
+            <Link href="/registro?next=/" className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
+              Começar teste de {trial} dias <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link href="#ferramentas" className="inline-flex h-11 items-center rounded-md border border-border px-6 text-sm font-semibold hover:bg-muted">
-              Ver ferramentas
-            </Link>
-          </div>
-          <p className="mt-3 text-[12px] text-muted-foreground">Sem cartão no teste. Sem chaves de API. Cancele quando quiser.</p>
-        </div>
-        <figure className="overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-black/30">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/marketing/inicio.jpg" alt="Tela inicial do CryptoScanner com mercado agora, sinais ativos do modelo validado e atalhos das ferramentas" width={1600} height={1000} className="h-auto w-full" />
-          <figcaption className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">Captura da aplicação com dados reais do momento da captura.</figcaption>
-        </figure>
-      </section>
-
-      <section id="ferramentas" aria-labelledby="tools" className="scroll-mt-20">
-        <h2 id="tools" className="text-2xl font-bold tracking-tight">Uma ferramenta para cada tarefa</h2>
-        <p className="mt-2 text-[14px] text-muted-foreground">Cada item do menu faz uma coisa. As análises profundas ficam separadas, no grupo Avançado.</p>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {tools.map((t) => (
-            <div key={t.href} className="rounded-lg border border-border bg-card p-4">
-              <ToolIconView icon={t.icon} className="h-5 w-5 text-primary" />
-              <h3 className="mt-3 text-[15px] font-semibold">{t.name}</h3>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{t.purpose}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section aria-labelledby="validado">
-        <h2 id="validado" className="text-2xl font-bold tracking-tight">Modelo de rompimento: números fora da amostra</h2>
-        <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-muted-foreground">
-          Regras escolhidas em um período e medidas em outro, com taxa e slippage, em 30 criptos. O setup de pullback que testamos junto não passou nesse teste e por isso não é oferecido como estratégia.
-        </p>
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          {VALIDATED.map((m) => (
-            <div key={m.name} className="rounded-xl border border-border bg-card p-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-[16px] font-semibold">{m.name}</h3>
-                <span className="rounded bg-success/15 px-1.5 py-px text-[11px] font-semibold text-success">{m.validation.label}</span>
-              </div>
-              <p className="mt-2 text-[13px] text-muted-foreground">{m.description}</p>
-              <p className="mt-3 text-[13px] leading-relaxed">{m.validation.summary}</p>
-              <p className="mt-2 text-[12.5px] leading-relaxed text-warning">{m.validation.caveats}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section aria-labelledby="simulador">
-        <h2 id="simulador" className="text-2xl font-bold tracking-tight">Simulador de aportes</h2>
-        <p className="mt-2 text-[14px] text-muted-foreground">Quanto teria rendido aportar em cripto, com os preços reais do período.</p>
-        <div className="mt-6">
-          <MiniSimulator />
-        </div>
-      </section>
-
-      <section aria-labelledby="ativos">
-        <h2 id="ativos" className="text-2xl font-bold tracking-tight">{ASSETS.length} ativos monitorados</h2>
-        <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-10">
-          {ASSETS.map((a) => (
-            <div key={a.symbol} className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1.5 text-[12.5px]">
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-[12px]">{a.glyph}</span>
-              <span className="min-w-0">
-                <span className="block font-semibold leading-tight">{a.symbol}</span>
-                <span className="block truncate text-[10.5px] text-muted-foreground">{a.name}</span>
+            <a href="#modelo" className="inline-flex h-12 items-center gap-2.5 rounded-xl border border-border bg-card px-4 text-left hover:border-primary/50">
+              <Signal className="h-5 w-5 text-primary" />
+              <span className="leading-tight">
+                <span className="block text-[13px] font-semibold">Sinais do modelo</span>
+                <span className="block text-[11px] text-muted-foreground">números fora da amostra</span>
               </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section aria-labelledby="jornada" className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-        <div>
-          <h2 id="jornada" className="text-2xl font-bold tracking-tight">Jornada: {content.lessonTitles.length} aulas</h2>
-          <p className="mt-2 text-[14px] leading-relaxed text-muted-foreground">Do funcionamento do Bitcoin à automação com agentes. Cada aula tem teste e uma prática dentro do próprio app, e o progresso fica salvo na sua conta.</p>
-        </div>
-        <ol className="grid gap-1.5 text-[13px] sm:grid-cols-2">
-          {content.lessonTitles.map((title, i) => (
-            <li key={title} className="flex gap-2 rounded-md border border-border bg-card px-3 py-2">
-              <span className="tabular w-5 shrink-0 text-muted-foreground">{i + 1}.</span>
-              {title}
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section id="planos" aria-labelledby="pricing" className="scroll-mt-20">
-        <h2 id="pricing" className="text-2xl font-bold tracking-tight">Planos</h2>
-        <p className="mt-2 text-[14px] text-muted-foreground">Comece com {trial} dias de teste completo. Depois, escolha o plano.</p>
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {(["PRO", "ELITE"] as const).map((p) => {
-            const l = data?.limits[p];
-            const items =
-              p === "PRO"
-                ? [
-                    "Todas as ferramentas do menu principal",
-                    "Sinais do modelo de rompimento validado (4H e 1D)",
-                    `${l?.monitors ?? "—"} monitores no servidor · ${l?.alerts ?? "—"} alertas`,
-                    `${l?.strategies ?? "—"} estratégias próprias · backtest de 1 timeframe`,
-                    `${l ? Math.round(l.historyDays / 30) : "—"} meses de histórico no backtest`,
-                    "Análise por IA: 100 consultas/dia",
-                  ]
-                : [
-                    "Tudo do PRO",
-                    "Backtest multi-timeframe",
-                    `${l ? Math.round(l.historyDays / 365) : "—"} anos de histórico no backtest`,
-                    `${l?.monitors ?? "—"} monitores · ${l?.alerts ?? "—"} alertas · ${l?.strategies ?? "—"} estratégias`,
-                    "Análise por IA: 500 consultas/dia",
-                  ];
-            return (
-              <div key={p} className={cn("flex flex-col rounded-xl border bg-card p-5", p === "ELITE" ? "border-primary/40" : "border-border")}>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold">{p}</h3>
-                </div>
-                <div className="mt-2">
-                  <span className="tabular text-3xl font-bold">{data ? `R$ ${data.prices[p]}` : "—"}</span>
-                  <span className="text-sm text-muted-foreground"> /mês</span>
-                </div>
-                <ul className="mt-4 flex flex-1 flex-col gap-2 text-[13.5px]">
-                  {items.map((i) => (
-                    <li key={i} className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> {i}
-                    </li>
-                  ))}
-                </ul>
-                <Link href="/registro?next=/planos" className="mt-5 flex h-10 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110">
-                  Começar teste de {trial} dias
-                </Link>
+            </a>
+            <a href="#simulador" className="inline-flex h-12 items-center gap-2.5 rounded-xl border border-border bg-card px-4 text-left hover:border-primary/50">
+              <Calculator className="h-5 w-5 text-primary" />
+              <span className="leading-tight">
+                <span className="block text-[13px] font-semibold">Simulador</span>
+                <span className="block text-[11px] text-muted-foreground">grátis, sem cadastro</span>
+              </span>
+            </a>
+          </div>
+          <dl className="mt-10 grid w-full max-w-3xl grid-cols-2 gap-6 sm:grid-cols-4">
+            {[
+              [String(content.assets), "ativos monitorados"],
+              [String(content.patterns), "padrões gráficos"],
+              [String(content.lessons.length), "aulas"],
+              [main ? R(main.validation.metrics.expectancyR) : "—", `por operação fora da amostra (${main?.tf ?? ""})`],
+            ].map(([v, l]) => (
+              <div key={l}>
+                <dt className="sr-only">{l}</dt>
+                <dd className="text-gradient text-3xl font-extrabold tabular-nums sm:text-4xl">{v}</dd>
+                <dd className="mt-1 text-[12px] text-muted-foreground">{l}</dd>
               </div>
-            );
-          })}
-        </div>
-        <p className="mt-3 text-[12px] text-muted-foreground">
-          Cobrança mensal via Mercado Pago. Cancelamento a qualquer momento. Arrependimento em até 7 dias da primeira cobrança com reembolso integral.
-        </p>
-      </section>
+            ))}
+          </dl>
+        </section>
 
-      <section aria-labelledby="faq">
-        <h2 id="faq" className="text-2xl font-bold tracking-tight">Perguntas frequentes</h2>
-        <div className="mt-4 divide-y divide-border rounded-lg border border-border bg-card">
-          {FAQ.map(([q, a], i) => (
-            <div key={q}>
-              <button onClick={() => setOpen(open === i ? null : i)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[14px] font-semibold" aria-expanded={open === i}>
-                {q}
-                <span className="text-muted-foreground">{open === i ? "−" : "+"}</span>
-              </button>
-              {open === i ? <p className="px-4 pb-4 text-[13.5px] leading-relaxed text-muted-foreground">{a}</p> : null}
-            </div>
-          ))}
-        </div>
-      </section>
+        <MarketStrip />
 
-      <section className="rounded-xl border border-border bg-card p-6 text-center">
-        <ShieldCheck className="mx-auto h-6 w-6 text-primary" aria-hidden />
-        <h2 className="mt-2 text-xl font-bold">Teste todas as ferramentas por {trial} dias</h2>
-        <p className="mt-1 text-[13.5px] text-muted-foreground">Sem cartão, sem chaves de API.</p>
-        <Link href="/registro?next=/" className="mt-4 inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-semibold text-primary-foreground hover:brightness-110">
-          Criar conta
-        </Link>
-        <p className="mt-3 text-[12px] text-muted-foreground">
-          Já tem conta?{" "}
-          <Link href="/login?next=/" className="text-primary hover:underline">
-            Entrar
+        {/* FERRAMENTAS */}
+        <section id="ferramentas" className="scroll-mt-20" aria-labelledby="tools">
+          <SectionHeading eyebrow="Ferramentas" title="Uma ferramenta para" accent="cada tarefa" subtitle="Organizadas pelo que você quer fazer. As análises profundas ficam separadas, no grupo Avançado." />
+          <h2 id="tools" className="sr-only">Ferramentas</h2>
+          <div className="mt-10">
+            <ToolsGrid tools={MAIN_TOOLS.filter((t) => t.href !== "/")} categories={TOOL_CATEGORIES} hrefFor={(t) => `/registro?next=${encodeURIComponent(t.href)}`} ctaFor={(t) => `Abrir ${t.name}`} />
+          </div>
+        </section>
+
+        {/* MERCADO + NOTÍCIAS */}
+        <section aria-labelledby="mercado">
+          <SectionHeading eyebrow="Ao vivo" title="O mercado" accent="agora" subtitle="Preços em tempo real dos ativos monitorados e as manchetes do dia, com fonte e horário." />
+          <h2 id="mercado" className="sr-only">Mercado agora</h2>
+          <div className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+            <MoversCard />
+            <NewsCard />
+          </div>
+        </section>
+
+        {/* MODELO */}
+        <section id="modelo" className="scroll-mt-20" aria-labelledby="validado">
+          <SectionHeading
+            eyebrow="Modelo de sinais"
+            tone="warning"
+            title="Resultado medido"
+            accent="fora da amostra"
+            subtitle="Regras escolhidas em um período e medidas em outro, já descontando taxa e slippage, em 30 criptos. O setup de pullback que testamos junto não passou e por isso não é oferecido como estratégia."
+          />
+          <h2 id="validado" className="sr-only">Modelo validado</h2>
+          <div className="mt-8 grid gap-4 lg:grid-cols-2">
+            {content.validated.map((m) => {
+              const k = m.validation.metrics;
+              return (
+                <article key={m.name} className="card-glow flex flex-col gap-4 rounded-2xl border border-border p-5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-[17px] font-bold">{m.name}</h3>
+                    <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">{m.validation.label}</span>
+                  </div>
+                  <p className="text-[13px] text-muted-foreground">{m.description}</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <StatTile label="Operações" value={k.trades} sub={k.period} className="px-3" />
+                    <StatTile label="Por operação" value={R(k.expectancyR)} tone="up" sub="líquido de custos" className="px-3" />
+                    <StatTile label="Fator de lucro" value={k.profitFactor.toFixed(2).replace(".", ",")} sub={`acerto ${k.winPct}%`} className="px-3" />
+                    <StatTile label="Ativos positivos" value={`${k.assetsPositive}/${k.assetsTotal}`} className="px-3" />
+                  </div>
+                  <div>
+                    <div className="mb-1 text-[11.5px] text-muted-foreground">R acumulado fora da amostra, operação a operação</div>
+                    <LineChart values={m.curve} height={130} tone="up" label={`R acumulado fora da amostra — ${m.name}`} />
+                  </div>
+                  <p className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[12.5px] leading-relaxed text-warning">{m.validation.caveats}</p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* SIMULADOR */}
+        <section id="simulador" className="scroll-mt-20" aria-labelledby="sim">
+          <SectionHeading eyebrow="Simulador" title="Quanto teria rendido" accent="aportar em cripto" subtitle="Escolha o ativo, a forma e o período. O cálculo usa os preços diários reais do período." />
+          <h2 id="sim" className="sr-only">Simulador de aportes</h2>
+          <div className="mt-8">
+            <Simulator />
+          </div>
+        </section>
+
+        {/* JORNADA */}
+        <section aria-labelledby="jornada">
+          <SectionHeading eyebrow="Jornada" title="Aprenda antes de" accent="operar" subtitle={`${content.lessons.length} aulas curtas com teste e prática dentro do próprio app. O progresso fica salvo na sua conta.`} />
+          <h2 id="jornada" className="sr-only">Jornada</h2>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {LEVELS.map((lv) => {
+              const list = content.lessons.filter((l) => l.level === lv.key);
+              return (
+                <article key={lv.key} className="card-glow flex flex-col gap-3 rounded-2xl border border-border p-5">
+                  <span className={cn("self-start rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide", lv.tone)}>{lv.label}</span>
+                  <p className="text-[13px] text-muted-foreground">{lv.text}</p>
+                  <ol className="flex flex-col gap-1.5 text-[13px]">
+                    {list.map((l) => (
+                      <li key={l.title} className="flex items-start justify-between gap-2 rounded-lg bg-muted/30 px-3 py-2">
+                        <span>{l.title}</span>
+                        <span className="tabular shrink-0 text-[11px] text-muted-foreground">{l.minutes} min</span>
+                      </li>
+                    ))}
+                  </ol>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* PLANOS */}
+        <section id="planos" aria-labelledby="pricing" className="scroll-mt-20">
+          <SectionHeading eyebrow="Planos" title="Comece com" accent={`${trial} dias grátis`} subtitle="Sem cartão no teste. Depois, escolha o plano." />
+          <h2 id="pricing" className="sr-only">Planos</h2>
+          <div className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-2">
+            {(["PRO", "ELITE"] as const).map((p) => {
+              const l = data?.limits[p];
+              const items =
+                p === "PRO"
+                  ? [
+                      "Todas as ferramentas do menu principal",
+                      "Sinais do modelo de rompimento testado (4H e 1D)",
+                      `${l?.monitors ?? "—"} monitores no servidor · ${l?.alerts ?? "—"} alertas`,
+                      `${l?.strategies ?? "—"} estratégias próprias · backtest de 1 timeframe`,
+                      `${l ? Math.round(l.historyDays / 30) : "—"} meses de histórico no backtest`,
+                      "Análise por IA: 100 consultas/dia",
+                    ]
+                  : ["Tudo do PRO", "Backtest multi-timeframe", `${l ? Math.round(l.historyDays / 365) : "—"} anos de histórico no backtest`, `${l?.monitors ?? "—"} monitores · ${l?.alerts ?? "—"} alertas · ${l?.strategies ?? "—"} estratégias`, "Análise por IA: 500 consultas/dia"];
+              return (
+                <div key={p} className={cn("flex flex-col rounded-2xl border p-6", p === "ELITE" ? "card-glow border-primary/50" : "border-border bg-card")}>
+                  <h3 className="text-lg font-extrabold tracking-tight">{p}</h3>
+                  <div className="mt-2">
+                    <span className="tabular text-4xl font-extrabold">{data ? `R$ ${data.prices[p]}` : "—"}</span>
+                    <span className="text-sm text-muted-foreground"> /mês</span>
+                  </div>
+                  <ul className="mt-5 flex flex-1 flex-col gap-2 text-[13.5px]">
+                    {items.map((i) => (
+                      <li key={i} className="flex gap-2">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> {i}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/registro?next=/planos" className="mt-6 flex h-11 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110">
+                    Começar teste de {trial} dias
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-center text-[12px] text-muted-foreground">Cobrança mensal via Mercado Pago. Cancelamento a qualquer momento. Arrependimento em até 7 dias da primeira cobrança com reembolso integral.</p>
+        </section>
+
+        {/* FAQ */}
+        <section aria-labelledby="faq" className="mx-auto w-full max-w-3xl">
+          <SectionHeading eyebrow="Dúvidas" title="Perguntas" accent="frequentes" />
+          <h2 id="faq" className="sr-only">Perguntas frequentes</h2>
+          <div className="mt-6 divide-y divide-border rounded-2xl border border-border bg-card">
+            {FAQ.map(([q, a], i) => (
+              <div key={q}>
+                <button onClick={() => setOpen(open === i ? null : i)} className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-[14px] font-semibold" aria-expanded={open === i}>
+                  {q}
+                  <span className="text-muted-foreground">{open === i ? "−" : "+"}</span>
+                </button>
+                {open === i ? <p className="px-5 pb-4 text-[13.5px] leading-relaxed text-muted-foreground">{a}</p> : null}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="card-glow rounded-3xl border border-border p-8 text-center sm:p-12">
+          <ShieldCheck className="mx-auto h-7 w-7 text-primary" aria-hidden />
+          <h2 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">
+            Teste todas as ferramentas por <span className="text-gradient">{trial} dias</span>
+          </h2>
+          <p className="mt-2 text-[14px] text-muted-foreground">Sem cartão, sem chaves de API.</p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            {["Scanner", "Agentes IA", "Sentinela", "Sinais do modelo", "Simulador", "Jornada"].map((c) => (
+              <Chip key={c}>{c}</Chip>
+            ))}
+          </div>
+          <Link href="/registro?next=/" className="mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
+            Criar conta <ArrowRight className="h-4 w-4" />
           </Link>
-        </p>
-      </section>
+          <p className="mt-3 text-[12px] text-muted-foreground">
+            Já tem conta?{" "}
+            <Link href="/login?next=/" className="text-primary hover:underline">
+              Entrar
+            </Link>
+          </p>
+        </section>
+      </div>
     </div>
   );
 }

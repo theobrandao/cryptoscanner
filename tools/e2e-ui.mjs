@@ -64,12 +64,12 @@ consoleErrors.length = 0;
 // ------------------------------------------------------------ páginas públicas
 await step("Início (anônimo): página de venda com ferramentas, números fora da amostra, simulador, preços e teste de 7 dias", async () => {
   await goto("/");
-  await page.waitForFunction(() => /Ferramentas claras para operar cripto/.test(document.body.innerText) && /Começar teste de 7 dias/.test(document.body.innerText) && /R\$ \d+/.test(document.body.innerText) && /Fora da amostra/.test(document.body.innerText), null, { timeout: 30_000 });
+  await page.waitForFunction(() => /ferramentas claras e/i.test(document.body.innerText) && /Começar teste de 7 dias/.test(document.body.innerText) && /R\$ \d+/.test(document.body.innerText) && /fora da amostra/i.test(document.body.innerText) && /Mercado agora/i.test(document.body.innerText), null, { timeout: 30_000 });
   const t = await page.locator("body").innerText();
   for (const tool of ["Scanner", "Agentes IA", "Sentinela", "Gráficos", "Fibonacci", "Carteira", "Simulador", "Jornada"]) expect(t.includes(tool), `ferramenta ${tool} ausente na página de venda`);
   expect(!/Depoimento|depoimento/.test(t), "depoimento na página (não há depoimentos reais)");
   await page.getByRole("button", { name: /Simular com preços reais/ }).click();
-  await page.waitForFunction(() => /Valor final/.test(document.body.innerText) && /simulação histórica, não projeção/.test(document.body.innerText), null, { timeout: 60_000 });
+  await page.waitForFunction(() => /Valor final/i.test(document.body.innerText) && /simulação histórica, não projeção/i.test(document.body.innerText), null, { timeout: 60_000 });
   const analyst = await page.getByRole("button", { name: "Analista IA" }).count();
   expect(analyst >= 1, "botão Analista IA ausente na barra superior");
   const purple = await page.evaluate(() => [...document.querySelectorAll("*")].some((e) => /from-ai|to-ai/.test(e.getAttribute("class") ?? "")));
@@ -251,7 +251,7 @@ await step("Registro pela interface", async () => {
 
 await step("Início (logado): mercado agora, sinais ativos do modelo validado, ferramentas; menu com uma ferramenta por finalidade", async () => {
   await goto("/");
-  await page.waitForFunction(() => /Sinais ativos — rompimento validado/.test(document.body.innerText) && (/posições abertas pelo modelo/.test(document.body.innerText) || /Nenhuma posição aberta/.test(document.body.innerText)), null, { timeout: 120_000 });
+  await page.waitForFunction(() => /Sinais ativos — rompimento testado/i.test(document.body.innerText) && /posições abertas/i.test(document.body.innerText), null, { timeout: 120_000 });
   const nav = await page.locator("nav[aria-label='Ferramentas']").first().innerText();
   const items = ["Início", "Jornada", "Panorama", "Bolhas", "Scanner", "Agentes IA", "Sentinela", "Gráficos", "Fibonacci", "Carteira", "Simulador"];
   for (const i of items) expect(nav.includes(i), `menu sem ${i}`);
@@ -260,8 +260,8 @@ await step("Início (logado): mercado agora, sinais ativos do modelo validado, f
   expect(adv === 0, "grupo Avançado deveria começar recolhido");
   await page.getByRole("button", { name: "Avançado" }).first().click();
   await page.locator("nav[aria-label='Ferramentas avançadas']").first().waitFor({ timeout: 5_000 });
-  const rows = await page.locator("section[aria-label='Sinais ativos'] table tbody tr").count();
-  return `${rows} linhas de sinais · ${await shot("inicio-logado")}`;
+  const cards = await page.locator("section[aria-label='Sinais ativos'] a[href^='/graficos']").count();
+  return `${cards} cartões de sinais · ${await shot("inicio-logado")}`;
 });
 
 await step("Tema claro/escuro e moeda BRL", async () => {

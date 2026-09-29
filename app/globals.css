@@ -179,3 +179,37 @@ body {
     }
   }
 }
+
+/* ---------------------------------------------------------------- Apresentação (v4) */
+.text-gradient {
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.icon-tile {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #fff;
+}
+.card-glow {
+  background: radial-gradient(120% 80% at 0% 0%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 60%), var(--card);
+}
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  animation: marquee 60s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
