@@ -34,7 +34,7 @@ interface TablePayload {
 type SortKey = "symbol" | "price" | "changePct24h" | "quoteVolume24h" | "relativeVolume" | "volatilityPct" | "trendStrength" | "rsi14" | "momentum" | "signalScore" | "patterns";
 
 const MOM_ORDER: Record<string, number> = { strong_down: -2, down: -1, flat: 0, up: 1, strong_up: 2 };
-const PAGE_SIZES = [10, 20, 50];
+const PAGE_SIZES = [10, 25, 50];
 
 export function ScannerTable({
   timeframe,
@@ -62,7 +62,7 @@ export function ScannerTable({
   const [onlyFavorites, setOnlyFavorites] = React.useState(false);
   const [onlyPatterns, setOnlyPatterns] = React.useState(false);
   const [page, setPage] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(20);
+  const [pageSize, setPageSize] = React.useState(25);
 
   React.useEffect(() => {
     if (data && onSourcesChange) onSourcesChange({ sources: data.sources, stale: data.staleCount > 0, scannedAt: data.scannedAt });
