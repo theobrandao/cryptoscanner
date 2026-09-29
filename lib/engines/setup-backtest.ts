@@ -93,6 +93,13 @@ export function backtestSetup(candles: readonly Candle[], opts: SetupBacktestOpt
     const risk = Math.abs(entry - g.stop);
     const rMult = ((long ? 1 : -1) * (r.exit - entry)) / risk;
     const mfeR = r.mfe / risk;
+    // Hit 1R/2R/3R: excursão a favor até o stop ou o horizonte, sem sair no TP1 (a saída no alvo limitaria a medição)
+    let runR = 0;
+    for (let j = t + 1; j <= Math.min(candles.length - 1, t + horizon); j++) {
+      const c = candles[j] as Candle;
+      if (long ? c.low <= g.stop : c.high >= g.stop) break; // candle do stop: conservador, não conta
+      runR = Math.max(runR, ((long ? c.high - entry : entry - c.low) as number) / risk);
+    }
     trades.push({
       key: "double_bottom", // campo exigido pelo tipo base; não usado para setups
       direction: dir,
@@ -110,9 +117,9 @@ export function backtestSetup(candles: readonly Candle[], opts: SetupBacktestOpt
       targetR: Math.abs(tp1 - entry) / risk,
       mfeR,
       maeR: r.mae / risk,
-      hit1R: mfeR >= 1,
-      hit2R: mfeR >= 2,
-      hit3R: mfeR >= 3,
+      hit1R: runR >= 1,
+      hit2R: runR >= 2,
+      hit3R: runR >= 3,
       tp2Hit: tp2 != null && r.mfe >= Math.abs(tp2 - entry),
       regime: regimes.trend[t] ?? "range",
       volRegime: regimes.vol[t] ?? "normal",

@@ -22,10 +22,11 @@ export interface MarketOverview {
   topGainers: MoverRow[];
   topLosers: MoverRow[];
   volumeLeaders: MoverRow[];
+  marketCapLeaders: MoverRow[];
   moversSource: { source: string; timestamp: number; stale: boolean } | null;
 }
 
-/** Visão geral: CoinGecko (capitalização, dominância, top 100) e alternative.me (Medo & Ganância). Cada bloco pode vir null. */
+/** Visão geral: CoinGecko/CoinPaprika (capitalização, dominância, top 100) e alternative.me (Medo & Ganância). Cada bloco pode vir null. */
 export async function getMarketOverview(): Promise<MarketOverview> {
   const [g, f, b] = await Promise.all([getGlobalMarket().catch(() => null), getFearGreed().catch(() => null), getBubbles(100).catch(() => null)]);
   const rows: MoverRow[] = (b?.bubbles ?? []).map((x) => ({ symbol: x.symbol.toUpperCase(), name: x.name, price: x.price, changePct24h: x.change["24h"], volume24h: x.volume24h, marketCap: x.marketCap }));
@@ -39,7 +40,7 @@ export async function getMarketOverview(): Promise<MarketOverview> {
           totalVolumeUsd: g.data.total_volume.usd ?? NaN,
           btcDominance: g.data.market_cap_percentage.btc ?? NaN,
           ethDominance: g.data.market_cap_percentage.eth ?? NaN,
-          source: "CoinGecko /global",
+          source: (g.data as { source?: string }).source === "coinpaprika" ? "CoinPaprika /global" : "CoinGecko /global",
           timestamp: g.data.updated_at * 1000,
           stale: g.stale,
         }
@@ -48,7 +49,8 @@ export async function getMarketOverview(): Promise<MarketOverview> {
     topGainers: [...withChange].sort((a, b2) => (b2.changePct24h ?? 0) - (a.changePct24h ?? 0)).slice(0, 8),
     topLosers: [...withChange].sort((a, b2) => (a.changePct24h ?? 0) - (b2.changePct24h ?? 0)).slice(0, 8),
     volumeLeaders: [...rows].sort((a, b2) => b2.volume24h - a.volume24h).slice(0, 8),
-    moversSource: b ? { source: "CoinGecko /coins/markets (top 100 por volume)", timestamp: b.fetchedAt, stale: b.stale } : null,
+    marketCapLeaders: [...rows].sort((a, b2) => b2.marketCap - a.marketCap).slice(0, 8),
+    moversSource: b ? { source: `${b.source} (top 100 por volume)`, timestamp: b.fetchedAt, stale: b.stale } : null,
   };
 }
 

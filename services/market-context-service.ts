@@ -145,7 +145,7 @@ async function closedOrNull(symbol: string, tf: Timeframe, limit: number): Promi
 }
 
 const SETUP_METHOD =
-  "Walk-forward do próprio setup (zona na estrutura + liquidez, gatilho por quebra da estrutura interna), candles fechados, entrada no fechamento do gatilho, stop estrutural, TP1 do setup, horizonte 40 candles, alvo e stop no mesmo candle = stop. Sem taxas/slippage.";
+  "Walk-forward do próprio setup (zona na estrutura + liquidez, gatilho por quebra da estrutura interna), candles fechados, entrada no fechamento do gatilho, stop estrutural, saída no TP1 do setup, horizonte 40 candles, alvo e stop no mesmo candle = stop. Hit 1R/2R/3R medido pela excursão a favor até o stop ou 40 candles (sem sair no TP1). Sem taxas/slippage.";
 
 function historicalFrom(trades: ReturnType<typeof backtestSetup>["trades"], fromTime: number, toTime: number, scope: HistoricalBlock["scope"]): HistoricalBlock {
   const m = computeMetrics(trades);
@@ -179,14 +179,14 @@ function historicalFrom(trades: ReturnType<typeof backtestSetup>["trades"], from
 
 /** Histórico do setup: ativo quando n ≥ 30; senão universo de 30 ativos (com indicação do escopo). Cache 12 h. */
 export async function getSetupHistorical(symbol: string, tf: Timeframe): Promise<HistoricalBlock | null> {
-  const own = await cached<HistoricalBlock | null>(`setupbt:v2:${symbol}:${tf}`, 12 * 3600, async () => {
+  const own = await cached<HistoricalBlock | null>(`setupbt:v3:${symbol}:${tf}`, 12 * 3600, async () => {
     const cs = await closedOrNull(symbol, tf, 600);
     if (!cs || cs.length < 300) return null;
     const r = backtestSetup(cs);
     return historicalFrom(r.trades, r.fromTime, r.toTime, "symbol");
   });
   if (own.value && own.value.samples >= HISTORICAL_MIN_SAMPLE) return own.value;
-  const uni = await cached<HistoricalBlock | null>(`setupbt:v2:*:${tf}`, 12 * 3600, async () => {
+  const uni = await cached<HistoricalBlock | null>(`setupbt:v3:*:${tf}`, 12 * 3600, async () => {
     const limiter = createLimiter(4, 0);
     const all: ReturnType<typeof backtestSetup>["trades"] = [];
     let from = Infinity;

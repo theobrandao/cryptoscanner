@@ -178,9 +178,13 @@ export function evaluateSetup(candles: readonly Candle[], g: SetupGeometry, inte
   if (trigger != null) {
     const ev = internal.events.find((e) => e.index === trigger && e.direction === g.direction);
     if (ev) triggerLevel = { price: ev.level, source: `${ev.type} interno rompido` };
-  } else {
-    // swing interno a favor mais recente ainda não rompido pelo fechamento
-    const cand = [...internal.swings].reverse().find((sw) => sw.kind === (long ? "high" : "low") && (long ? sw.price > last.close : sw.price < last.close));
+  } else if (touch >= 0) {
+    // após tocar a zona: swing interno a favor mais recente ainda não rompido pelo fechamento, entre a
+    // zona e o TP1 (um gatilho além do TP1 não deixaria R:R; nesse caso fica sem nível)
+    const tp1 = g.targets[0]?.price;
+    const cand = [...internal.swings]
+      .reverse()
+      .find((sw) => sw.kind === (long ? "high" : "low") && (long ? sw.price > last.close : sw.price < last.close) && (tp1 == null || (long ? sw.price < tp1 : sw.price > tp1)));
     if (cand) triggerLevel = { price: cand.price, source: long ? "topo interno (fechamento acima confirma)" : "fundo interno (fechamento abaixo confirma)" };
   }
 

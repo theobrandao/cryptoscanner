@@ -5,7 +5,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { ImagePlus, Save, Sparkles, Upload, X } from "lucide-react";
+import { Bot, ImagePlus, Save, Upload, X } from "lucide-react";
 import type { ChartImageAnalysis } from "@/services/chart-image-service";
 import { Badge, DirectionBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,7 +99,7 @@ export function ChartAnalysis() {
     <Card id="analise-ia">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-accent" /> Análise de Gráfico por IA
+          <Bot className="h-4 w-4 text-primary" /> Análise de Gráfico por IA
         </CardTitle>
         <CardDescription>
           Envie a captura de um gráfico e receba uma leitura técnica estruturada: padrões, tendência, pontos operacionais e relação risco/retorno. Potencial, risco e relação são recalculados

@@ -16,7 +16,7 @@ export default async function ChartsPage({ params }: PageProps<"/charts/[symbol]
   if (!getAsset(s)) notFound();
   return (
     <Suspense>
-      <TerminalWorkspace symbol={s} />
+      <TerminalWorkspace symbol={s} mode="charts" />
     </Suspense>
   );
 }

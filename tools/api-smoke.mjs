@@ -662,6 +662,19 @@ await test("Comercial", "Contexto global: exchange × instrumento (OKX perpétuo
   return `dados ${d.dataVenue} ${d.instrument} (${d.quality.status}) · funding ${d.derivatives ? (d.derivatives.fundingRate * 100).toFixed(4) + "%" : "n/d"} · próximo ${d.derivatives ? new Date(d.derivatives.nextFundingTime).toISOString().slice(11, 16) + " UTC" : "—"}`;
 });
 
+await test("Comercial", "POST /api/markets/BTC/analyst (AI Analyst sobre o mesmo contexto; anônimo → 401)", async () => {
+  const anon = await call("POST", "/api/markets/BTC/analyst", { auth: false, body: { tf: "4h" } });
+  expectStatus(anon, 401);
+  const r = await call("POST", "/api/markets/BTC/analyst", { body: { tf: "4h", exchange: "binance", instrument: "spot", llm: false } });
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(d.contextKey === "binance:spot:BTC:4h", `contextKey ${d.contextKey}`);
+  expect(Array.isArray(d.sections) && d.sections.length >= 5, "seções ausentes");
+  expect(/Confluence \d+\/100/.test(d.headline), `headline ${d.headline}`);
+  expect(!/compre|venda agora|buy now/i.test(JSON.stringify(d)), "linguagem de ordem no analista");
+  return `${d.sections.length} seções · LLM ${d.guardrail.llm}`;
+});
+
 await test("Comercial", "GET /api/markets/setups e /api/markets/overview", async () => {
   const s = await call("GET", "/api/markets/setups?tf=4h");
   expectStatus(s, 200);

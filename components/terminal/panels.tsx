@@ -77,6 +77,8 @@ function structureText(seq: string, trend: string) {
   return trend === "neutral" ? "Range / sem sequência" : seq || "—";
 }
 
+export const REGIME_TONE: Record<string, "up" | "down" | "warn" | "info" | "muted"> = { "Bull Trend": "up", "Bear Trend": "down", Range: "muted", Expansion: "info", Compression: "info", "High Volatility": "warn" };
+
 export function StructurePanel({ ctx }: { ctx: MarketContext }) {
   const s = ctx.structure;
   return (
@@ -86,6 +88,7 @@ export function StructurePanel({ ctx }: { ctx: MarketContext }) {
       <MetricRow label="Last BOS" value={s.lastBos ? `${px(s.lastBos.level)} ${DIR(s.lastBos.direction)}` : "—"} tone={dirTone(s.lastBos?.direction)} hint={s.lastBos ? formatDateTime(s.lastBos.time) : undefined} />
       <MetricRow label={`Last ${s.lastChoch?.type ?? "CHoCH"}`} value={s.lastChoch ? `${px(s.lastChoch.level)} ${DIR(s.lastChoch.direction)}` : "—"} tone={dirTone(s.lastChoch?.direction)} hint={s.lastChoch ? formatDateTime(s.lastChoch.time) : undefined} />
       <MetricRow label="Market Phase" value={s.phase} tone={s.phase === "Expansion" ? "info" : s.phase === "Reversal" ? "warn" : "muted"} />
+      <MetricRow label="Market Regime" value={ctx.regime.regime} tone={REGIME_TONE[ctx.regime.regime]} hint={ctx.regime.reasons.join(" · ")} />
       <Stamp {...s.stamp} />
     </Panel>
   );
@@ -112,13 +115,21 @@ export function LiquidityPanel({ ctx, onViewChart }: { ctx: MarketContext; onVie
 
 /* ------------------------------------------------------------------ Confluence */
 
+const LABEL_STYLE: Record<string, { color: string; chip: string }> = {
+  Exceptional: { color: "var(--success)", chip: "bg-success/15 text-success" },
+  Strong: { color: "var(--success)", chip: "bg-success/15 text-success" },
+  Good: { color: "var(--info)", chip: "bg-info/15 text-info" },
+  Moderate: { color: "var(--warning)", chip: "bg-warning/15 text-warning" },
+  Low: { color: "var(--muted-foreground)", chip: "bg-muted text-muted-foreground" },
+};
+
 function Gauge({ value, label }: { value: number; label: string }) {
   const r = 38;
   const c = 2 * Math.PI * r;
   const arc = c * 0.75;
-  const color = label === "No Trade" ? "var(--danger)" : value >= 75 ? "var(--success)" : value >= 65 ? "var(--info)" : "var(--warning)";
+  const color = LABEL_STYLE[label]?.color ?? "var(--muted-foreground)";
   return (
-    <svg viewBox="0 0 100 100" className="h-[112px] w-[112px]" role="img" aria-label={`Confluence Score ${value} de 100`}>
+    <svg viewBox="0 0 100 100" className="h-[104px] w-[104px]" role="img" aria-label={`Confluence Score ${value} de 100 (${label})`}>
       <circle cx="50" cy="50" r={r} fill="none" stroke="var(--muted)" strokeWidth="8" strokeDasharray={`${arc} ${c}`} transform="rotate(135 50 50)" strokeLinecap="round" />
       <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="8" strokeDasharray={`${(arc * value) / 100} ${c}`} transform="rotate(135 50 50)" strokeLinecap="round" />
       <text x="50" y="52" textAnchor="middle" className="fill-foreground" style={{ font: "700 26px Inter, sans-serif" }}>
@@ -131,10 +142,15 @@ function Gauge({ value, label }: { value: number; label: string }) {
   );
 }
 
+/**
+ * Confluence Score R2: barras por componente (0..máx), penalidades separadas e a conta explícita
+ * Raw − Penalties = Final (limitado a 0–100). A conta fecha com os números exibidos.
+ */
 export function ConfluencePanel({ ctx, className }: { ctx: MarketContext; className?: string }) {
   const c = ctx.confluence;
   const [open, setOpen] = React.useState(false);
-  const pen = c.penalties.reduce((s, p) => s + p.points, 0);
+  const style = LABEL_STYLE[c.label] ?? LABEL_STYLE.Low;
+  const clamped = Math.round(c.raw + c.penaltyTotal) !== c.score;
   return (
     <Panel
       className={className}
@@ -146,51 +162,57 @@ export function ConfluencePanel({ ctx, className }: { ctx: MarketContext; classN
       }
     >
       <div className="flex gap-3">
-        <div className="flex shrink-0 flex-col items-center gap-2">
+        <div className="flex shrink-0 flex-col items-center gap-1.5">
           <Gauge value={c.score} label={c.label} />
-          <span className={cn("rounded-md px-2 py-1 text-[11px] font-semibold", c.verdict === "NO_TRADE" ? "bg-danger/15 text-danger" : c.score >= 75 ? "bg-success/15 text-success" : "bg-info/15 text-info")}>
-            {c.label}
-          </span>
+          <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-semibold", style?.chip)}>{c.label}</span>
+          <dl className="tabular grid grid-cols-[auto_auto] gap-x-2 text-[11px]" aria-label="Cálculo do score">
+            <dt className="text-muted-foreground">Raw</dt>
+            <dd className="text-right">{c.raw.toFixed(1)}</dd>
+            <dt className="text-muted-foreground">Penalties</dt>
+            <dd className={cn("text-right", c.penaltyTotal < 0 && "text-danger")}>{c.penaltyTotal.toFixed(1)}</dd>
+            <dt className="font-semibold">Final</dt>
+            <dd className="text-right font-semibold">{c.score}</dd>
+          </dl>
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
           {c.components.map((k) => (
-            <div key={k.key} className="grid grid-cols-[minmax(0,1fr)_minmax(40px,1fr)_40px] items-center gap-2 text-[11.5px]" title={k.reasons.join(" · ")}>
-              <span className={cn("truncate", k.available ? "text-muted-foreground" : "text-muted-foreground/50 line-through")}>{k.label}</span>
+            <div key={k.key} className="grid grid-cols-[minmax(0,1fr)_minmax(36px,1fr)_42px] items-center gap-2 text-[11.5px]" title={k.reasons.join(" · ")}>
+              <span className={cn("truncate", k.available ? "text-muted-foreground" : "text-muted-foreground/50")}>{k.label}</span>
               <span className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <span className={cn("block h-full rounded-full", k.score >= 0 ? "bg-success" : "bg-danger")} style={{ width: `${k.available ? (Math.abs(k.score) / k.max) * 100 : 0}%` }} />
+                <span className="block h-full rounded-full bg-primary" style={{ width: `${k.available ? (k.score / k.max) * 100 : 0}%` }} />
               </span>
-              <span className={cn("tabular text-right", k.score < 0 && "text-danger")}>{k.available ? `${Math.round(k.score)}/${k.max}` : "n/d"}</span>
+              <span className="tabular text-right">{k.available ? `${Number.isInteger(k.score) ? k.score : k.score.toFixed(1)}/${k.max}` : "n/d"}</span>
             </div>
           ))}
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(40px,1fr)_40px] items-center gap-2 text-[11.5px]">
-            <span className="text-muted-foreground">Penalties</span>
-            <span className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <span className="block h-full rounded-full bg-danger" style={{ width: `${Math.min(100, Math.abs(pen) * 5)}%` }} />
-            </span>
-            <span className={cn("tabular text-right", pen < 0 && "text-danger")}>{pen}</span>
-          </div>
         </div>
       </div>
+      {c.verdict === "NO_TRADE" ? (
+        <p className="mt-2 rounded-md border border-danger/30 bg-danger/10 px-2 py-1 text-[11px] text-danger">
+          <span className="font-semibold">NO TRADE:</span> {c.noTradeReasons.join(" · ")}
+        </p>
+      ) : null}
       {open ? (
         <div className="mt-3 space-y-1.5 border-t border-border pt-2 text-[11.5px]">
           {c.components.map((k) => (
             <p key={k.key}>
-              <span className="font-semibold">{k.label}</span> <span className="tabular text-muted-foreground">({k.available ? `${k.score}/${k.max}` : "fora do cálculo"})</span>: {k.reasons.join(" · ") || "—"}
+              <span className="font-semibold">{k.label}</span> <span className="tabular text-muted-foreground">({k.available ? `${k.score}/${k.max}` : `n/d, vale 0 de ${k.max}`})</span>: {k.reasons.join(" · ") || "—"}
             </p>
           ))}
-          {c.penalties.map((p) => (
-            <p key={p.label} className="text-danger">
-              {p.points} · {p.label}
-            </p>
-          ))}
-          {c.noTradeReasons.length ? (
-            <div className="rounded-md border border-danger/30 bg-danger/10 p-2 text-danger">
-              <span className="font-semibold">NO TRADE:</span> {c.noTradeReasons.join(" · ")}
-            </div>
-          ) : null}
-          <p className="text-muted-foreground">Nota = soma dos componentes e penalidades ÷ máximo dos componentes disponíveis. Qualidade de confluência, não probabilidade.</p>
+          {c.penalties.length ? (
+            c.penalties.map((p) => (
+              <p key={p.label} className="text-danger">
+                {p.points} · {p.label}
+              </p>
+            ))
+          ) : (
+            <p className="text-muted-foreground">Sem penalidades.</p>
+          )}
+          <p className="text-muted-foreground">
+            Final = Raw ({c.raw.toFixed(1)}) + Penalties ({c.penaltyTotal.toFixed(1)}){clamped ? ", limitado a 0–100" : ""} = {c.score}. Pesos: Structure 20, Liquidity 15, HTF 15, Volume 10, Momentum 10, Derivatives 10, Historical 10, Risk 10. Componente sem dado vale 0. Mede qualidade de confluência, não probabilidade.
+          </p>
         </div>
       ) : null}
+      <Stamp {...c.stamp} />
     </Panel>
   );
 }
@@ -217,26 +239,40 @@ function Check({ ok }: { ok: boolean }) {
   );
 }
 
+const CONDITION_LABEL: Record<string, string> = {
+  NO_SETUP: "NO SETUP",
+  NEUTRAL: "NEUTRAL",
+  LOW_CONFLUENCE: "LOW CONFLUENCE",
+  CONFLICTING_TIMEFRAMES: "CONFLICTING TIMEFRAMES",
+  DATA_UNAVAILABLE: "DATA UNAVAILABLE",
+};
+
+/** Máquina de estados do setup. Sem linguagem de ordem: descreve estado, checagens e o nível de gatilho. */
 export function SetupPanel({ ctx }: { ctx: MarketContext }) {
   const s = ctx.setup;
-  const noTrade = ctx.confluence.verdict === "NO_TRADE";
+  const c = ctx.confluence;
+  const noTrade = c.verdict === "NO_TRADE";
   return (
-    <Panel title="Setup Status">
+    <Panel title="Setup Status" action={<span className="rounded border border-border px-1.5 text-[11px] text-muted-foreground">{ctx.timeframe}</span>}>
       {!s ? (
         <>
-          <div className="mb-2 rounded-md bg-muted py-2 text-center text-sm font-bold text-muted-foreground">NO SETUP</div>
-          <Unavailable>{ctx.confluence.noTradeReasons[0] ?? "Sem direção ou níveis suficientes para montar entrada, invalidação e alvo."}</Unavailable>
+          <div className="mb-2 rounded-md bg-muted py-2 text-center text-sm font-bold text-muted-foreground">{CONDITION_LABEL[c.condition] ?? "NO SETUP"}</div>
+          <Unavailable>{c.noTradeReasons[0] ?? "Sem direção ou níveis suficientes para montar zona, invalidação e alvo."}</Unavailable>
         </>
       ) : (
         <>
           <div className={cn("mb-2 rounded-md py-2 text-center text-sm font-bold tracking-wide", STATE_STYLE[s.state])}>{s.state.replace("_", " ")}</div>
+          {c.condition !== "OK" && c.condition !== "NO_SETUP" ? <p className="mb-1 text-center text-[11px] font-semibold text-warning">{CONDITION_LABEL[c.condition]}</p> : null}
           <MetricRow label="Direction" value={DIR(s.direction)} tone={dirTone(s.direction)} />
           <MetricRow label="Setup Detected" value={<Check ok={s.checks.setupDetected} />} />
           <MetricRow label="Structure Aligned" value={<Check ok={s.checks.structureAligned} />} />
-          <MetricRow label="Confluence Met" value={<Check ok={s.checks.confluenceMet} />} />
+          <MetricRow label="Confluence ≥ 60" value={<Check ok={s.checks.confluenceMet} />} />
           <MetricRow label="Awaiting Trigger" value={<Check ok={s.checks.awaitingTrigger} />} />
+          <MetricRow label="Trigger Level" value={s.triggerLevel ? px(s.triggerLevel.price) : "—"} tone="info" hint={s.triggerLevel?.source ?? "aguardando swing interno a favor"} />
+          <MetricRow label="Entry Zone" value={zone(s.entryZone)} hint={`nível-chave: ${s.keyLevel.source}`} />
+          <MetricRow label="Invalidation" value={px(s.invalidation.price)} tone="down" hint={s.invalidation.source} />
           <p className="mt-2 text-[11px] text-muted-foreground">{s.stateReason}</p>
-          {noTrade ? <p className="mt-1 text-[11px] font-semibold text-danger">NO TRADE · {ctx.confluence.noTradeReasons.join(" · ")}</p> : null}
+          {noTrade ? <p className="mt-1 text-[11px] font-semibold text-danger">NO TRADE · {c.noTradeReasons.join(" · ")}</p> : null}
         </>
       )}
     </Panel>
@@ -245,12 +281,39 @@ export function SetupPanel({ ctx }: { ctx: MarketContext }) {
 
 /* ------------------------------------------------------------------ Derivatives */
 
-export function DerivativesPanel({ ctx }: { ctx: MarketContext }) {
+function useNow(ms = 30_000) {
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+  return now;
+}
+
+export function countdown(to: number, now: number) {
+  const s = Math.max(0, Math.round((to - now) / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+}
+
+export function DerivativesPanel({ ctx, onSwitchPerp }: { ctx: MarketContext; onSwitchPerp?: () => void }) {
   const d = ctx.derivatives;
+  const now = useNow();
+  const spot = ctx.instrument === "spot";
   return (
     <Panel title="Derivatives" action={d ? <span className="text-[10.5px] uppercase text-muted-foreground">{d.exchange} perp</span> : null}>
-      {!d ? (
-        <Unavailable>{ctx.derivativesError ?? "Derivativos indisponíveis."} Preço spot segue normal.</Unavailable>
+      {spot ? (
+        <>
+          <Unavailable>Spot: funding, open interest e liquidações se aplicam a contratos perpétuos.</Unavailable>
+          {onSwitchPerp ? (
+            <button onClick={onSwitchPerp} className="mt-2 h-8 w-full rounded-md border border-border text-[12px] font-semibold hover:bg-muted">
+              Switch to Perpetual
+            </button>
+          ) : null}
+        </>
+      ) : !d ? (
+        <Unavailable>{ctx.derivativesError ?? "Derivativos indisponíveis."}</Unavailable>
       ) : (
         <>
           <MetricRow label="Open Interest" value={<>{d.openInterestUsd != null ? formatCompact(d.openInterestUsd) : "—"} {d.openInterestChange24hPct != null ? <span className={d.openInterestChange24hPct >= 0 ? "text-success" : "text-danger"}>{formatPct(d.openInterestChange24hPct, 1)}</span> : null}</>} />
@@ -259,7 +322,8 @@ export function DerivativesPanel({ ctx }: { ctx: MarketContext }) {
             value={d.openInterestUsd != null && d.openInterestChange24hPct != null ? formatCompact((d.openInterestUsd * d.openInterestChange24hPct) / (100 + d.openInterestChange24hPct)) : "—"}
             tone={d.openInterestChange24hPct != null ? (d.openInterestChange24hPct >= 0 ? "up" : "down") : "muted"}
           />
-          <MetricRow label="Funding Rate" value={Number.isFinite(d.fundingRate) ? `${(d.fundingRate * 100).toFixed(4)}%` : "—"} tone={d.fundingRate > 0.0005 ? "warn" : undefined} />
+          <MetricRow label="Funding Rate" value={Number.isFinite(d.fundingRate) ? `${(d.fundingRate * 100).toFixed(4)}%` : "—"} tone={Math.abs(d.fundingRate) > 0.0005 ? "warn" : undefined} />
+          <MetricRow label="Next Funding" value={Number.isFinite(d.nextFundingTime) && d.nextFundingTime > 0 ? countdown(d.nextFundingTime, now) : "—"} hint={Number.isFinite(d.nextFundingTime) ? formatDateTime(d.nextFundingTime) : undefined} />
           <MetricRow label="Liquidations (24h)" value="n/d" tone="muted" hint={d.liquidationsNote} />
           <MetricRow label="Long/Short Ratio" value={d.longShortRatio != null ? d.longShortRatio.toFixed(2) : "n/d"} />
           <MetricRow
@@ -267,6 +331,9 @@ export function DerivativesPanel({ ctx }: { ctx: MarketContext }) {
             value={d.takerBuyVol != null && d.takerSellVol != null && d.takerBuyVol + d.takerSellVol > 0 ? `${((d.takerBuyVol / (d.takerBuyVol + d.takerSellVol)) * 100).toFixed(1)}% / ${((d.takerSellVol / (d.takerBuyVol + d.takerSellVol)) * 100).toFixed(1)}%` : "n/d"}
           />
           <Stamp {...d.stamp} />
+          <a href={`/derivatives?symbol=${ctx.symbol}&exchange=${ctx.exchange}`} className="mt-2 flex h-8 items-center justify-center rounded-md border border-border text-[12px] font-semibold hover:bg-muted">
+            View Details
+          </a>
         </>
       )}
     </Panel>
@@ -279,23 +346,35 @@ export function HistoricalPanel({ ctx, className }: { ctx: MarketContext; classN
   const h = ctx.historical;
   const r = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}R`);
   const pc = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v * 100)}%`);
+  const d = (t: number) => new Date(t).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
   return (
-    <Panel className={className} title="Historical Performance" action={<span className="rounded border border-border px-1.5 text-[11px] text-muted-foreground">{ctx.timeframe}</span>}>
+    <Panel
+      className={className}
+      title="Historical Performance"
+      action={h?.smallSample ? <span className="rounded bg-warning/15 px-1.5 text-[10.5px] font-semibold text-warning">LOW SAMPLE SIZE</span> : <span className="rounded border border-border px-1.5 text-[11px] text-muted-foreground">{ctx.timeframe}</span>}
+    >
       {!h ? (
         <Unavailable>Sem backtest para este ativo/timeframe (histórico insuficiente).</Unavailable>
       ) : (
         <>
-          <MetricRow label="Total Setups" value={`${h.samples}${h.scope === "universe" ? " (30 ativos)" : ""}`} hint={h.scope === "universe" ? "Amostra do ativo abaixo de 30: usando o universo" : undefined} />
-          <MetricRow label="Hit Rate (TP1)" value={pc(h.hitRate)} hint={h.hitRateCi ? `IC 95% ${pc(h.hitRateCi.low)}–${pc(h.hitRateCi.high)}` : undefined} />
-          <MetricRow label="Hit Rate (1R)" value={pc(h.hit1R)} />
-          <MetricRow label="Hit Rate (2R)" value={pc(h.hit2R)} />
-          <MetricRow label="Expectancy" value={r(h.expectancyR)} tone={h.expectancyR != null ? (h.expectancyR > 0 ? "up" : "down") : "muted"} />
-          <MetricRow label="Profit Factor" value={h.profitFactor != null ? h.profitFactor.toFixed(2) : "—"} />
-          <MetricRow label="Max Drawdown" value={h.maxDrawdownR != null ? `-${h.maxDrawdownR.toFixed(1)}R` : "—"} tone="down" />
-          <MetricRow label="By regime (bull / bear / range)" value={<span className="text-[11px]">{`${r(h.regime.bull)} / ${r(h.regime.bear)} / ${r(h.regime.range)}`}</span>} />
-          {h.smallSample ? <p className="mt-1 text-[11px] text-warning">Amostra pequena (n &lt; {h.minSample}): não usar isoladamente.</p> : null}
+          <p className="mb-1.5 text-[11px] text-muted-foreground" title={h.method}>
+            {h.scope === "universe" ? "Universo (30 ativos)" : `${ctx.symbol}/USDT`} · {ctx.timeframe.toUpperCase()} · Structure Pullback · regime atual {ctx.regime.regime} · {d(h.fromTime)}–{d(h.toTime)}
+          </p>
+          <div className="grid grid-cols-1 gap-x-4 @min-[520px]:grid-cols-2">
+            <MetricRow label="Total Setups" value={String(h.samples)} hint={h.scope === "universe" ? `Amostra do ativo abaixo de ${h.minSample}: usando o universo` : undefined} />
+            <MetricRow label="Expectancy" value={r(h.expectancyR)} tone={h.expectancyR != null ? (h.expectancyR > 0 ? "up" : "down") : "muted"} />
+            <MetricRow label="Hit 1R / 2R / 3R" value={`${pc(h.hit1R)} / ${pc(h.hit2R)} / ${pc(h.hit3R)}`} hint="% das operações cuja excursão a favor atingiu 1R, 2R e 3R" />
+            <MetricRow label="Avg R" value={r(h.avgR)} />
+            <MetricRow label="Profit Factor" value={h.profitFactor != null ? h.profitFactor.toFixed(2) : "—"} />
+            <MetricRow label="Max Drawdown" value={h.maxDrawdownR != null ? `-${h.maxDrawdownR.toFixed(1)}R` : "—"} tone="down" />
+            <MetricRow label="Avg MFE" value={r(h.avgMfeR)} tone="up" hint="excursão máxima a favor, média" />
+            <MetricRow label="Avg MAE" value={h.avgMaeR != null ? `-${h.avgMaeR.toFixed(2)}R` : "—"} tone="down" hint="excursão máxima contra, média" />
+            <MetricRow label="Hit TP1 (IC 95%)" value={pc(h.hitRate)} hint={h.hitRateCi ? `IC 95% ${pc(h.hitRateCi.low)}–${pc(h.hitRateCi.high)}` : undefined} />
+            <MetricRow label="Bull / Bear / Range" value={<span className="text-[11px]">{`${r(h.regime.bull)} / ${r(h.regime.bear)} / ${r(h.regime.range)}`}</span>} />
+          </div>
+          {h.smallSample ? <p className="mt-1 text-[11px] text-warning">LOW SAMPLE SIZE (n &lt; {h.minSample}): não usar isoladamente.</p> : null}
           <p className="mt-1 text-[10.5px] text-muted-foreground" title={h.method}>
-            Backtest walk-forward do setup · {new Date(h.fromTime).toLocaleDateString("pt-BR")}–{new Date(h.toTime).toLocaleDateString("pt-BR")}
+            Backtest walk-forward causal · {h.dataSource} · sem taxas/slippage
           </p>
         </>
       )}

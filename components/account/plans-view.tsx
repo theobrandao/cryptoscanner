@@ -71,7 +71,7 @@ export function PlansView() {
 
   return (
     <PageShell>
-      <PageTitle title="Plans" description="7 dias de teste completo. Depois, PRO ou ELITE. Sem plano gratuito; sua conta e configurações ficam salvas." />
+      <PageTitle title="Choose Your Plan" description="7 dias de teste completo. Depois, PRO ou ELITE. Sem plano gratuito; sua conta e configurações ficam salvas." />
       {params.get("checkout") === "return" ? <Alert variant="info" className="mb-4" title="Pagamento em processamento">A confirmação do Mercado Pago pode levar alguns minutos. Esta página atualiza sozinha.</Alert> : null}
       {data ? (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm">
@@ -91,9 +91,9 @@ export function PlansView() {
         {(["PRO", "ELITE"] as const).map((p) => {
           const current = data && data.plan === p && (data.status === "ACTIVE" || data.status === "CANCELLED");
           return (
-            <section key={p} className={cn("flex flex-col rounded-xl border bg-card p-5", p === "ELITE" ? "border-ai/50" : "border-border")}>
+            <section key={p} className={cn("flex flex-col rounded-xl border bg-card p-5", p === "ELITE" ? "border-primary/40" : "border-border")}>
               <div className="flex items-center justify-between">
-                <h2 className={cn("text-lg font-bold", p === "ELITE" && "bg-gradient-to-r from-ai to-primary bg-clip-text text-transparent")}>{p}</h2>
+                <h2 className="text-lg font-bold">{p}</h2>
                 {p === "PRO" ? <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">Mais escolhido</span> : null}
               </div>
               <div className="mt-2">
@@ -117,7 +117,7 @@ export function PlansView() {
                 <button
                   onClick={() => void checkout(p)}
                   disabled={!data?.billing.configured || busy !== null || data?.tier === "ADMIN"}
-                  className={cn("mt-5 h-10 rounded-md text-sm font-semibold disabled:opacity-50", p === "ELITE" ? "bg-gradient-to-r from-ai to-primary text-white" : "bg-primary text-primary-foreground")}
+                  className={cn("mt-5 h-10 rounded-md text-sm font-semibold disabled:opacity-50", "bg-primary text-primary-foreground hover:brightness-110")}
                 >
                   {busy === p ? "Abrindo Mercado Pago…" : `Assinar ${p}`}
                 </button>

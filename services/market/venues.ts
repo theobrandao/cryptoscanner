@@ -17,16 +17,8 @@ import { getCandles, getTicker } from "@/services/market/market-service";
  *
  * Docs: Binance Spot /api/v3 e USDⓈ-M /fapi/v1; Bybit v5 /v5/market (category spot|linear); OKX v5 /api/v5/market.
  */
-export const VENUES = ["binance", "bybit", "okx"] as const;
-export type Venue = (typeof VENUES)[number];
-export const INSTRUMENTS = ["spot", "perp"] as const;
-export type Instrument = (typeof INSTRUMENTS)[number];
-
-export const VENUE_LABEL: Record<Venue, string> = { binance: "Binance", bybit: "Bybit", okx: "OKX" };
-export const INSTRUMENT_LABEL: Record<Instrument, string> = { spot: "Spot", perp: "Perpetual" };
-
-export const isVenue = (v: unknown): v is Venue => typeof v === "string" && (VENUES as readonly string[]).includes(v);
-export const isInstrument = (v: unknown): v is Instrument => typeof v === "string" && (INSTRUMENTS as readonly string[]).includes(v);
+import { VENUES, VENUE_LABEL, INSTRUMENT_LABEL, type Instrument, type Venue } from "@/lib/venues";
+export { VENUES, INSTRUMENTS, VENUE_LABEL, INSTRUMENT_LABEL, isVenue, isInstrument, type Venue, type Instrument } from "@/lib/venues";
 
 export interface VenueTicker {
   price: number;

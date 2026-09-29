@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { useRouter } from "next/navigation";
 import { Plus, Star } from "lucide-react";
 import { Panel, Unavailable } from "@/components/terminal/panels";
 import { useTickers } from "@/hooks/use-tickers";
@@ -17,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { MarketContext } from "@/services/market-context-service";
 import type { MarketOverview, SetupRow } from "@/services/market-overview-service";
 import type { Timeframe } from "@/types/market";
+import type { Instrument } from "@/lib/venues";
 
 const px = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? "—" : formatPrice(v));
 
@@ -34,11 +34,10 @@ function Tabs<T extends string>({ items, value, onChange, className }: { items: 
 
 /* ------------------------------------------------------------------ Watchlist */
 
-const WL_TABS = ["All", "Majors", "Layer 1", "Layer 2", "DeFi", "AI", "Memes", "Custom"] as const;
+const WL_TABS = ["All", "Majors", "Layer 1", "DeFi", "AI", "Memes", "Custom"] as const;
 
-export function WatchlistPanel({ selected, tf, trendBySymbol }: { selected: string; tf: Timeframe; trendBySymbol: Map<string, string> }) {
+export function WatchlistPanel({ selected, trendBySymbol, onSelect }: { selected: string; trendBySymbol: Map<string, string>; onSelect: (symbol: string) => void }) {
   const { bySymbol } = useTickers();
-  const router = useRouter();
   const { user } = useSession();
   const [tab, setTab] = useLocalStorage<(typeof WL_TABS)[number]>("cs-wl-tab", "All");
   const { data: wl } = useSWR<{ items: Array<{ symbol: string }> }>(user && tab === "Custom" ? "/api/watchlist" : null);
@@ -74,7 +73,7 @@ export function WatchlistPanel({ selected, tf, trendBySymbol }: { selected: stri
               const a = ASSETS.find((x) => x.symbol === s);
               const trend = trendBySymbol.get(s);
               return (
-                <tr key={s} onClick={() => router.push(`/charts/${s}?tf=${tf}`)} className={cn("cursor-pointer border-t border-border/60 hover:bg-muted/50", s === selected && "bg-primary/10")}>
+                <tr key={s} onClick={() => onSelect(s)} className={cn("cursor-pointer border-t border-border/60 hover:bg-muted/50", s === selected && "bg-primary/10")} aria-selected={s === selected}>
                   <td className="px-3 py-1.5">
                     <span className="flex items-center gap-2">
                       <Star className="h-3 w-3 text-muted-foreground" />
@@ -100,7 +99,7 @@ export function WatchlistPanel({ selected, tf, trendBySymbol }: { selected: stri
 
 /* ------------------------------------------------------------------ Market Overview */
 
-const MO_TABS = ["Top Gainers", "Top Losers", "Volume Leaders"] as const;
+const MO_TABS = ["Top Gainers", "Top Losers", "Volume Leaders", "Market Cap"] as const;
 
 function FearGreedGauge({ value, label }: { value: number; label: string }) {
   const color = value >= 75 ? "var(--success)" : value >= 55 ? "var(--info)" : value >= 45 ? "var(--muted-foreground)" : value >= 25 ? "var(--warning)" : "var(--danger)";
@@ -118,14 +117,15 @@ function FearGreedGauge({ value, label }: { value: number; label: string }) {
 export function MarketOverviewPanel() {
   const { data } = useSWR<MarketOverview>("/api/markets/overview", { refreshInterval: 120_000 });
   const [tab, setTab] = React.useState<(typeof MO_TABS)[number]>("Top Gainers");
-  const rows = tab === "Top Gainers" ? data?.topGainers : tab === "Top Losers" ? data?.topLosers : data?.volumeLeaders;
+  const rows = tab === "Top Gainers" ? data?.topGainers : tab === "Top Losers" ? data?.topLosers : tab === "Volume Leaders" ? data?.volumeLeaders : data?.marketCapLeaders;
+  const fin = (v: number | undefined) => v != null && Number.isFinite(v);
   const g = data?.global;
   return (
     <Panel title="Market Overview" action={<span className="text-[11px] text-muted-foreground">24h</span>} bodyClassName="p-0">
       <div className="grid grid-cols-2 gap-2 p-3">
-        <Tile label="Total Market Cap" value={g ? formatCompact(g.totalMarketCapUsd) : "—"} sub={g ? formatPct(g.marketCapChange24hPct) : null} up={g ? g.marketCapChange24hPct >= 0 : undefined} title={g ? `${g.source}${g.stale ? " (cache)" : ""}` : "indisponível"} />
-        <Tile label="24h Volume" value={g ? formatCompact(g.totalVolumeUsd) : "—"} title={g?.source} />
-        <Tile label="BTC Dominance" value={g ? `${g.btcDominance.toFixed(1)}%` : "—"} sub={g ? `ETH ${g.ethDominance.toFixed(1)}%` : null} title={g?.source} />
+        <Tile label="Total Market Cap" value={g && fin(g.totalMarketCapUsd) ? formatCompact(g.totalMarketCapUsd) : "—"} sub={g && fin(g.marketCapChange24hPct) ? formatPct(g.marketCapChange24hPct) : null} up={g ? g.marketCapChange24hPct >= 0 : undefined} title={g ? `${g.source}${g.stale ? " (cache)" : ""}` : "indisponível"} />
+        <Tile label="24h Volume" value={g && fin(g.totalVolumeUsd) ? formatCompact(g.totalVolumeUsd) : "—"} title={g?.source} />
+        <Tile label="BTC Dominance" value={g && fin(g.btcDominance) ? `${g.btcDominance.toFixed(1)}%` : "—"} sub={g && fin(g.ethDominance) ? `ETH ${g.ethDominance.toFixed(1)}%` : null} title={g?.source} />
         <div className="rounded-md border border-border p-2" title={data?.fearGreed ? `${data.fearGreed.source}${data.fearGreed.stale ? " (cache)" : ""}` : "indisponível"}>
           <div className="text-[10.5px] text-muted-foreground">Fear &amp; Greed</div>
           {data?.fearGreed ? (
@@ -147,7 +147,7 @@ export function MarketOverviewPanel() {
               <th className="px-2 py-1.5 font-medium">Symbol</th>
               <th className="px-2 py-1.5 text-right font-medium">Price</th>
               <th className="px-2 py-1.5 text-right font-medium">24h %</th>
-              <th className="px-3 py-1.5 text-right font-medium">Volume</th>
+              <th className="px-3 py-1.5 text-right font-medium">{tab === "Market Cap" ? "Mkt Cap" : "Volume"}</th>
             </tr>
           </thead>
           <tbody>
@@ -157,12 +157,13 @@ export function MarketOverviewPanel() {
                 <td className="px-2 py-1.5 font-medium">{r.symbol}</td>
                 <td className="tabular px-2 py-1.5 text-right">{px(r.price)}</td>
                 <td className={cn("tabular px-2 py-1.5 text-right", (r.changePct24h ?? 0) >= 0 ? "text-success" : "text-danger")}>{r.changePct24h != null ? formatPct(r.changePct24h) : "—"}</td>
-                <td className="tabular px-3 py-1.5 text-right text-muted-foreground">{formatCompact(r.volume24h, "$")}</td>
+                <td className="tabular px-3 py-1.5 text-right text-muted-foreground">{formatCompact(tab === "Market Cap" ? r.marketCap : r.volume24h, "$")}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {data && !rows?.length ? <div className="p-3"><Unavailable>Ranking indisponível (CoinGecko).</Unavailable></div> : null}
+        {data && !rows?.length ? <div className="p-3"><Unavailable>Ranking indisponível (fontes de mercado sem resposta).</Unavailable></div> : null}
+        {data?.moversSource ? <p className="border-t border-border px-3 py-1 text-[10px] text-muted-foreground">Fonte: {data.moversSource.source}{data.moversSource.stale ? " · cache" : ""}</p> : null}
       </div>
     </Panel>
   );
@@ -178,62 +179,60 @@ function Tile({ label, value, sub, up, title }: { label: string; value: string; 
   );
 }
 
-/* ------------------------------------------------------------------ Market Scanner */
+/* ------------------------------------------------------------------ Market Scanner (preview: Top Setups) */
 
-const SC_TABS = ["Top Setups", "Ready", "Bullish", "Bearish", "All"] as const;
+/** Faixas do Confluence Score (iguais às do motor): Low < 40 ≤ Moderate < 60 ≤ Good < 75 ≤ Strong < 90 ≤ Exceptional. */
+export function scoreTone(score: number) {
+  return score >= 75 ? "bg-success/20 text-success" : score >= 60 ? "bg-info/20 text-info" : score >= 40 ? "bg-muted text-foreground" : "bg-muted text-muted-foreground";
+}
 
-export function ScannerPanel({ tf, selected }: { tf: Timeframe; selected: string }) {
+export function ScannerPanel({ tf, selected, onSelect }: { tf: Timeframe; selected: string; onSelect: (symbol: string) => void }) {
   const { data, error } = useSWR<{ rows: SetupRow[]; generatedAt: number }>(`/api/markets/setups?tf=${tf}`, { refreshInterval: 120_000, revalidateOnFocus: false });
-  const [tab, setTab] = React.useState<(typeof SC_TABS)[number]>("Top Setups");
-  const router = useRouter();
-  const rows = (data?.rows ?? []).filter((r) =>
-    tab === "Top Setups" ? r.verdict !== "NO_TRADE" : tab === "Ready" ? r.state === "READY" || r.state === "TRIGGERED" : tab === "Bullish" ? r.direction === "bullish" && r.verdict !== "NO_TRADE" : tab === "Bearish" ? r.direction === "bearish" && r.verdict !== "NO_TRADE" : true,
-  );
+  const rows = (data?.rows ?? []).filter((r) => r.verdict !== "NO_TRADE").slice(0, 8);
   return (
     <Panel
-      title="Market Scanner"
+      title="Market Scanner · Top Setups"
       action={
-        <Link href="/scanner" className="text-[11px] text-muted-foreground hover:text-foreground">
+        <Link href={`/scanner?tf=${tf}`} className="text-[11px] text-muted-foreground hover:text-foreground">
           Open scanner →
         </Link>
       }
       bodyClassName="p-0"
     >
-      <Tabs items={SC_TABS} value={tab} onChange={setTab} className="border-b border-border px-2 py-1.5" />
       {error ? <div className="p-3"><Unavailable>Scanner indisponível no momento. Tente novamente.</Unavailable></div> : null}
       {!data && !error ? <div className="skeleton m-3 h-40 rounded-md" /> : null}
-      <div className="max-h-[280px] overflow-y-auto">
+      <div className="max-h-[300px] overflow-y-auto">
         <table className="w-full whitespace-nowrap text-[12px]">
           <thead className="sticky top-0 bg-card text-left text-[11px] text-muted-foreground">
             <tr>
               <th className="px-3 py-1.5 font-medium">#</th>
               <th className="px-2 py-1.5 font-medium">Symbol</th>
-              <th className="px-2 py-1.5 text-right font-medium">Price</th>
               <th className="px-2 py-1.5 font-medium">Setup</th>
-              <th className="px-2 py-1.5 text-right font-medium">Score</th>
-              <th className="px-3 py-1.5 text-right font-medium">24h %</th>
+              <th className="px-2 py-1.5 text-right font-medium">R:R</th>
+              <th className="px-3 py-1.5 text-right font-medium">Score</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={r.symbol} onClick={() => router.push(`/charts/${r.symbol}?tf=${tf}`)} className={cn("cursor-pointer border-t border-border/60 hover:bg-muted/50", r.symbol === selected && "bg-primary/10")}>
+              <tr key={r.symbol} onClick={() => onSelect(r.symbol)} className={cn("cursor-pointer border-t border-border/60 hover:bg-muted/50", r.symbol === selected && "bg-primary/10")}>
                 <td className="px-3 py-1.5 text-muted-foreground">{i + 1}</td>
                 <td className="px-2 py-1.5 font-medium">{r.symbol}/USDT</td>
-                <td className="tabular px-2 py-1.5 text-right">{px(r.price)}</td>
                 <td className={cn("px-2 py-1.5 text-[11px]", r.direction === "bullish" ? "text-success" : r.direction === "bearish" ? "text-danger" : "text-muted-foreground")}>
-                  {r.verdict === "NO_TRADE" ? "No trade" : `${r.direction === "bullish" ? "Bullish" : "Bearish"} · ${(r.state ?? "").toLowerCase().replace("_", " ")}`}
+                  {r.direction === "bullish" ? "Bullish" : "Bearish"} · {(r.state ?? "—").replace("_", " ")}
                 </td>
-                <td className="px-2 py-1.5 text-right">
-                  <span className={cn("tabular inline-block min-w-8 rounded px-1.5 py-0.5 text-center text-[11px] font-semibold", r.score >= 75 ? "bg-success/20 text-success" : r.score >= 65 ? "bg-info/20 text-info" : "bg-muted text-muted-foreground")}>{r.score}</span>
+                <td className="tabular px-2 py-1.5 text-right text-muted-foreground">{r.rr != null ? r.rr.toFixed(1) : "—"}</td>
+                <td className="px-3 py-1.5 text-right">
+                  <span className={cn("tabular inline-block min-w-8 rounded px-1.5 py-0.5 text-center text-[11px] font-semibold", scoreTone(r.score))} title={r.label}>
+                    {r.score}
+                  </span>
                 </td>
-                <td className={cn("tabular px-3 py-1.5 text-right", (r.changePct24h ?? 0) >= 0 ? "text-success" : "text-danger")}>{r.changePct24h != null ? formatPct(r.changePct24h) : "—"}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {data && rows.length === 0 ? <div className="p-3"><Unavailable>Nenhum ativo neste filtro agora.</Unavailable></div> : null}
+        {data && rows.length === 0 ? <div className="p-3"><Unavailable>Nenhum setup operável agora no {tf.toUpperCase()} (todos em NO TRADE).</Unavailable></div> : null}
       </div>
-      <p className="border-t border-border px-3 py-1.5 text-[10.5px] text-muted-foreground">Ranking técnico por Confluence Score — não é recomendação.</p>
+      <p className="border-t border-border px-3 py-1.5 text-[10.5px] text-muted-foreground">Binance spot · ranking técnico por Confluence Score, não é recomendação.</p>
     </Panel>
   );
 }
@@ -242,11 +241,13 @@ export function ScannerPanel({ tf, selected }: { tf: Timeframe; selected: string
 
 export function RiskPanel({ ctx }: { ctx: MarketContext }) {
   const s = ctx.setup;
+  const perp = (ctx.instrument as Instrument) === "perp";
   const [side, setSide] = React.useState<"long" | "short">(s?.direction === "bearish" ? "short" : "long");
-  const [account] = useLocalStorage("cs-risk-account", "10000");
-  const [riskPct] = useLocalStorage("cs-risk-pct", "1");
-  const [lev] = useLocalStorage("cs-risk-lev", "5");
+  const [account, setAccount] = useLocalStorage("cs-risk-account", "10000");
+  const [riskPct, setRiskPct] = useLocalStorage("cs-risk-pct", "1");
+  const [levRaw, setLev] = useLocalStorage("cs-risk-lev", "5");
   const [mmr] = useLocalStorage("cs-risk-mmr", "0.5");
+  const lev = perp ? levRaw : "1";
   const matches = s && ((side === "long" && s.direction === "bullish") || (side === "short" && s.direction === "bearish"));
   let size: ReturnType<typeof positionSize> | null = null;
   if (matches && s) {
@@ -256,7 +257,7 @@ export function RiskPanel({ ctx }: { ctx: MarketContext }) {
       size = null;
     }
   }
-  const liq = matches && s && size ? liquidationPrice({ side, entry: s.idealEntry, qty: size.qty, leverage: Number(lev), mmr: Number(mmr) / 100 }) : null;
+  const liq = perp && matches && s && size ? liquidationPrice({ side, entry: s.idealEntry, qty: size.qty, leverage: Number(lev), mmr: Number(mmr) / 100 }) : null;
   const q = matches && s ? `?entry=${s.idealEntry.toPrecision(8)}&stop=${s.stop.toPrecision(8)}&target=${s.targets[0]?.price.toPrecision(8) ?? ""}&symbol=${ctx.symbol}` : "";
   return (
     <Panel
@@ -271,6 +272,11 @@ export function RiskPanel({ ctx }: { ctx: MarketContext }) {
         </div>
       }
     >
+      <div className="mb-2 grid grid-cols-3 gap-2 text-[11px]">
+        <NumField label="Balance ($)" value={account} onChange={setAccount} min={1} />
+        <NumField label="Risk %" value={riskPct} onChange={setRiskPct} min={0.1} max={10} step={0.1} />
+        <NumField label="Leverage" value={lev} onChange={setLev} min={1} max={125} disabled={!perp} hint={perp ? undefined : "Spot: sem alavancagem"} />
+      </div>
       {!matches || !s ? (
         <Unavailable>Sem setup {side === "long" ? "comprado" : "vendido"} neste contexto. Use a calculadora para níveis próprios.</Unavailable>
       ) : (
@@ -282,16 +288,34 @@ export function RiskPanel({ ctx }: { ctx: MarketContext }) {
           {s.targets.map((t) => (
             <Row key={t.label} k={`Target ${t.label.slice(2)}`} v={`${px(t.price)} (+${t.r.toFixed(1)}R)`} tone="up" hint={t.source} />
           ))}
-          <Row k="Account Balance" v={`$ ${Number(account).toLocaleString("pt-BR")}`} />
           <Row k="Risk per Trade" v={`${riskPct}% ($ ${size ? size.capitalAtRisk.toFixed(0) : "—"})`} />
-          <Row k="Leverage" v={`${lev}×`} tone="warn" />
-          <Row k="Liq. Price (Estimated)" v={liq ? px(liq) : "—"} hint={`Fórmula Binance isolated, MMR ${mmr}%`} />
+          <Row k="Margin Required" v={size ? `$ ${(size.notional / Number(lev)).toFixed(0)}` : "—"} hint="notional ÷ alavancagem" />
+          <Row k="Est. Liquidation Price" v={perp ? (liq ? px(liq) : "—") : "n/a (spot)"} tone={perp ? "warn" : undefined} hint={perp ? `Estimativa: fórmula Binance isolated, MMR ${mmr}%; a exchange usa tiers e mark price` : "Spot sem alavancagem não tem liquidação"} />
         </div>
       )}
       <Link href={`/risco${q}`} className="mt-3 flex h-9 items-center justify-center rounded-md bg-primary text-[13px] font-semibold text-primary-foreground hover:brightness-110">
         Calculate Position Size
       </Link>
     </Panel>
+  );
+}
+
+function NumField({ label, value, onChange, min, max, step, disabled, hint }: { label: string; value: string; onChange: (v: string) => void; min?: number; max?: number; step?: number; disabled?: boolean; hint?: string }) {
+  return (
+    <label className="flex min-w-0 flex-col gap-0.5" title={hint}>
+      <span className="truncate text-muted-foreground">{label}</span>
+      <input
+        type="number"
+        inputMode="decimal"
+        value={value}
+        min={min}
+        max={max}
+        step={step ?? 1}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="tabular h-7 w-full rounded border border-input bg-background px-1.5 text-[12px] outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+      />
+    </label>
   );
 }
 

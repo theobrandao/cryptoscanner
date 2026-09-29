@@ -22,14 +22,20 @@ import {
   Moon,
   Radar,
   Search,
+  Eye,
+  EyeOff,
   Settings,
   ShieldCheck,
-  Sparkles,
   Star,
   Sun,
   Workflow,
   X,
 } from "lucide-react";
+import { AiAnalystButton } from "@/components/terminal/ai-analyst";
+import { useActiveSelection } from "@/hooks/use-market-selection";
+import { useLocalStorage } from "@/hooks/use-local-storage";
+import { timeAgo } from "@/lib/format";
+import { INSTRUMENT_LABEL, VENUE_LABEL } from "@/lib/venues";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTheme } from "@/components/providers/theme-provider";
@@ -38,6 +44,7 @@ import { useTickers } from "@/hooks/use-tickers";
 import { ASSETS } from "@/lib/assets";
 import { apiFetch } from "@/lib/client-api";
 import { formatPct, formatPrice } from "@/lib/format";
+import type { VenueStatus } from "@/services/market/venues";
 import { cn } from "@/lib/utils";
 
 type NavLink = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match?: string[] };
@@ -48,7 +55,7 @@ export const PRIMARY_NAV: NavLink[] = [
   { href: "/panorama", label: "Markets", icon: Globe2, match: ["/panorama", "/bubbles"] },
   { href: "/scanner", label: "Market Scanner", icon: Radar },
   { href: "/sentinela", label: "Market Monitor", icon: Activity },
-  { href: "/charts/BTC", label: "Charts", icon: CandlestickChart, match: ["/charts", "/graficos", "/terminal", "/fibonacci"] },
+  { href: "/charts", label: "Charts", icon: CandlestickChart, match: ["/charts", "/graficos", "/terminal", "/fibonacci"] },
   { href: "/derivatives", label: "Derivatives", icon: Gauge },
   { href: "/agentes", label: "Strategies", icon: Workflow },
   { href: "/estatisticas", label: "Backtest", icon: FlaskConical },
@@ -64,11 +71,18 @@ const SECONDARY_NAV: NavLink[] = [
 const FOOT_NAV: NavLink[] = [
   { href: "/preferencias", label: "Settings", icon: Settings },
   { href: "/suporte", label: "Help & Support", icon: HelpCircle },
+];
+
+/** Páginas fora da sidebar, acessíveis pela busca global. */
+const EXTRA_PAGES: NavLink[] = [
   { href: "/jornada", label: "Academy", icon: BookOpen },
+  { href: "/bubbles", label: "Market Bubbles", icon: Globe2 },
+  { href: "/planos", label: "Plans & Billing", icon: Briefcase },
+  { href: "/status", label: "System Status", icon: Activity },
 ];
 
 const MOBILE_NAV: NavLink[] = [
-  { href: "/charts/BTC", label: "Charts", icon: CandlestickChart, match: ["/charts"] },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/scanner", label: "Scanner", icon: Radar },
   { href: "/sentinela", label: "Monitor", icon: Activity },
   { href: "/risco", label: "Risk", icon: ShieldCheck },
@@ -100,25 +114,47 @@ interface SubscriptionView {
   trialDays: number;
 }
 
+/**
+ * Trial discreto: "Trial · N days left" + barra fina + View Plans. A ênfase cresce no fim do teste:
+ * dias 1–3 neutro, 4–5 destaque leve, 6–7 aviso; expirado → "Choose Your Plan".
+ */
 function TrialCard() {
   const { user } = useSession();
   const { data } = useSWR<SubscriptionView>(user ? "/api/billing/subscription" : null, { revalidateOnFocus: false });
   if (!user || !data || (data.status !== "TRIALING" && data.status !== "EXPIRED" && data.status !== "PAST_DUE")) return null;
-  const pct = data.daysLeft != null ? Math.max(0, Math.min(100, (data.daysLeft / data.trialDays) * 100)) : 0;
-  return (
-    <div className="mx-3 rounded-lg border border-border bg-elevated p-3">
-      <div className="flex items-center gap-2 text-sm font-semibold">
-        <span className="grid h-5 w-5 place-items-center rounded-full bg-warning/20 text-[10px] text-warning">◷</span>
-        {data.status === "TRIALING" ? `${data.daysLeft} ${data.daysLeft === 1 ? "day" : "days"} left` : data.status === "PAST_DUE" ? "Payment pending" : "Trial ended"}
+  if (data.status !== "TRIALING")
+    return (
+      <div className="mx-3 rounded-lg border border-warning/40 bg-warning/10 p-3">
+        <div className="text-[13px] font-semibold">{data.status === "PAST_DUE" ? "Payment pending" : "Trial ended"}</div>
+        <div className="mt-0.5 text-[11px] text-muted-foreground">Sua conta e configurações continuam salvas.</div>
+        <Link href="/planos" className="mt-2 flex h-8 items-center justify-center rounded-md bg-primary text-[12.5px] font-semibold text-primary-foreground hover:brightness-110">
+          Choose Your Plan
+        </Link>
       </div>
-      <div className="mt-0.5 text-[11px] text-muted-foreground">{data.status === "TRIALING" ? "in your free trial" : "choose your plan to continue"}</div>
-      {data.status === "TRIALING" ? (
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
-        </div>
-      ) : null}
-      <Link href="/planos" className="mt-3 flex h-9 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110">
-        Upgrade Now
+    );
+  const left = data.daysLeft ?? 0;
+  const day = Math.min(data.trialDays, Math.max(1, data.trialDays - left + 1)); // dia do teste (1..7)
+  const level = day >= 6 ? "high" : day >= 4 ? "mid" : "low";
+  const pct = Math.max(0, Math.min(100, (left / data.trialDays) * 100));
+  return (
+    <div className={cn("mx-3 rounded-lg border p-3", level === "high" ? "border-warning/40 bg-warning/5" : "border-border bg-elevated")}>
+      <div className="flex items-center justify-between text-[12.5px]">
+        <span className="font-semibold">Trial</span>
+        <span className={cn("tabular", level === "high" ? "text-warning" : "text-muted-foreground")}>
+          {left} {left === 1 ? "day" : "days"} left
+        </span>
+      </div>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
+        <div className={cn("h-full rounded-full", level === "high" ? "bg-warning" : "bg-primary/70")} style={{ width: `${pct}%` }} />
+      </div>
+      <Link
+        href="/planos"
+        className={cn(
+          "mt-2 flex h-8 items-center justify-center rounded-md text-[12.5px] font-semibold",
+          level === "low" ? "border border-border text-muted-foreground hover:text-foreground" : "bg-primary text-primary-foreground hover:brightness-110",
+        )}
+      >
+        View Plans
       </Link>
     </div>
   );
@@ -145,24 +181,19 @@ function SideLink({ l, pathname, onClick, badge }: { l: NavLink; pathname: strin
 }
 
 function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+  const { selection } = useActiveSelection();
+  const nav = PRIMARY_NAV.map((l) => (l.href === "/charts" ? { ...l, href: `/charts/${selection.symbol}?tf=${selection.timeframe}&exchange=${selection.exchange}&instrument=${selection.instrument}` } : l));
   return (
     <div className="flex h-full flex-col gap-3 py-3">
       <div className="px-4 pb-1">
         <BrandMark />
       </div>
       <nav className="flex flex-col gap-0.5 px-2" aria-label="Principal">
-        {PRIMARY_NAV.map((l) => (
-          <SideLink key={l.href} l={l} pathname={pathname} onClick={onNavigate} />
+        {nav.map((l) => (
+          <SideLink key={l.label} l={l} pathname={pathname} onClick={onNavigate} />
         ))}
       </nav>
-      <div className="px-3">
-        <Link href="/mentor" onClick={onNavigate} className="flex h-11 items-center gap-3 rounded-lg border border-border bg-gradient-to-r from-ai/20 to-primary/10 px-3 text-sm font-semibold hover:from-ai/30">
-          <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-ai to-primary text-white">
-            <Sparkles className="h-3.5 w-3.5" />
-          </span>
-          AI Analyst
-        </Link>
-      </div>
+      <div className="mx-4 h-px bg-border" />
       <nav className="flex flex-col gap-0.5 px-2" aria-label="Listas e alertas">
         {SECONDARY_NAV.map((l) => (
           <SideLink key={l.label} l={l} pathname={pathname} onClick={onNavigate} />
@@ -180,17 +211,22 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
   );
 }
 
-const STRIP = ["BTC", "ETH", "SOL", "BNB", "XRP"];
+const STRIP = ["BTC", "ETH", "SOL"];
 
-function TickerStrip() {
+function TickerStrip({ hidden, onToggle }: { hidden: boolean; onToggle: () => void }) {
   const { bySymbol } = useTickers();
   return (
-    <div className="hidden min-w-0 items-center gap-5 overflow-hidden 2xl:flex" aria-label="Cotações">
+    <div className="hidden min-w-0 items-center gap-4 overflow-hidden xl:flex" aria-label="Cotações">
+      <button onClick={onToggle} className="grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={hidden ? "Mostrar cotações" : "Ocultar cotações"} title={hidden ? "Mostrar cotações" : "Ocultar cotações"}>
+        {hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+      </button>
+      {hidden ? null : (
+        <>
       {STRIP.map((s) => {
         const t = bySymbol.get(s);
         const a = ASSETS.find((x) => x.symbol === s);
         return (
-          <Link key={s} href={`/charts/${s}`} className="flex items-center gap-2 text-xs hover:opacity-80">
+          <Link key={s} href={`/?symbol=${s}`} className="flex items-center gap-2 text-xs hover:opacity-80">
             <span className="grid h-6 w-6 place-items-center rounded-full bg-muted text-[12px]">{a?.glyph}</span>
             <span className="leading-tight">
               <span className="block font-semibold text-muted-foreground">{s}</span>
@@ -202,13 +238,23 @@ function TickerStrip() {
           </Link>
         );
       })}
+        </>
+      )}
     </div>
   );
 }
 
-/** Estado do dado: LIVE quando o último ticker tem menos de 30 s; senão mostra o atraso real. */
-function DataStatusPill() {
+const STATUS_TONE: Record<string, string> = { LIVE: "text-success", DELAYED: "text-warning", DEGRADED: "text-warning", FALLBACK: "text-info", OFFLINE: "text-danger" };
+
+/**
+ * "Live Markets" clicável → Market Data Status: estado por exchange (LIVE/DELAYED/DEGRADED/OFFLINE),
+ * latência e última atualização, stream de preços e o contexto ativo.
+ */
+function MarketDataStatus() {
   const { data, connected } = useTickers();
+  const { selection } = useActiveSelection();
+  const [open, setOpen] = React.useState(false);
+  const { data: st } = useSWR<{ checkedAt: number; venues: VenueStatus[] }>(open ? "/api/markets/status" : null, { refreshInterval: open ? 30_000 : 0 });
   const [now, setNow] = React.useState(() => Date.now());
   React.useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 5000);
@@ -217,13 +263,50 @@ function DataStatusPill() {
   const age = data ? Math.max(0, Math.round((now - data.fetchedAt) / 1000)) : null;
   const live = data != null && !data.stale && age != null && age < 30;
   return (
-    <span
-      className={cn("hidden h-8 items-center gap-2 rounded-md border border-border px-3 text-xs font-semibold sm:inline-flex", live ? "text-success" : "text-warning")}
-      title={data ? `Fonte: ${data.source} · ${connected ? "stream" : "polling"} · atualizado há ${age}s` : "sem dados"}
-    >
-      <span className={cn("h-2 w-2 rounded-full", live ? "bg-success live-dot" : "bg-warning")} />
-      {live ? "Live Markets" : data ? (data.stale ? "Data from cache" : `Data delayed ${age}s`) : "Connecting…"}
-    </span>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          className={cn("hidden h-8 items-center gap-2 rounded-md border border-border px-3 text-xs font-semibold hover:bg-muted sm:inline-flex", live ? "text-success" : "text-warning")}
+          aria-label="Market Data Status"
+        >
+          <span className={cn("h-2 w-2 rounded-full", live ? "bg-success live-dot" : "bg-warning")} />
+          {live ? "Live Markets" : data ? (data.stale ? "Data from cache" : `Delayed ${age}s`) : "Connecting…"}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 p-0">
+        <div className="border-b border-border px-3 py-2">
+          <div className="text-[13px] font-semibold">Market Data Status</div>
+          <div className="text-[11px] text-muted-foreground">
+            Contexto ativo: {selection.symbol}/USDT · {VENUE_LABEL[selection.exchange]} {INSTRUMENT_LABEL[selection.instrument]} · {selection.timeframe.toUpperCase()}
+          </div>
+        </div>
+        <ul className="divide-y divide-border text-[12px]">
+          {(st?.venues ?? []).map((v) => (
+            <li key={v.venue} className="flex items-center gap-2 px-3 py-2" title={v.error ?? undefined}>
+              <span className="w-16 font-semibold">{v.label}</span>
+              <span className={cn("w-20 font-semibold", STATUS_TONE[v.status])}>{v.status}</span>
+              <span className="tabular w-14 text-right text-muted-foreground">{v.latencyMs != null ? `${v.latencyMs} ms` : "—"}</span>
+              <span className="ml-auto truncate text-[11px] text-muted-foreground">{v.error ? v.error : timeAgo(v.checkedAt, now)}</span>
+            </li>
+          ))}
+          {!st ? <li className="px-3 py-2 text-muted-foreground">Verificando exchanges…</li> : null}
+          <li className="flex items-center gap-2 px-3 py-2">
+            <span className="w-16 font-semibold">Preços</span>
+            <span className={cn("w-20 font-semibold", live ? "text-success" : "text-warning")}>{live ? "LIVE" : data?.stale ? "DELAYED" : "DELAYED"}</span>
+            <span className="ml-auto truncate text-[11px] text-muted-foreground">
+              {data ? `${data.source} · ${connected ? "stream" : "polling"} · ${age}s` : "sem dados"}
+            </span>
+          </li>
+        </ul>
+        <div className="border-t border-border px-3 py-2 text-[10.5px] text-muted-foreground">
+          LIVE &lt; 1,5 s · DEGRADED lento · DELAYED dado antigo · OFFLINE sem resposta. Detalhes em{" "}
+          <Link href="/status" className="text-primary underline">
+            System Status
+          </Link>
+          .
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -246,7 +329,7 @@ function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-1 rounded-full" aria-label="Conta">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-primary to-ai text-xs font-bold text-white">{initials}</span>
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/20 text-xs font-bold text-foreground">{initials}</span>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
@@ -277,7 +360,8 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
   const router = useRouter();
   const term = q.trim().toLowerCase();
   const assets = ASSETS.filter((a) => !term || a.symbol.toLowerCase().includes(term) || a.name.toLowerCase().includes(term)).slice(0, 8);
-  const pages = [...PRIMARY_NAV, ...FOOT_NAV].filter((n) => term && n.label.toLowerCase().includes(term));
+  const pages = [...PRIMARY_NAV, ...SECONDARY_NAV, ...FOOT_NAV, ...EXTRA_PAGES].filter((n) => term && n.label.toLowerCase().includes(term));
+  const STRATEGIES = ["Structure Pullback", "Breakout", "Liquidity Sweep", "EMA Trend", "Mean Reversion"].filter((i) => term && i.toLowerCase().includes(term));
   const INDICATORS = ["EMA", "RSI", "MACD", "ATR", "Bollinger", "VWAP", "Fibonacci", "Volume Profile"].filter((i) => term && i.toLowerCase().includes(term));
   const go = (href: string) => {
     onOpenChange(false);
@@ -295,8 +379,8 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && assets[0] && go(`/charts/${assets[0].symbol}`)}
-              placeholder="Search markets, pairs, indicators, strategies..."
+              onKeyDown={(e) => e.key === "Enter" && assets[0] && go(`/?symbol=${assets[0].symbol}`)}
+              placeholder="Search markets, pairs, strategies, indicators..."
               className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-9 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
             />
             {q ? (
@@ -307,19 +391,24 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
           </div>
         </DialogHeader>
         <div className="max-h-80 overflow-y-auto p-2 text-sm">
+          {STRATEGIES.map((i) => (
+            <button key={i} onClick={() => go(`/agentes?template=${encodeURIComponent(i)}`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
+              <Workflow className="h-4 w-4 text-muted-foreground" /> {i} <span className="ml-auto text-xs text-muted-foreground">strategy</span>
+            </button>
+          ))}
           {pages.map((p) => (
-            <button key={p.href} onClick={() => go(p.href)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
+            <button key={p.label} onClick={() => go(p.href)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
               <p.icon className="h-4 w-4 text-muted-foreground" /> {p.label}
             </button>
           ))}
           {INDICATORS.map((i) => (
-            <button key={i} onClick={() => go(`/charts/BTC?ind=${encodeURIComponent(i)}`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
-              <CandlestickChart className="h-4 w-4 text-muted-foreground" /> {i} <span className="ml-auto text-xs text-muted-foreground">indicador no Charts</span>
+            <button key={i} onClick={() => go(`/?ind=${encodeURIComponent(i)}`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
+              <CandlestickChart className="h-4 w-4 text-muted-foreground" /> {i} <span className="ml-auto text-xs text-muted-foreground">indicator</span>
             </button>
           ))}
           <div className="px-2 pb-1 pt-2 text-[11px] uppercase tracking-wide text-muted-foreground">Markets</div>
           {assets.map((a) => (
-            <button key={a.symbol} onClick={() => go(`/charts/${a.symbol}`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
+            <button key={a.symbol} onClick={() => go(`/?symbol=${a.symbol}`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
               <span className="w-5 text-center text-muted-foreground">{a.glyph}</span>
               <span className="font-semibold">{a.symbol}/USDT</span>
               <span className="text-muted-foreground">{a.name}</span>
@@ -340,6 +429,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { theme, toggle } = useTheme();
   const [menu, setMenu] = React.useState(false);
   const [search, setSearch] = React.useState(false);
+  const [hideTickers, setHideTickers] = useLocalStorage<boolean>("cs-hide-tickers", false);
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -369,12 +459,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="Buscar (Ctrl+K)"
           >
             <Search className="h-4 w-4 shrink-0" />
-            <span className="truncate">Search markets, pairs, indicators...</span>
+            <span className="truncate">Search markets, pairs, strategies, indicators...</span>
             <kbd className="ml-auto hidden rounded border border-border px-1.5 text-[10px] sm:inline">⌘ K</kbd>
           </button>
-          <TickerStrip />
+          <TickerStrip hidden={hideTickers} onToggle={() => setHideTickers(!hideTickers)} />
           <div className="ml-auto flex items-center gap-1.5">
-            <DataStatusPill />
+            <MarketDataStatus />
+            <AiAnalystButton />
             <Link href="/carteira?tab=alerts" className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted" aria-label="Notificações">
               <Bell className="h-4 w-4" />
             </Link>
@@ -386,7 +477,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <main className="min-w-0 flex-1 pb-16 lg:pb-0">{children}</main>
         <footer className="border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
-          Conteúdo técnico e educacional, não é recomendação de investimento. Dados: Binance, OKX, Kraken, CoinGecko, alternative.me. Confluence Score mede qualidade de confluência, não probabilidade.
+          Conteúdo técnico e educacional, não é recomendação de investimento. Dados: Binance, Bybit, OKX, Kraken, CoinGecko, CoinPaprika, BCB (PTAX), alternative.me. Confluence Score mede qualidade de confluência, não probabilidade.
         </footer>
       </div>
 

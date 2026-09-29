@@ -62,13 +62,15 @@ for (let i = 0; i < 2; i++) {
 consoleErrors.length = 0;
 
 // ------------------------------------------------------------ páginas públicas
-await step("Home carrega com tickers ao vivo e top 20 por volume", async () => {
+await step("Dashboard (anônimo): convite ao teste de 7 dias; barra com busca, Live Markets e AI Analyst neutro", async () => {
   await goto("/");
-  await page.waitForSelector("text=Os 20 ativos mais negociados", { timeout: 20_000 });
-  await page.waitForFunction(() => document.body.innerText.includes("BTC"), null, { timeout: 20_000 });
-  const priceCells = await page.locator("text=/\\$\\s?[0-9][0-9.,]+/").count();
-  expect(priceCells >= 10, `poucos preços renderizados (${priceCells})`);
-  return `${priceCells} preços · ${await shot("home")}`;
+  await page.waitForFunction(() => /Start 7-day trial/.test(document.body.innerText), null, { timeout: 30_000 });
+  await page.getByRole("button", { name: "Market Data Status" }).first().waitFor({ timeout: 10_000 }).catch(() => {});
+  const analyst = await page.getByRole("button", { name: "AI Analyst" }).count();
+  expect(analyst >= 1, "botão AI Analyst ausente na barra superior");
+  const purple = await page.evaluate(() => [...document.querySelectorAll("*")].some((e) => /from-ai|to-ai/.test(e.getAttribute("class") ?? "")));
+  expect(!purple, "gradiente roxo de IA ainda presente");
+  return await shot("dashboard-anonimo");
 });
 
 await step("Scanner: tabela em tempo real com 30 linhas (inclui ZEC e ALGO) e RSI", async () => {
@@ -192,10 +194,13 @@ await step("Mentor: pergunta com dados reais e SOS mindset", async () => {
   return `dados reais + protocolo · ${await shot("mentor")}`;
 });
 
-await step("Planos: 3 planos e bloco PLATINUM", async () => {
+await step("Planos: PRO e ELITE em R$, teste de 7 dias, sem plano gratuito", async () => {
   await goto("/planos");
+  await page.waitForFunction(() => /PRO/.test(document.body.innerText) && /ELITE/.test(document.body.innerText), null, { timeout: 20_000 });
   const t = await page.locator("body").innerText();
-  expect(/Free/i.test(t) && /Pro/i.test(t) && /Platinum/i.test(t), "planos ausentes");
+  expect(/R\$\s?\d+/.test(t), "preço em R$ ausente");
+  expect(/7 dias/i.test(t), "teste de 7 dias não mencionado");
+  expect(!/\bFREE\b/.test(t), "plano gratuito exibido");
   return await shot("planos");
 });
 
@@ -330,7 +335,7 @@ await step("Preferências: alterar tema/moeda/timeframe e Chat ID", async () => 
   return `chatId=${pref.telegramChatId ?? "—"} · ${await shot("preferencias")}`;
 });
 
-await step("Planos: trocar para PLATINUM libera 15M no scanner; voltar para FREE", async () => {
+await step("Planos: trocar para PLATINUM libera 15M no scanner; voltar para PRO", async () => {
   await goto("/planos");
   const btn = page.getByRole("button", { name: /Platinum|Assinar|Escolher/i }).first();
   const changed = await page.evaluate(async () => (await fetch("/api/plans/change", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan: "PLATINUM" }) })).status);
@@ -341,7 +346,8 @@ await step("Planos: trocar para PLATINUM libera 15M no scanner; voltar para FREE
   await tf.click();
   await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 30, null, { timeout: 40_000 });
   const file = await shot("scanner-15m-platinum");
-  await page.evaluate(async () => fetch("/api/plans/change", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan: "FREE" }) }));
+  // volta para PRO (modelo comercial não tem plano gratuito; FREE encerraria o acesso ao Dashboard)
+  await page.evaluate(async () => fetch("/api/plans/change", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan: "PRO" }) }));
   return `15M liberado (${await btn.count()} CTA) · ${file}`;
 });
 
@@ -412,21 +418,36 @@ await step("Risco: tamanho de posição 10.000 × 1% com stop de 5% = 20 unidade
   return `qty 20 e liquidação 90,45 exibidas · ${await shot("risco")}`;
 });
 
-await step("Charts BTC/USDT 4H: header, gráfico, estrutura, liquidez, confluência, setup, derivativos, histórico, watchlist, overview, scanner, risco", async () => {
-  await goto("/charts/BTC?tf=4h");
-  await page.waitForFunction(() => ["Market Structure", "Liquidity", "Confluence Score", "Setup Status", "Derivatives", "Historical Performance", "Watchlist", "Market Overview", "Market Scanner", "Risk Management"].every((t) => document.body.innerText.includes(t)), null, { timeout: 90_000 });
+await step("Dashboard R2 BTC/USDT 4H: header, gráfico, estrutura, liquidez, confluência (Raw/Penalties/Final), setup, derivativos, histórico, watchlist, overview, scanner, risco", async () => {
+  await goto("/?symbol=BTC&tf=4h&exchange=okx&instrument=perp");
+  const PANELS = ["Market Structure", "Liquidity", "Confluence Score", "Setup Status", "Derivatives", "Historical Performance", "Watchlist", "Market Overview", "Market Scanner", "Risk Management", "Raw", "Penalties", "Final", "Trigger Level", "Next Funding"];
+  await page.waitForFunction((ps) => ps.every((t) => document.body.innerText.includes(t)), PANELS, { timeout: 90_000 });
   const canvases = await page.locator("canvas").count();
   expect(canvases >= 3, `gráfico sem canvas (${canvases})`);
   const header = await page.locator("h1").first().innerText();
   expect(/BTC\/USDT/.test(header), `header ${header}`);
-  const shot1 = await shot("charts-btc");
+  const shot1 = await shot("dashboard-btc");
+  // spot: sem funding/OI no header e painel explica
+  await page.getByRole("radio", { name: "Spot" }).click();
+  await page.waitForFunction(() => location.search.includes("instrument=spot") && /Contexto okx:spot:BTC:4h/.test(document.body.innerText) && !/Next Funding/.test(document.querySelector("h1")?.closest("div.flex.flex-col")?.textContent ?? ""), null, { timeout: 90_000 });
   // troca de timeframe atualiza todo o contexto
   await page.getByRole("tab", { name: "1D", exact: true }).first().click();
-  await page.waitForFunction(() => location.search.includes("tf=1d") && /BTCUSDT · 1D/.test(document.body.innerText), null, { timeout: 90_000 });
-  // troca de ativo pela watchlist
+  await page.waitForFunction(() => location.search.includes("tf=1d") && /Contexto okx:spot:BTC:1d/.test(document.body.innerText), null, { timeout: 90_000 });
+  // troca de ativo pela watchlist mantém exchange/instrumento/timeframe
   await page.locator("tr", { hasText: "ETH/USDT" }).first().click();
-  await page.waitForFunction(() => location.pathname === "/charts/ETH" && /ETH\/USDT/.test(document.querySelector("h1")?.textContent ?? "") && /ETHUSDT · 1D/.test(document.body.innerText), null, { timeout: 90_000 });
-  return `${canvases} canvas · 4H→1D e BTC→ETH sincronizados · ${shot1}`;
+  await page.waitForFunction(() => /Contexto okx:spot:ETH:1d/.test(document.body.innerText) && /ETH\/USDT/.test(document.querySelector("h1")?.textContent ?? ""), null, { timeout: 90_000 });
+  // Charts usa o mesmo workspace
+  await goto("/charts/SOL?tf=1h&exchange=binance&instrument=spot");
+  await page.waitForFunction(() => /Contexto binance:spot:SOL:1h/.test(document.body.innerText), null, { timeout: 90_000 });
+  return `${canvases} canvas · OKX perp→spot, 4H→1D, BTC→ETH e /charts/SOL sincronizados · ${shot1}`;
+});
+
+await step("AI Analyst: painel lê o contexto ativo e só usa números do contexto", async () => {
+  await page.getByRole("button", { name: "AI Analyst" }).first().click();
+  await page.waitForFunction(() => /SOL\/USDT · Binance Spot · 1H/.test(document.body.innerText) && /Confluence Score/i.test(document.body.innerText) && /ESTRUTURA|Estrutura/.test(document.body.innerText), null, { timeout: 60_000 });
+  const file = await shot("ai-analyst");
+  await page.keyboard.press("Escape");
+  return file;
 });
 
 await step("Suporte logado: Meus chamados + exclusão da conta (LGPD) pela interface", async () => {

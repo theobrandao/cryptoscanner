@@ -19,7 +19,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { CanvasRenderingTarget2D } from "fancy-canvas";
-import { bollinger, ema, macd, rsi } from "@/lib/indicators/core";
+import { atr, bollinger, ema, macd, rsi } from "@/lib/indicators/core";
 import { useTheme } from "@/components/providers/theme-provider";
 import type { Candle } from "@/types/market";
 
@@ -56,6 +56,9 @@ export interface ChartSegmentLine {
 
 export interface Overlays {
   ema: boolean;
+  atr: boolean;
+  /** suporte/resistência por swings (linhas) */
+  levels: boolean;
   bb: boolean;
   vwap: boolean;
   volume: boolean;
@@ -66,9 +69,15 @@ export interface Overlays {
   setup: boolean;
 }
 
-export const DEFAULT_OVERLAYS: Overlays = { ema: true, bb: false, vwap: false, volume: true, rsi: true, macd: true, structure: true, liquidity: true, setup: true };
+export const DEFAULT_OVERLAYS: Overlays = { ema: true, atr: false, levels: true, bb: false, vwap: false, volume: true, rsi: true, macd: false, structure: true, liquidity: true, setup: true };
 
-const COLORS = { up: "#16c784", down: "#ea3943", info: "#3aa0ff", warning: "#f5a524", muted: "#8193a8", e9: "#a78bfa", e21: "#f59e0b", e50: "#fb7185", e200: "#e6edf5", bb: "#3aa0ff", vwap: "#22d3ee" };
+/** Completa preferências salvas antes da inclusão de novas camadas. */
+export const withOverlayDefaults = (o: Partial<Overlays> | null | undefined): Overlays => ({ ...DEFAULT_OVERLAYS, ...(o ?? {}) });
+
+/** Painéis inferiores ativos (RSI, MACD, ATR) — usado para calcular a altura do gráfico. */
+export const lowerPanes = (o: Overlays) => Number(o.rsi) + Number(o.macd) + Number(o.atr);
+
+const COLORS = { up: "#16c784", down: "#ea3943", info: "#3aa0ff", warning: "#f5a524", muted: "#8193a8", e9: "#a78bfa", e21: "#f59e0b", e50: "#fb7185", e100: "#38bdf8", e200: "#e6edf5", bb: "#3aa0ff", vwap: "#22d3ee" };
 const tone = (c: string) => (c === "success" ? COLORS.up : c === "danger" ? COLORS.down : c === "warning" ? COLORS.warning : c === "info" ? COLORS.info : COLORS.muted);
 const T = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp;
 const nz = (v: number | undefined) => (v != null && Number.isFinite(v) ? v : null);
@@ -137,7 +146,7 @@ export interface Legend {
 }
 
 /**
- * Gráfico do terminal (TradingView Lightweight Charts, Apache-2.0): candles, volume, EMAs 9/21/50/200,
+ * Gráfico do terminal (TradingView Lightweight Charts, Apache-2.0): candles, volume, EMAs 9/21/50/100/200, ATR,
  * Bollinger, VWAP, painéis RSI e MACD, e camadas de estrutura/liquidez/setup ligáveis.
  */
 export function TerminalChart({
@@ -200,6 +209,7 @@ export function TerminalChart({
       line(ema(closes, 9), COLORS.e9, 1);
       line(ema(closes, 21), COLORS.e21, 1);
       line(ema(closes, 50), COLORS.e50, 1);
+      line(ema(closes, 100), COLORS.e100, 1);
       line(ema(closes, 200), COLORS.e200, 2);
     }
     if (overlays.bb) {
@@ -247,7 +257,11 @@ export function TerminalChart({
       line(m.signal, COLORS.warning, 1, pane, LineStyle.Solid, "Signal");
       pane++;
     }
-    // painel principal 4× maior que RSI/MACD
+    if (overlays.atr) {
+      line(atr(candles as Candle[], 14), COLORS.warning, 1, pane, LineStyle.Solid, "ATR 14");
+      pane++;
+    }
+    // painel principal 4× maior que RSI/MACD/ATR
     chart.panes().forEach((p, i) => p.setStretchFactor(i === 0 ? 4 : 1));
 
     for (const l of lines) candle.createPriceLine({ price: l.price, color: tone(l.color), lineWidth: 1, lineStyle: l.dashed ? LineStyle.Dashed : LineStyle.Solid, axisLabelVisible: true, title: compact ? "" : l.label });
