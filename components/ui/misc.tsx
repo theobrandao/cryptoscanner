@@ -10,12 +10,13 @@ export function Separator({ className, ...props }: React.HTMLAttributes<HTMLDivE
   return <div role="separator" className={cn("h-px w-full bg-border", className)} {...props} />;
 }
 
-export function Progress({ value, className, tone = "primary" }: { value: number; className?: string; tone?: "primary" | "success" | "danger" | "warning" }) {
+/** Barra de progresso; `label` dá nome à barra para leitores de tela e `valueText` troca o "N%" lido por um texto (ex.: "3 de 12 aulas"). */
+export function Progress({ value, className, tone = "primary", label, valueText }: { value: number; className?: string; tone?: "primary" | "success" | "danger" | "warning"; label?: string; valueText?: string }) {
   const v = Math.max(0, Math.min(100, value));
   const bg = { primary: "bg-primary", success: "bg-success", danger: "bg-danger", warning: "bg-warning" }[tone];
   return (
-    <div className={cn("h-1.5 w-full overflow-hidden rounded-full bg-muted", className)} role="progressbar" aria-valuenow={v} aria-valuemin={0} aria-valuemax={100}>
-      <div className={cn("h-full transition-all", bg)} style={{ width: `${v}%` }} />
+    <div className={cn("h-1.5 w-full overflow-hidden rounded-full bg-muted", className)} role="progressbar" aria-valuenow={v} aria-valuemin={0} aria-valuemax={100} aria-label={label} aria-valuetext={valueText}>
+      <div className={cn("h-full transition-[width] motion-reduce:transition-none", bg)} style={{ width: `${v}%` }} />
     </div>
   );
 }

@@ -101,7 +101,7 @@ type PanelData = ReturnType<typeof usePanelData>;
 
 /* ───────────────────────── peças visuais ───────────────────────── */
 
-const cardCls = "card-glow group flex min-h-[132px] flex-col gap-3 rounded-2xl border border-border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5";
+const cardCls = "card-glow group relative flex min-h-[132px] flex-col gap-3 rounded-2xl border border-border p-4 transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 motion-reduce:transition-none motion-reduce:hover:translate-y-0";
 
 function Tile({ icon: Icon }: { icon: React.ComponentType<{ className?: string }> }) {
   return (
@@ -116,14 +116,15 @@ function CardHead({ icon, label }: { icon: React.ComponentType<{ className?: str
     <div className="flex items-center gap-2.5">
       <Tile icon={icon} />
       <span className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
-      <ArrowRight aria-hidden className="ml-auto h-4 w-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+      <ArrowRight aria-hidden className="ml-auto h-4 w-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-primary motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" />
     </div>
   );
 }
 
 function Lines() {
   return (
-    <div className="flex flex-col gap-2" aria-busy="true">
+    <div className="flex flex-col gap-2" role="status" aria-busy="true">
+      <span className="sr-only">Carregando…</span>
       <span className="skeleton h-6 w-20 rounded-md" />
       <span className="skeleton h-3.5 w-28 rounded" />
     </div>
@@ -145,12 +146,43 @@ function Ring({ value, total }: { value: number; total: number }) {
   return (
     <svg viewBox="0 0 40 40" className="h-11 w-11 shrink-0 -rotate-90" aria-hidden>
       <circle cx="20" cy="20" r={r} fill="none" strokeWidth="4" className="stroke-muted" />
-      <circle cx="20" cy="20" r={r} fill="none" strokeWidth="4" strokeLinecap="round" className="stroke-primary transition-[stroke-dashoffset] duration-500" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} />
+      <circle cx="20" cy="20" r={r} fill="none" strokeWidth="4" strokeLinecap="round" className="stroke-primary transition-[stroke-dashoffset] duration-500 motion-reduce:transition-none" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} />
     </svg>
   );
 }
 
 const Locked = () => <span className="text-[12px] text-muted-foreground">Requer plano ativo</span>;
+
+/**
+ * Cartão que é um link inteiro. Com `retry` (falha ao carregar) o cartão vira bloco com um link que cobre a área
+ * e o botão "Tentar de novo" por cima: botão dentro de link não é permitido em HTML.
+ */
+function CardLink({ href, label, retry, children }: { href: string; label: string; retry?: React.ReactNode; children: React.ReactNode }) {
+  if (!retry)
+    return (
+      <Link href={href} className={cardCls}>
+        {children}
+      </Link>
+    );
+  return (
+    <div className={cardCls}>
+      <Link href={href} aria-label={label} className="absolute inset-0 rounded-2xl" />
+      {children}
+      <div className="relative z-10">{retry}</div>
+    </div>
+  );
+}
+
+function RetryNote({ onRetry, dash }: { onRetry: () => void; dash?: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground" role="alert">
+      <span>{dash ? "“—” = não foi possível carregar." : "Não foi possível carregar."}</span>
+      <button type="button" onClick={onRetry} className="font-semibold text-primary hover:underline">
+        Tentar de novo
+      </button>
+    </div>
+  );
+}
 
 /* ───────────────────────── cartões ───────────────────────── */
 
@@ -202,16 +234,15 @@ function AccessCard({ d }: { d: PanelData }) {
 
 function AgentsCard({ d }: { d: PanelData }) {
   const { agents } = d;
+  const failed = !agents.loading && d.core && Boolean(agents.error);
   return (
-    <Link href="/agentes" className={cardCls}>
+    <CardLink href="/agentes" label="Abrir agentes" retry={failed ? <RetryNote onRetry={() => void agents.mutate()} /> : undefined}>
       <CardHead icon={Bot} label="Agentes" />
       {agents.loading ? (
         <Lines />
       ) : !d.core ? (
         <Locked />
-      ) : agents.error ? (
-        <span className="text-[12px] text-muted-foreground">Não foi possível carregar.</span>
-      ) : (
+      ) : agents.error ? null : (
         <div>
           <div className="tabular text-2xl font-extrabold leading-none">
             {agents.active}
@@ -220,15 +251,20 @@ function AgentsCard({ d }: { d: PanelData }) {
           <div className="mt-1 text-[12.5px] text-muted-foreground">{agents.total ? `ativos · ${agents.total} no total` : "Nenhum agente criado"}</div>
         </div>
       )}
-    </Link>
+    </CardLink>
   );
 }
 
 function AlertsCard({ d }: { d: PanelData }) {
   const { monitors, alerts } = d;
   const loading = monitors.loading || alerts.loading;
+  const failed = !loading && d.core && Boolean(monitors.error || alerts.error);
+  const retry = () => {
+    if (monitors.error) void monitors.mutate();
+    if (alerts.error) void alerts.mutate();
+  };
   return (
-    <Link href="/monitor" className={cardCls}>
+    <CardLink href="/monitor" label="Abrir alertas" retry={failed ? <RetryNote dash onRetry={retry} /> : undefined}>
       <CardHead icon={Bell} label="Alertas" />
       {loading ? (
         <Lines />
@@ -249,7 +285,7 @@ function AlertsCard({ d }: { d: PanelData }) {
           </div>
         </div>
       )}
-    </Link>
+    </CardLink>
   );
 }
 
@@ -289,14 +325,15 @@ function FavoritesCard({ d }: { d: PanelData }) {
         </Link>
       </div>
       {d.favoritesLoading && !list.length ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" aria-busy="true">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" role="status" aria-busy="true">
+          <span className="sr-only">Carregando favoritos…</span>
           {[0, 1, 2].map((i) => (
             <span key={i} className="skeleton h-[52px] rounded-xl" />
           ))}
         </div>
       ) : !list.length ? (
         <Link href="/scanner" className="flex h-[52px] items-center gap-2 rounded-xl border border-dashed border-border px-3 text-[13px] text-muted-foreground hover:border-primary/50 hover:text-foreground">
-          <Star className="h-4 w-4 shrink-0" /> Adicione favoritos na estrela de qualquer ativo
+          <Star aria-hidden className="h-4 w-4 shrink-0" /> Adicione favoritos na estrela de qualquer ativo
         </Link>
       ) : (
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
@@ -348,7 +385,7 @@ function Onboarding({ d }: { d: PanelData }) {
           </p>
         </div>
         <button onClick={() => setDismissed(true)} className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Ocultar primeiros passos">
-          <X className="h-4 w-4" />
+          <X aria-hidden className="h-4 w-4" />
         </button>
       </div>
       <div className="mt-3">
@@ -358,8 +395,11 @@ function Onboarding({ d }: { d: PanelData }) {
         {items.map((i) => (
           <li key={i.label}>
             <Link href={i.href} className={cn("flex h-10 items-center gap-2 rounded-lg border px-3 text-[13px] transition-colors", i.done ? "border-success/30 bg-success/5 text-muted-foreground" : "border-border hover:border-primary/50 hover:text-foreground")}>
-              <span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-full border", i.done ? "border-success bg-success text-white" : "border-muted-foreground/40")}>{i.done ? <Check className="h-3 w-3" /> : null}</span>
-              <span className={cn("truncate", i.done && "line-through decoration-muted-foreground/40")}>{i.label}</span>
+              <span aria-hidden className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-full border", i.done ? "border-success bg-success text-white dark:text-background" : "border-muted-foreground/40")}>{i.done ? <Check className="h-3 w-3" /> : null}</span>
+              <span className={cn("truncate", i.done && "line-through decoration-muted-foreground/40")}>
+                {i.label}
+                <span className="sr-only"> {i.done ? "(concluído)" : "(pendente)"}</span>
+              </span>
             </Link>
           </li>
         ))}
@@ -381,8 +421,8 @@ export function QuickActions() {
   return (
     <nav aria-label="Ações rápidas" className="grid grid-cols-2 gap-2 lg:grid-cols-4">
       {ACTIONS.map((a) => (
-        <Link key={a.href} href={a.href} className="group flex h-12 items-center gap-2.5 rounded-xl border border-border bg-card px-3 text-[13px] font-semibold transition-all hover:-translate-y-0.5 hover:border-primary/50">
-          <a.icon className="h-4 w-4 shrink-0 text-primary" />
+        <Link key={a.href} href={a.href} className="group flex h-12 items-center gap-2.5 rounded-xl border border-border bg-card px-3 text-[13px] font-semibold transition-[transform,border-color] hover:-translate-y-0.5 hover:border-primary/50 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
+          <a.icon aria-hidden className="h-4 w-4 shrink-0 text-primary" />
           <span className="truncate">{a.label}</span>
           <ArrowRight aria-hidden className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground/50 group-hover:text-primary" />
         </Link>

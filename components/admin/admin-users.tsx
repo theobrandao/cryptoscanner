@@ -121,7 +121,12 @@ function Avatar({ u, className }: { u: Pick<UserRow, "name" | "email">; classNam
 function Usage({ c }: { c: UserRow["counts"] }) {
   return (
     <span className="tabular text-[11.5px] text-muted-foreground" title={`${c.agents} agentes · ${c.monitors} monitores · ${c.alerts} alertas · ${c.strategies} estratégias`}>
-      {c.agents} ag · {c.monitors} mon · {c.alerts} al
+      <span aria-hidden>
+        {c.agents} ag · {c.monitors} mon · {c.alerts} al
+      </span>
+      <span className="sr-only">
+        {c.agents} {c.agents === 1 ? "agente" : "agentes"}, {c.monitors} {c.monitors === 1 ? "monitor" : "monitores"}, {c.alerts} {c.alerts === 1 ? "alerta" : "alertas"}
+      </span>
     </span>
   );
 }
@@ -159,8 +164,8 @@ export function AdminUsersTab() {
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2 md:flex-row md:items-center">
         <div className="relative md:max-w-sm md:flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome ou e-mail" className="pl-9" aria-label="Buscar usuário" />
+          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input type="search" name="busca-usuario" autoComplete="off" spellCheck={false} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome ou e-mail…" className="pl-9" aria-label="Buscar usuário" />
         </div>
         <div className="flex gap-2 md:ml-auto">
           <Select value={sort} onValueChange={(v) => setSort(v as AdminSort)}>
@@ -176,7 +181,7 @@ export function AdminUsersTab() {
             </SelectContent>
           </Select>
           <a href={exportHref} download className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium hover:bg-muted sm:h-9">
-            <Download className="h-4 w-4" />
+            <Download aria-hidden className="h-4 w-4" />
             Exportar CSV
           </a>
         </div>
@@ -213,13 +218,16 @@ export function AdminUsersTab() {
               </TableHeader>
               <TableBody>
                 {data.rows.map((u) => (
-                  <TableRow key={u.id} className="cursor-pointer" onClick={() => setOpenId(u.id)} tabIndex={0} onKeyDown={(e) => (e.key === "Enter" || e.key === " " ? (e.preventDefault(), setOpenId(u.id)) : undefined)}>
+                  <TableRow key={u.id} className="relative cursor-pointer">
                     <TableCell>
                       <div className="flex min-w-0 items-center gap-2.5">
                         <Avatar u={u} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 truncate font-medium">
-                            <span className="truncate">{u.name}</span>
+                            {/* o botão cobre a linha inteira (::after), então clicar em qualquer ponto abre os detalhes */}
+                            <button type="button" onClick={() => setOpenId(u.id)} className="min-w-0 truncate text-left cursor-pointer after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring hover:underline">
+                              {u.name}
+                            </button>
                             <TelegramMark on={u.telegramConnected} />
                           </div>
                           <div className="truncate text-[12px] text-muted-foreground">{u.email}</div>
@@ -268,7 +276,7 @@ export function AdminUsersTab() {
             ))}
           </ul>
           <div className="flex items-center justify-between gap-2 text-[12.5px] text-muted-foreground">
-            <span>
+            <span aria-live="polite">
               {data.total} {data.total === 1 ? "usuário" : "usuários"} · página {data.page} de {data.pages}
             </span>
             <div className="flex gap-1">
@@ -289,7 +297,8 @@ export function AdminUsersTab() {
 
 function ListSkeleton() {
   return (
-    <div className="flex flex-col gap-2" aria-busy="true" aria-label="Carregando usuários">
+    <div className="flex flex-col gap-2" role="status" aria-busy="true">
+      <span className="sr-only">Carregando usuários…</span>
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
           <Skeleton className="h-8 w-8 rounded-full" />
@@ -336,11 +345,22 @@ function providerLabel(u: UserRow): string {
   return u.subscription.provider ? (PROVIDER_LABEL[u.subscription.provider] ?? u.subscription.provider) : "—";
 }
 
+/** Resumo do que foi pausado junto com bloqueio/encerramento de acesso. */
+function pausedText(p: unknown): string {
+  if (!p || typeof p !== "object") return "";
+  const x = p as { agents?: number; alerts?: number; monitors?: number };
+  const n = (x.agents ?? 0) + (x.alerts ?? 0) + (x.monitors ?? 0);
+  return n ? ` · pausados: ${x.agents ?? 0} agentes, ${x.alerts ?? 0} alertas, ${x.monitors ?? 0} monitores` : "";
+}
+
 export function describeAudit(r: Pick<AuditRow, "action" | "details">): string {
   const d = r.details ?? {};
-  if (r.action === "grant") return `${String(d.plan ?? "")} · ${d.days == null ? "sem prazo" : `${String(d.days)} dias`}${d.currentPeriodEnd ? ` · até ${fmtDay(String(d.currentPeriodEnd))}` : ""}`;
+  const resume = d.automations === "manual_resume" ? " · automações não reativadas" : "";
+  if (r.action === "grant") return `${String(d.plan ?? "")} · ${d.days == null ? "sem prazo" : `${String(d.days)} dias`}${d.currentPeriodEnd ? ` · até ${fmtDay(String(d.currentPeriodEnd))}` : ""}${resume}`;
   if (r.action === "extend_trial") return `+${String(d.days ?? "")} dias · teste até ${fmtDay(d.trialEndsAt ? String(d.trialEndsAt) : null)}`;
-  if (r.action === "block") return d.reason ? `Motivo: ${String(d.reason)}` : "Sem motivo informado";
+  if (r.action === "block") return (d.reason ? `Motivo: ${String(d.reason)}` : "Sem motivo informado") + pausedText(d.paused);
+  if (r.action === "revoke") return `Acesso encerrado${pausedText(d.paused)}`;
+  if (r.action === "unblock") return `Desbloqueado${resume}`;
   if (r.action === "password_reset") return d.emailEnabled === false ? "E-mail não configurado: link não enviado" : "Link enviado por e-mail";
   if (r.action === "delete") return d.name ? `Nome: ${String(d.name)}` : "";
   return "";
@@ -406,7 +426,8 @@ function UserDetailDrawer({ id, onClose }: { id: string | null; onClose: () => v
         </DialogHeader>
         {error ? <Alert variant="danger">{(error as Error).message}</Alert> : null}
         {!u && !error ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3" role="status" aria-busy="true">
+            <span className="sr-only">Carregando…</span>
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-32 w-full" />
             <Skeleton className="h-32 w-full" />
@@ -595,8 +616,8 @@ function ActionDialogs({
       title = "Liberar acesso";
       body = (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label>Plano</Label>
+          <div className="flex flex-col gap-1.5" role="group" aria-labelledby="grant-plan-label">
+            <Label id="grant-plan-label">Plano</Label>
             <div className="flex gap-2">
               {(["PRO", "ELITE"] as const).map((p) => (
                 <Button key={p} size="sm" variant={plan === p ? "default" : "outline"} onClick={() => setPlan(p)} aria-pressed={plan === p}>
@@ -605,8 +626,8 @@ function ActionDialogs({
               ))}
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Prazo</Label>
+          <div className="flex flex-col gap-1.5" role="group" aria-labelledby="grant-days-label">
+            <Label id="grant-days-label">Prazo</Label>
             <div className="flex flex-wrap gap-2">
               {GRANT_DAYS.map((d) => (
                 <Button key={d.v} size="sm" variant={days === d.v ? "default" : "outline"} onClick={() => setDays(d.v)} aria-pressed={days === d.v}>
@@ -633,7 +654,7 @@ function ActionDialogs({
         <Alert variant="warning">Esta conta já tem plano ativo. Para mudar o prazo, use Liberar acesso.</Alert>
       ) : (
         <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
+          <div className="flex gap-2" role="group" aria-label="Dias a mais de teste">
             {[3, 7, 14].map((d) => (
               <Button key={d} size="sm" variant={trialDays === d ? "default" : "outline"} onClick={() => setTrialDays(d)} aria-pressed={trialDays === d}>
                 +{d} dias

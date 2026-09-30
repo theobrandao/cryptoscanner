@@ -4,6 +4,7 @@ import { sentimentAgent, type SentimentOutput } from "@/agents/sentiment-agent";
 import { createStrategyContext, evaluateStrategies, type StrategySignal } from "@/agents/strategies";
 import { createDefaultTools } from "@/agents/tools";
 import { getPrisma, requirePrisma } from "@/database/client";
+import { automationsAllowed } from "@/lib/admin-users";
 import { getEnv, isTelegramConfigured } from "@/lib/env";
 import { computeSnapshot } from "@/lib/indicators/snapshot";
 import { createLogger } from "@/lib/logger";
@@ -115,13 +116,15 @@ export async function runUserAgent(agent: Agent, options: { force?: boolean; now
   return summary;
 }
 
-/** Ciclo do worker: executa todos os agentes ativos. */
+/** Ciclo do worker: executa os agentes ativos de contas não bloqueadas e com acesso (assinatura ativa ou admin). */
 export async function runAllActiveAgents(): Promise<AgentRunSummary[]> {
   const prisma = getPrisma();
   if (!prisma) return [];
-  const agents = await prisma.agent.findMany({ where: { status: "ACTIVE" } });
+  const agents = await prisma.agent.findMany({ where: { status: "ACTIVE", user: { blockedAt: null } }, include: { user: { select: { blockedAt: true, role: true, subscription: true } } } });
   const out: AgentRunSummary[] = [];
-  for (const a of agents) {
+  for (const { user, ...a } of agents) {
+    // sem acesso: não roda nem avisa (o agente continua ACTIVE e volta a rodar quando a assinatura voltar)
+    if (!automationsAllowed(user)) continue;
     try {
       out.push(await runUserAgent(a));
     } catch (err) {

@@ -2,8 +2,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { requirePrisma } from "@/database/client";
 import { ApiError, BLOCKED_MESSAGE } from "@/lib/api";
 import { hashPassword } from "@/lib/auth";
-import { getEnv, isGoogleLoginConfigured, isOwnerEmail } from "@/lib/env";
+import { getEnv, isGoogleLoginConfigured } from "@/lib/env";
 import { canRegister } from "@/lib/invite";
+import { shouldPromoteOwner } from "@/lib/owner-promotion";
 import { createLogger } from "@/lib/logger";
 import { track } from "@/services/analytics-service";
 import { applyPendingGrants } from "@/services/billing/kiwify";
@@ -13,7 +14,10 @@ import { startTrial } from "@/services/subscription-service";
 /**
  * Entrar/cadastrar com Google — OAuth 2.0 "authorization code" com PKCE e state (CSRF), sem biblioteca externa.
  *  - Só e-mail verificado pelo Google (email_verified) vira conta.
- *  - Conta existente com o mesmo e-mail é vinculada (googleSub) e entra normalmente.
+ *  - Conta existente com o mesmo e-mail é vinculada (googleSub) e entra normalmente. Se ela nasceu por senha (sem googleSub),
+ *    a senha é trocada por uma aleatória e as sessões abertas caem: o cadastro por senha não prova posse do e-mail, e quem
+ *    cadastrou o e-mail de outra pessoa perde o acesso quando o dono verdadeiro entra pelo Google.
+ *  - Dono (OWNER_EMAILS) vira ADMIN só com e-mail verificado pelo Google (lib/owner-promotion.ts).
  *  - Conta nova exige o aceite dos Termos na tela de cadastro (flag no state) e respeita canRegister().
  * Docs: developers.google.com/identity/protocols/oauth2/web-server · openid-connect
  */
@@ -69,6 +73,8 @@ export interface GoogleIdentity {
   sub: string;
   email: string;
   name: string;
+  /** claim email_verified do Google (exchangeCode só devolve identidades verificadas) */
+  emailVerified: boolean;
 }
 
 /** Troca o código pelo token e confere o id_token no endpoint tokeninfo do Google (assinatura, aud, iss, e-mail verificado). */
@@ -95,12 +101,34 @@ export async function exchangeCode(code: string, verifier: string): Promise<Goog
   }
   const email = claims.email.trim().toLowerCase();
   const local = email.split("@")[0] ?? "usuario";
-  return { sub: claims.sub, email, name: (claims.name ?? claims.given_name ?? local).trim().slice(0, 80) || local };
+  return { sub: claims.sub, email, name: (claims.name ?? claims.given_name ?? local).trim().slice(0, 80) || local, emailVerified: verified };
 }
 
 export interface GoogleSignInResult {
   user: { id: string; email: string; name: string; plan: "FREE" | "PRO" | "PLATINUM"; role: "USER" | "ADMIN" };
   created: boolean;
+}
+
+export interface GoogleLinkChanges {
+  googleSub?: string;
+  plan?: "PLATINUM";
+  role?: "ADMIN";
+  /** conta criada por senha e vinculada agora: senha aleatória + passwordChangedAt (derruba sessões de quem a cadastrou) */
+  resetPassword: boolean;
+}
+
+/** Decide o que muda numa conta existente ao entrar com Google (vínculo, troca de senha e promoção do dono). */
+export function googleLinkChanges(user: { googleSub: string | null; email: string; plan: string; role: string; createdAt: Date }, identity: GoogleIdentity): GoogleLinkChanges {
+  const out: GoogleLinkChanges = { resetPassword: false };
+  if (identity.emailVerified && user.googleSub !== identity.sub) {
+    out.googleSub = identity.sub;
+    out.resetPassword = user.googleSub == null;
+  }
+  if (shouldPromoteOwner({ email: identity.email, via: "google", emailVerified: identity.emailVerified, createdAt: user.createdAt }) && user.email.toLowerCase() === identity.email.toLowerCase() && (user.plan !== "PLATINUM" || user.role !== "ADMIN")) {
+    out.plan = "PLATINUM";
+    out.role = "ADMIN";
+  }
+  return out;
 }
 
 /**
@@ -110,15 +138,17 @@ export interface GoogleSignInResult {
 export async function signInWithGoogle(identity: GoogleIdentity, opts: { acceptTerms: boolean }): Promise<GoogleSignInResult> {
   const prisma = requirePrisma();
   const env = getEnv();
+  if (!identity.emailVerified) throw new ApiError(401, "Conta Google sem e-mail verificado ou token inválido", "google_token_invalid");
   let user = await prisma.user.findFirst({ where: { OR: [{ googleSub: identity.sub }, { email: identity.email }] } });
-  const owner = isOwnerEmail(identity.email);
+  const owner = shouldPromoteOwner({ email: identity.email, via: "google", emailVerified: identity.emailVerified, createdAt: new Date() });
   if (user) {
     if (user.blockedAt) throw new ApiError(403, BLOCKED_MESSAGE, "account_blocked");
-    const data: { googleSub?: string; plan?: "PLATINUM"; role?: "ADMIN" } = {};
-    if (user.googleSub !== identity.sub) data.googleSub = identity.sub;
-    if (owner && (user.plan !== "PLATINUM" || user.role !== "ADMIN")) {
-      data.plan = "PLATINUM";
-      data.role = "ADMIN";
+    const { resetPassword, ...changes } = googleLinkChanges(user, identity);
+    const data: { googleSub?: string; plan?: "PLATINUM"; role?: "ADMIN"; passwordHash?: string; passwordChangedAt?: Date } = { ...changes };
+    if (resetPassword) {
+      // mesma senha aleatória das contas novas pelo Google; "Esqueci minha senha" cria outra se o dono quiser
+      data.passwordHash = await hashPassword(b64url(randomBytes(32)));
+      data.passwordChangedAt = new Date();
     }
     if (Object.keys(data).length) user = await prisma.user.update({ where: { id: user.id }, data });
     if (await applyPendingGrants(user.id, user.email)) user = (await prisma.user.findUnique({ where: { id: user.id } })) ?? user;

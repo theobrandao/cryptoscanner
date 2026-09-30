@@ -97,23 +97,36 @@ export async function createLinkCode(userId: string): Promise<{ code: string; ur
   return { code, url: telegramDeepLink(code), expiresInSec: LINK_TTL_SEC };
 }
 
-async function completeLink(match: LinkMatch): Promise<boolean> {
+/**
+ * Resultado de uma conexão: "done" (gravada agora), "claimed_elsewhere" (outra verificação reivindicou o código e ainda
+ * pode falhar) ou "failed" (erro ao gravar; a reivindicação é liberada para nova tentativa).
+ * Só "done" deixa a atualização ser confirmada ao Telegram; as outras seguram o offset.
+ */
+export type LinkOutcome = "done" | "claimed_elsewhere" | "failed";
+
+export async function completeLink(match: LinkMatch): Promise<LinkOutcome> {
   const cache = getCache();
   // Reivindicação atômica: duas verificações simultâneas não gravam nem confirmam duas vezes.
-  if ((await cache.incr(claimKey(match.code), 120)) !== 1) return true;
-  await requirePrisma().user.update({ where: { id: match.userId }, data: { telegramChatId: match.chatId } });
+  if ((await cache.incr(claimKey(match.code), 120)) !== 1) return "claimed_elsewhere";
+  try {
+    await requirePrisma().user.update({ where: { id: match.userId }, data: { telegramChatId: match.chatId } });
+  } catch (err) {
+    log.warn("falha ao concluir conexão do Telegram", { error: (err as Error).message });
+    await cache.del(claimKey(match.code));
+    return "failed";
+  }
   await cache.del(codeKey(match.code));
   if ((await cache.get<string>(userKey(match.userId))) === match.code) await cache.del(userKey(match.userId));
   await cache.set(doneKey(match.userId), true, LINK_TTL_SEC);
   const sent = await sendTelegramMessage(match.chatId, LINK_CONFIRMATION_TEXT);
   if (!sent.ok) log.warn("chat associado, mas a confirmação não foi enviada", { error: sent.error });
-  return true;
+  return "done";
 }
 
 /**
  * Lê getUpdates, conclui todas as conexões pendentes encontradas e confirma ao Telegram o que foi
  * tratado. Retorna se o usuário informado está conectado por este fluxo.
- * Lança TelegramWebhookConflictError quando o bot tem webhook (409).
+ * Lança TelegramWebhookConflictError quando o bot tem webhook (409) e TelegramBusyError quando outra leitura está em andamento.
  */
 export async function checkLink(userId: string): Promise<{ connected: boolean }> {
   const cache = getCache();
@@ -140,15 +153,10 @@ export async function checkLink(userId: string): Promise<{ connected: boolean }>
 
   const blocked = new Set<number>();
   for (const m of pickMatches(updates, pending)) {
-    try {
-      await completeLink(m);
-    } catch (err) {
-      log.warn("falha ao concluir conexão do Telegram", { error: (err as Error).message });
-      await cache.del(claimKey(m.code));
-      blocked.add(m.updateId);
-    }
+    // "claimed_elsewhere" segura o offset como "failed": quem reivindicou ainda pode falhar e a mensagem não pode sumir
+    if ((await completeLink(m)) !== "done") blocked.add(m.updateId);
   }
-  // Uma segunda mensagem "/start <código>" com código já tratado não bloqueia; só a que falhou.
+  // Códigos desconhecidos/expirados e repetições de um código já tratado não bloqueiam; só as conexões não concluídas.
   const offset = computeAckOffset(updates, blocked);
   if (offset !== null) {
     try {

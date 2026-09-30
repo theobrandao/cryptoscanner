@@ -31,11 +31,13 @@ export const POST = withApi(async (req) => {
   await connection();
   await enforceRateLimit(req, "auth");
   const body = await parseBody(req, bodySchema);
+  // E-mail do dono (OWNER_EMAILS) nunca é cadastrado por senha: o cadastro não prova posse do e-mail e daria ADMIN a quem
+  // chegasse primeiro. A conta do dono nasce pelo login com Google (e-mail verificado).
+  if (isOwnerEmail(body.email)) throw new ApiError(403, "Para esta conta, entre com o Google.", "owner_use_google");
   if (!canRegister(body.email, body.invite)) throw new ApiError(403, "Cadastro restrito ao dono da conta (uso pessoal)", "invite_required");
   const prisma = requirePrisma();
   const exists = await prisma.user.findUnique({ where: { email: body.email } });
   if (exists) throw new ApiError(409, "E-mail já cadastrado", "email_taken");
-  const owner = isOwnerEmail(body.email);
   const user = await prisma.user.create({
     data: {
       name: body.name,
@@ -43,23 +45,21 @@ export const POST = withApi(async (req) => {
       passwordHash: await hashPassword(body.password),
       termsVersion: getEnv().LEGAL_TERMS_VERSION,
       termsAcceptedAt: new Date(),
-      ...(owner ? { plan: "PLATINUM" as const, role: "ADMIN" as const } : {}),
       preference: { create: {} },
       watchlists: { create: { name: "Favoritos", isDefault: true } },
     },
   });
-  // teste grátis do PRO (dono/admin não precisa)
-  if (!owner) {
-    await startTrial(user.id);
-    await prisma.user.update({ where: { id: user.id }, data: { plan: "PRO" } });
-    await track("trial_started", { userId: user.id });
-  }
+  // teste grátis do PRO
+  await startTrial(user.id);
+  await prisma.user.update({ where: { id: user.id }, data: { plan: "PRO" } });
+  await track("trial_started", { userId: user.id });
   // compra feita na Kiwify antes do cadastro (mesmo e-mail) substitui o teste
+  // TODO segurança: aplicar compra pendente só com e-mail confirmado quando o envio de e-mail estiver ativo
   await applyPendingGrants(user.id, user.email);
-  await track("signup", { userId: user.id, props: { owner } });
+  await track("signup", { userId: user.id, props: { owner: false } });
   await logAccess(req, user.id, "register");
   void sendTemplate("welcome", { to: user.email, name: user.name }).catch(() => undefined);
-  const session = { id: user.id, email: user.email, name: user.name, plan: owner ? user.plan : ("PRO" as const), role: user.role };
+  const session = { id: user.id, email: user.email, name: user.name, plan: "PRO" as const, role: user.role };
   const token = await createSessionToken(session);
   const res = NextResponse.json({ ok: true, data: { user: session } }, { status: 201 });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());

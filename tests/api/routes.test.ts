@@ -7,6 +7,7 @@ vi.mock("next/server", async (importOriginal) => {
 });
 
 import { getCache } from "@/lib/cache";
+import { resetEnvCache } from "@/lib/env";
 import { ASSETS } from "@/lib/assets";
 import { setProvidersForTests } from "@/services/market/market-service";
 import { ProviderError, type MarketProvider } from "@/services/market/providers/types";
@@ -147,6 +148,24 @@ describe("rotas da API", () => {
     const res = await POST(new Request("http://localhost/api/auth/login", { method: "POST", body: JSON.stringify({ email: "alguem@exemplo.com", password: "x" }) }), { params: Promise.resolve({}) });
     expect(res.status).toBe(503);
     expect((await json(res)).error?.code).toBe("database_unavailable");
+  });
+
+  it("POST /api/auth/register recusa cadastro por senha com e-mail do dono (só Google)", async () => {
+    const saved = process.env.OWNER_EMAILS;
+    process.env.OWNER_EMAILS = "dono@example.com";
+    resetEnvCache();
+    try {
+      const { POST } = await import("@/app/api/auth/register/route");
+      const res = await POST(new Request("http://localhost/api/auth/register", { method: "POST", body: JSON.stringify({ name: "Intruso", email: "Dono@Example.com", password: "SenhaForte#2026", acceptTerms: true }) }), { params: Promise.resolve({}) });
+      expect(res.status).toBe(403);
+      const body = await json(res);
+      expect(body.error?.code).toBe("owner_use_google");
+      expect(body.error?.message).toBe("Para esta conta, entre com o Google.");
+    } finally {
+      if (saved === undefined) delete process.env.OWNER_EMAILS;
+      else process.env.OWNER_EMAILS = saved;
+      resetEnvCache();
+    }
   });
 
   it("rotas autenticadas respondem 401 sem sessão", async () => {

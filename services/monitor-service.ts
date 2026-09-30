@@ -177,7 +177,7 @@ export async function evaluateMonitors(opts: { budgetMs?: number; batch?: number
   const t0 = Date.now();
   const budget = opts.budgetMs ?? 20_000;
   const monitors = await prisma.monitor.findMany({
-    where: { active: true },
+    where: { active: true, user: { blockedAt: null } },
     orderBy: [{ lastCheckedAt: { sort: "asc", nulls: "first" } }],
     take: opts.batch ?? 60,
     include: { user: { select: { telegramChatId: true, role: true, subscription: true } }, strategy: true },

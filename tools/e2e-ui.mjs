@@ -188,11 +188,12 @@ await step("Simulador: DCA BTC BRL 12 meses (resultado e gráfico)", async () =>
 await step("Jornada Trader: abrir aula, responder teste e concluir", async () => {
   await goto("/jornada");
   await page.waitForFunction(() => /12 aulas/i.test(document.body.innerText), null, { timeout: 20_000 });
-  await page.locator("button", { hasText: /O que é Bitcoin/ }).first().click();
+  await page.getByRole("link", { name: /O que é Bitcoin/ }).first().click();
+  await page.waitForURL(/\/jornada\?aula=/, { timeout: 10_000 });
   await page.waitForFunction(() => /Teste rápido/i.test(document.body.innerText), null, { timeout: 10_000 });
   await page.getByRole("button", { name: /Teste rápido/ }).first().click();
-  await page.locator("button", { hasText: /A recompensa por bloco cai pela metade/ }).click();
-  await page.locator("button", { hasText: /A oferta e demanda em cada corretora/ }).click();
+  await page.getByRole("radio", { name: /A recompensa por bloco cai pela metade/ }).click();
+  await page.getByRole("radio", { name: /A oferta e demanda em cada corretora/ }).click();
   await page.getByRole("button", { name: /Corrigir e concluir aula/i }).click();
   await page.waitForFunction(() => /2\/2 corretas/i.test(document.body.innerText), null, { timeout: 10_000 });
   return `aula concluída 2/2 · ${await shot("jornada")}`;

@@ -27,8 +27,14 @@ type Phase =
   | { kind: "timeout" }
   | { kind: "error"; message: string };
 
+/** Erros que encerram a verificação automática; os demais (ex.: Telegram ocupado) seguem até o prazo de 3 min. */
+const STOP_POLLING_CODES = new Set(["telegram_webhook_set", "telegram_unavailable"]);
+const CHAT_ID_RE = /^-?\d+$/;
+
 function errMessage(err: unknown): string {
-  return err instanceof ApiClientError ? err.message : String(err);
+  return err instanceof ApiClientError
+    ? err.message
+    : "Não foi possível conectar agora. Verifique sua internet e tente de novo.";
 }
 
 /**
@@ -54,7 +60,10 @@ export function TelegramConnect({
     "link" | "check" | "test" | "disconnect" | "save" | null
   >(null);
   const [chatId, setChatId] = React.useState("");
+  const chatIdTrimmed = chatId.trim();
+  const chatIdInvalid = chatIdTrimmed !== "" && !CHAT_ID_RE.test(chatIdTrimmed);
   const inFlight = React.useRef(false);
+  const waitingActionsRef = React.useRef<HTMLDivElement>(null);
   const onChangedRef = React.useRef(onChanged);
   React.useEffect(() => {
     onChangedRef.current = onChanged;
@@ -88,7 +97,7 @@ export function TelegramConnect({
           });
         }
       } catch (err) {
-        if (err instanceof ApiClientError && err.status === 503) {
+        if (err instanceof ApiClientError && STOP_POLLING_CODES.has(err.code)) {
           setPhase({ kind: "error", message: err.message });
         } else if (manual) {
           toast({
@@ -112,6 +121,12 @@ export function TelegramConnect({
 
   // Verificação periódica enquanto aguarda o toque em "Iniciar".
   const deadline = phase.kind === "waiting" ? phase.deadline : null;
+
+  // Ao aparecer o aviso de espera, o foco vai para "Já toquei em Iniciar" (primeiro botão do bloco).
+  React.useEffect(() => {
+    if (deadline === null) return;
+    waitingActionsRef.current?.querySelector("button")?.focus();
+  }, [deadline]);
   React.useEffect(() => {
     if (deadline === null) return;
     const id = window.setInterval(() => {
@@ -188,7 +203,11 @@ export function TelegramConnect({
   const saveManual = async () => {
     setBusy("save");
     try {
-      await postJson("/api/preferences", { telegramChatId: chatId }, "PATCH");
+      await postJson(
+        "/api/preferences",
+        { telegramChatId: chatIdTrimmed },
+        "PATCH",
+      );
       toast({ title: "Chat ID salvo", variant: "success" });
       setChatId("");
       setPhase({ kind: "idle" });
@@ -248,20 +267,31 @@ export function TelegramConnect({
         <div className="flex gap-2">
           <Input
             id="telegram-chat-id"
+            name="telegramChatId"
             value={chatId}
-            onChange={(e) => setChatId(e.target.value.replace(/[^\d-]/g, ""))}
-            placeholder="123456789"
-            inputMode="numeric"
+            onChange={(e) => setChatId(e.target.value)}
+            placeholder="Ex.: 123456789…"
+            inputMode="text"
+            pattern="-?\d+"
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={chatIdInvalid || undefined}
+            aria-describedby={chatIdInvalid ? "telegram-chat-id-error" : undefined}
           />
           <Button
             variant="secondary"
             onClick={() => void saveManual()}
             loading={busy === "save"}
-            disabled={!chatId}
+            disabled={!chatIdTrimmed || chatIdInvalid}
           >
             Salvar Chat ID
           </Button>
         </div>
+        {chatIdInvalid ? (
+          <p id="telegram-chat-id-error" className="text-danger">
+            Use só números. Chat ID de grupo começa com &quot;-&quot;.
+          </p>
+        ) : null}
       </div>
     </details>
   );
@@ -301,7 +331,10 @@ export function TelegramConnect({
   return (
     <div className="flex flex-col gap-3 text-sm">
       {phase.kind === "waiting" ? (
-        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/40 p-3">
+        <div
+          role="status"
+          className="flex flex-col gap-2 rounded-md border border-border bg-muted/40 p-3"
+        >
           <div className="flex items-center gap-2 font-medium">
             <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
             Abra o Telegram e toque em Iniciar…
@@ -319,7 +352,7 @@ export function TelegramConnect({
             </a>
             .
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div ref={waitingActionsRef} className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
               size="sm"

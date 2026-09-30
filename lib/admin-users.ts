@@ -2,7 +2,7 @@
  * Regras puras do Painel de controle (usuários): filtros por acesso/situação, rótulos, travas de ação e CSV.
  * Usado pelo serviço (servidor) e pela tela (cliente) — sem acesso a banco ou ambiente.
  */
-import { effectiveStatus, tierFor, type SubscriptionLike, type Tier } from "@/lib/entitlements";
+import { effectiveStatus, ENTITLEMENTS, tierFor, type SubscriptionLike, type Tier } from "@/lib/entitlements";
 
 export const ADMIN_TIERS = ["TRIAL", "PRO", "ELITE", "NONE", "ADMIN"] as const;
 export const ADMIN_STATUSES = ["ativo", "teste", "expirado", "bloqueado", "inadimplente"] as const;
@@ -26,6 +26,15 @@ export const ACTION_LABEL: Record<string, string> = {
   delete: "Excluiu a conta",
 };
 export const PROVIDER_LABEL: Record<string, string> = { kiwify: "Kiwify", mercadopago: "Mercado Pago", manual: "manual" };
+
+/**
+ * Automações (agentes, alertas, monitores) só rodam para conta não bloqueada e com acesso às ferramentas.
+ * Mesma regra do monitor: tier sem `core` (sem assinatura ativa) não recebe alertas automáticos.
+ */
+export function automationsAllowed(owner: { blockedAt: Date | null; role: string; subscription: SubscriptionLike | null }, now = new Date()): boolean {
+  if (owner.blockedAt) return false;
+  return ENTITLEMENTS[tierFor(owner.subscription, owner.role, now)].core;
+}
 
 /** Acesso (tier) e situação de uma conta, como o painel mostra. */
 export function classifyUser(u: { role: string; blockedAt: Date | string | null; subscription: SubscriptionLike | null }, now = new Date()): { tier: Tier; status: AdminStatus; effective: string | null } {

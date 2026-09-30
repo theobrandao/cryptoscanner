@@ -40,6 +40,13 @@ export function RouteProgress() {
     if (state === "loading") setState("done");
   }
 
+  // segurança: se a rota nunca muda (navegação cancelada, mesmo endereço, erro), a barra some sozinha em 8 s
+  React.useEffect(() => {
+    if (state !== "loading") return;
+    const t = setTimeout(() => setState("idle"), 8000);
+    return () => clearTimeout(t);
+  }, [state]);
+
   React.useEffect(() => {
     if (state !== "done") return;
     timer.current = setTimeout(() => setState("idle"), 350);
@@ -51,7 +58,7 @@ export function RouteProgress() {
   return (
     <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-[60] h-0.5">
       <div
-        className="h-full bg-gradient-to-r from-primary to-accent shadow-[0_0_8px_var(--primary)]"
+        className="h-full bg-gradient-to-r from-primary to-accent shadow-[0_0_8px_var(--primary)] motion-reduce:transition-none!"
         style={{
           width: state === "idle" ? "0%" : state === "loading" ? "80%" : "100%",
           opacity: state === "idle" ? 0 : 1,

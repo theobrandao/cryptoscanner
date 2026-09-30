@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { PageShell } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +30,10 @@ import { cn } from "@/lib/utils";
 import { JourneyHeroArt, LessonArt } from "./lesson-art";
 import { WIDGETS } from "./lesson-widgets";
 
-type ProgressMap = Record<string, { done: boolean; score: number; at: string }>;
+type Entry = { done: boolean; score: number; at: string };
+type ProgressMap = Record<string, Entry>;
 type Filter = "todas" | LessonLevel;
+type SaveStatus = "saving" | "ok" | "error";
 
 const LEVEL_VARIANT: Record<LessonLevel, "success" | "default" | "accent"> = {
   iniciante: "success",
@@ -39,75 +42,100 @@ const LEVEL_VARIANT: Record<LessonLevel, "success" | "default" | "accent"> = {
 };
 const TOTAL_MIN = LESSONS.reduce((s, l) => s + l.minutes, 0);
 
-const AULA_EVENT = "cs-aula";
-function subscribeAula(cb: () => void) {
-  window.addEventListener("popstate", cb);
-  window.addEventListener(AULA_EVENT, cb);
-  return () => {
-    window.removeEventListener("popstate", cb);
-    window.removeEventListener(AULA_EVENT, cb);
-  };
-}
+const PAGE_TITLE_ID = "jornada-titulo";
+const LESSON_TITLE_ID = "aula-titulo";
+const STEP_HEADING_ID = "aula-etapa-titulo";
 
-function readAulaParam(): string | null {
+/** "smooth" só quando a pessoa não pediu menos movimento no sistema. */
+function scrollBehavior(): ScrollBehavior {
   try {
-    const slug = new URLSearchParams(window.location.search).get("aula");
-    return slug && LESSONS.some((l) => l.slug === slug) ? slug : null;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "auto"
+      : "smooth";
   } catch {
-    return null;
+    return "auto";
   }
 }
 
-function writeAulaParam(slug: string | null) {
-  try {
-    const url = new URL(window.location.href);
-    if (slug) url.searchParams.set("aula", slug);
-    else url.searchParams.delete("aula");
-    window.history.replaceState(window.history.state, "", url.toString());
-    window.dispatchEvent(new Event(AULA_EVENT));
-  } catch {
-    /* sem histórico: segue sem link direto */
-  }
+function focusById(id: string) {
+  document.getElementById(id)?.focus({ preventScroll: true });
 }
+
+const lessonHref = (slug: string) => `/jornada?aula=${slug}`;
 
 /**
  * Jornada Trader: trilha aberta (sem login) de 12 aulas autorais com ilustrações, exercícios interativos e
  * teste rápido. Progresso fica no navegador; com conta, também é sincronizado pelo /api/learning.
+ * A aula aberta vem da URL (?aula=slug) pelo roteador do Next: link direto, botão Voltar e menu lateral funcionam.
  */
 export function JourneyView() {
+  // useSearchParams fica dentro do Suspense: a lista de aulas continua no HTML pré-renderizado
+  return (
+    <React.Suspense fallback={<JourneyContent openSlug={null} />}>
+      <JourneyFromUrl />
+    </React.Suspense>
+  );
+}
+
+function JourneyFromUrl() {
+  const slug = useSearchParams().get("aula");
+  const valid = slug && LESSONS.some((l) => l.slug === slug) ? slug : null;
+  return <JourneyContent openSlug={valid} />;
+}
+
+function JourneyContent({ openSlug }: { openSlug: string | null }) {
+  const router = useRouter();
   const { user } = useSession();
   const [local, setLocal] = useLocalStorage<ProgressMap>("cs-learning", {});
   const { data: remote, mutate } = useSWR<{ progress: ProgressMap }>(
     user ? "/api/learning" : null,
   );
   const progress: ProgressMap = { ...local, ...(remote?.progress ?? {}) };
-  // aula aberta vem da URL (?aula=slug): link direto e compartilhável para cada aula
-  const openSlug = React.useSyncExternalStore(
-    subscribeAula,
-    readAulaParam,
-    () => null,
-  );
   const [filter, setFilter] = React.useState<Filter>("todas");
+  const [save, setSave] = React.useState<{
+    slug: string;
+    status: SaveStatus;
+    entry: Entry;
+  } | null>(null);
   const done = LESSONS.filter((l) => progress[l.slug]?.done).length;
   const pct = Math.round((done / LESSONS.length) * 100);
   const nextUp = LESSONS.find((l) => !progress[l.slug]?.done);
 
-  const openLesson = React.useCallback((slug: string | null) => {
-    writeAulaParam(slug);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  const openLesson = React.useCallback(
+    (slug: string | null) => {
+      router.push(slug ? lessonHref(slug) : "/jornada", { scroll: false });
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
+    },
+    [router],
+  );
+
+  // foco acompanha a troca de tela: título da aula ao abrir, título da página ao voltar (não na primeira carga)
+  const lastSlug = React.useRef(openSlug);
+  React.useEffect(() => {
+    if (lastSlug.current === openSlug) return;
+    lastSlug.current = openSlug;
+    focusById(openSlug ? LESSON_TITLE_ID : PAGE_TITLE_ID);
+  }, [openSlug]);
+
+  const pushRemote = async (slug: string, entry: Entry) => {
+    setSave({ slug, status: "saving", entry });
+    try {
+      await apiFetch("/api/learning", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ progress: { [slug]: entry } }),
+      });
+      setSave({ slug, status: "ok", entry });
+      await mutate();
+    } catch {
+      setSave({ slug, status: "error", entry });
+    }
+  };
 
   const complete = async (lesson: Lesson, score: number) => {
     const entry = { done: true, score, at: new Date().toISOString() };
     setLocal((p) => ({ ...p, [lesson.slug]: entry }));
-    if (user) {
-      await apiFetch("/api/learning", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ progress: { [lesson.slug]: entry } }),
-      }).catch(() => undefined);
-      await mutate();
-    }
+    if (user) await pushRemote(lesson.slug, entry);
   };
 
   const open = openSlug ? LESSONS.find((l) => l.slug === openSlug) : null;
@@ -122,6 +150,10 @@ export function JourneyView() {
           lesson={open}
           saved={progress[open.slug]}
           loggedIn={!!user}
+          saveStatus={save?.slug === open.slug ? save.status : undefined}
+          onRetrySave={() => {
+            if (save?.slug === open.slug) void pushRemote(save.slug, save.entry);
+          }}
           onBack={() => openLesson(null)}
           onOpen={openLesson}
           onComplete={(score) => void complete(open, score)}
@@ -137,7 +169,11 @@ export function JourneyView() {
                     {LESSONS.length} aulas · {TOTAL_MIN} min no total
                   </span>
                 </div>
-                <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+                <h1
+                  id={PAGE_TITLE_ID}
+                  tabIndex={-1}
+                  className="mt-2 text-2xl font-bold tracking-tight outline-none sm:text-3xl"
+                >
                   Jornada <span className="text-gradient">Trader</span>
                 </h1>
                 <p className="mt-1 max-w-xl text-sm text-muted-foreground">
@@ -157,6 +193,8 @@ export function JourneyView() {
                     value={pct}
                     tone={pct === 100 ? "success" : "primary"}
                     className="mt-1"
+                    label="Seu progresso na Jornada"
+                    valueText={`${done} de ${LESSONS.length} aulas`}
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
                     {user ? (
@@ -200,7 +238,7 @@ export function JourneyView() {
 
           <div
             className="mb-4 flex flex-wrap gap-2"
-            role="tablist"
+            role="group"
             aria-label="Filtrar por nível"
           >
             {(["todas", "iniciante", "intermediario", "avancado"] as const).map(
@@ -213,8 +251,8 @@ export function JourneyView() {
                 return (
                   <button
                     key={f}
-                    role="tab"
-                    aria-selected={filter === f}
+                    type="button"
+                    aria-pressed={filter === f}
                     onClick={() => setFilter(f)}
                     className={cn(
                       "inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm transition-colors cursor-pointer",
@@ -226,6 +264,7 @@ export function JourneyView() {
                     {f === "todas" ? "Todas" : LEVEL_LABEL[f]}
                     <span className="tabular text-xs text-muted-foreground">
                       {d}/{list.length}
+                      <span className="sr-only"> concluídas</span>
                     </span>
                   </button>
                 );
@@ -238,14 +277,14 @@ export function JourneyView() {
               const p = progress[l.slug];
               const isNext = nextUp?.slug === l.slug;
               return (
-                <button
+                <Link
                   key={l.slug}
-                  onClick={() => openLesson(l.slug)}
-                  className="group text-left cursor-pointer"
+                  href={lessonHref(l.slug)}
+                  className="group block rounded-lg text-left"
                 >
                   <Card
                     className={cn(
-                      "h-full overflow-hidden transition-all group-hover:-translate-y-0.5 group-hover:border-primary/50 group-hover:shadow-lg",
+                      "h-full overflow-hidden transition-[transform,border-color,box-shadow] group-hover:-translate-y-0.5 group-hover:border-primary/50 group-hover:shadow-lg motion-reduce:transition-none motion-reduce:group-hover:translate-y-0",
                       p?.done && "border-success/50",
                       isNext && !p?.done && "ring-1 ring-primary/40",
                     )}
@@ -260,9 +299,10 @@ export function JourneyView() {
                         Aula {l.order}
                       </span>
                       {p?.done ? (
-                        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-success px-2 py-0.5 text-xs font-semibold text-white">
+                        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-background/85 px-2 py-0.5 text-xs font-semibold text-success backdrop-blur">
                           <Check className="h-3 w-3" aria-hidden /> {p.score}/
                           {l.quiz.length}
+                          <span className="sr-only"> corretas</span>
                         </span>
                       ) : null}
                       {WIDGETS[l.slug] ? (
@@ -281,9 +321,9 @@ export function JourneyView() {
                           {LEVEL_LABEL[l.level]}
                         </Badge>
                       </div>
-                      <div className="mt-2 font-semibold leading-snug">
+                      <h3 className="mt-2 font-semibold leading-snug">
                         {l.title}
-                      </div>
+                      </h3>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {l.summary}
                       </p>
@@ -300,7 +340,7 @@ export function JourneyView() {
                       </div>
                     </CardContent>
                   </Card>
-                </button>
+                </Link>
               );
             })}
           </div>
@@ -342,10 +382,16 @@ export function JourneyView() {
 
 type Step = { key: string; label: string };
 
+/** Alvos em que ← → têm função própria (campos, listas, grupos de opções, controles deslizantes). */
+const ARROW_OWNERS =
+  'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="listbox"], [role="radiogroup"], [role="radio"], [role="slider"], [role="tablist"], [role="menu"], [role="combobox"]';
+
 function LessonReader({
   lesson,
   saved,
   loggedIn,
+  saveStatus,
+  onRetrySave,
   onBack,
   onOpen,
   onComplete,
@@ -353,6 +399,8 @@ function LessonReader({
   lesson: Lesson;
   saved?: { done: boolean; score: number };
   loggedIn: boolean;
+  saveStatus?: SaveStatus;
+  onRetrySave: () => void;
   onBack: () => void;
   onOpen: (slug: string) => void;
   onComplete: (score: number) => void;
@@ -381,7 +429,7 @@ function LessonReader({
 
   const navRef = React.useRef<HTMLElement>(null);
   const firstRender = React.useRef(true);
-  // ao trocar de etapa: etapa ativa visível na barra e, se a barra saiu da tela, volta até ela
+  // ao trocar de etapa: etapa ativa visível na barra, volta até a barra se ela saiu da tela e o foco vai para o título da etapa
   React.useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
@@ -389,35 +437,59 @@ function LessonReader({
     }
     const nav = navRef.current;
     if (!nav) return;
+    const behavior = scrollBehavior();
     nav.querySelector('[aria-current="step"]')?.scrollIntoView({
       block: "nearest",
       inline: "center",
-      behavior: "smooth",
+      behavior,
     });
     if (nav.getBoundingClientRect().top < 64)
       window.scrollTo({
         top: window.scrollY + nav.getBoundingClientRect().top - 80,
-        behavior: "smooth",
+        behavior,
       });
+    focusById(STEP_HEADING_ID);
   }, [step]);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (
-        t &&
-        (t.tagName === "INPUT" ||
-          t.tagName === "TEXTAREA" ||
-          t.isContentEditable ||
-          t.getAttribute("role") === "slider")
-      )
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey)
         return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || t.closest?.(ARROW_OWNERS))) return;
       if (e.key === "ArrowRight") go(step + 1);
-      else if (e.key === "ArrowLeft") go(step - 1);
+      else go(step - 1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [go, step]);
+
+  // setas dentro de um grupo de respostas movem o foco entre as opções (a escolha continua sendo no clique/Enter)
+  const onOptionsKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const dir =
+      e.key === "ArrowDown" || e.key === "ArrowRight"
+        ? 1
+        : e.key === "ArrowUp" || e.key === "ArrowLeft"
+          ? -1
+          : 0;
+    if (!dir) return;
+    const radios = Array.from(
+      e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]'),
+    );
+    const i = radios.indexOf(document.activeElement as HTMLElement);
+    if (i < 0) return;
+    e.preventDefault();
+    radios[(i + dir + radios.length) % radios.length]?.focus();
+  };
+
+  const saveMsg = !loggedIn
+    ? "Progresso salvo neste navegador."
+    : saveStatus === "error"
+      ? "Não conseguimos salvar na sua conta; o progresso ficou neste navegador."
+      : saveStatus === "saving"
+        ? "Salvando na sua conta…"
+        : "Progresso salvo na sua conta.";
 
   return (
     <div className="flex flex-col gap-4">
@@ -447,7 +519,11 @@ function LessonReader({
                 </span>
               ) : null}
             </div>
-            <h1 className="mt-2 text-xl font-bold leading-tight sm:text-2xl">
+            <h1
+              id={LESSON_TITLE_ID}
+              tabIndex={-1}
+              className="mt-2 text-xl font-bold leading-tight outline-none sm:text-2xl"
+            >
               {lesson.title}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -459,9 +535,9 @@ function LessonReader({
             className="aspect-[16/9] rounded-none border-0 md:border-l"
           />
         </div>
-        <div className="h-1 w-full bg-muted">
+        <div className="h-1 w-full bg-muted" aria-hidden>
           <div
-            className="h-full bg-primary transition-all duration-300"
+            className="h-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
             style={{ width: `${((step + 1) / steps.length) * 100}%` }}
           />
         </div>
@@ -475,6 +551,7 @@ function LessonReader({
         {steps.map((s, i) => (
           <button
             key={s.key}
+            type="button"
             onClick={() => go(i)}
             aria-current={i === step ? "step" : undefined}
             className={cn(
@@ -500,7 +577,11 @@ function LessonReader({
                 <div className="text-xs font-semibold uppercase tracking-wide text-primary">
                   Parte {step + 1} de {lesson.sections.length}
                 </div>
-                <h2 className="mt-1 text-lg font-semibold">
+                <h2
+                  id={STEP_HEADING_ID}
+                  tabIndex={-1}
+                  className="mt-1 text-lg font-semibold outline-none"
+                >
                   {lesson.sections[step]!.heading}
                 </h2>
                 <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-muted-foreground">
@@ -511,7 +592,13 @@ function LessonReader({
 
             {cur.key === "keys" ? (
               <section>
-                <h2 className="text-lg font-semibold">Pontos-chave</h2>
+                <h2
+                  id={STEP_HEADING_ID}
+                  tabIndex={-1}
+                  className="text-lg font-semibold outline-none"
+                >
+                  Pontos-chave
+                </h2>
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
                   {lesson.keyPoints.map((k, i) => (
                     <div
@@ -530,7 +617,11 @@ function LessonReader({
 
             {cur.key === "lab" && widget ? (
               <section>
-                <h2 className="flex items-center gap-2 text-lg font-semibold">
+                <h2
+                  id={STEP_HEADING_ID}
+                  tabIndex={-1}
+                  className="flex items-center gap-2 text-lg font-semibold outline-none"
+                >
                   <FlaskConical className="h-4 w-4 text-primary" aria-hidden />{" "}
                   {widget.title}
                 </h2>
@@ -543,7 +634,13 @@ function LessonReader({
 
             {cur.key === "quiz" ? (
               <section>
-                <h2 className="text-lg font-semibold">Teste rápido</h2>
+                <h2
+                  id={STEP_HEADING_ID}
+                  tabIndex={-1}
+                  className="text-lg font-semibold outline-none"
+                >
+                  Teste rápido
+                </h2>
                 <p className="text-sm text-muted-foreground">
                   {lesson.quiz.length} perguntas. A resposta aparece assim que
                   você escolhe.
@@ -551,15 +648,22 @@ function LessonReader({
                 <div className="mt-3 flex flex-col gap-3">
                   {lesson.quiz.map((q, i) => {
                     const answered = answers[i] !== undefined;
+                    const locked = answered || checked;
+                    const qid = `${lesson.slug}-q${i}`;
                     return (
                       <div
                         key={q.q}
                         className="rounded-lg border border-border p-4"
                       >
-                        <div className="text-sm font-medium">
+                        <div id={qid} className="text-sm font-medium">
                           {i + 1}. {q.q}
                         </div>
-                        <div className="mt-2 flex flex-col gap-1.5">
+                        <div
+                          role="radiogroup"
+                          aria-labelledby={qid}
+                          onKeyDown={onOptionsKey}
+                          className="mt-2 flex flex-col gap-1.5"
+                        >
                           {q.options.map((o, j) => {
                             const sel = answers[i] === j;
                             const state = answered
@@ -572,12 +676,16 @@ function LessonReader({
                             return (
                               <button
                                 key={o}
-                                disabled={answered || checked}
-                                onClick={() =>
-                                  setAnswers({ ...answers, [i]: j })
-                                }
+                                type="button"
+                                role="radio"
+                                aria-checked={sel}
+                                aria-disabled={locked || undefined}
+                                onClick={() => {
+                                  if (locked) return;
+                                  setAnswers({ ...answers, [i]: j });
+                                }}
                                 className={cn(
-                                  "flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors cursor-pointer disabled:cursor-default",
+                                  "flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors cursor-pointer aria-disabled:cursor-default",
                                   state === "ok" &&
                                     "border-success bg-success/10",
                                   state === "bad" &&
@@ -589,17 +697,29 @@ function LessonReader({
                               >
                                 <span className="flex w-4 shrink-0 justify-center text-center">
                                   {state === "ok" ? (
-                                    <Check
-                                      className="h-4 w-4 text-success"
-                                      aria-label="correta"
-                                    />
+                                    <>
+                                      <Check
+                                        className="h-4 w-4 text-success"
+                                        aria-hidden
+                                      />
+                                      <span className="sr-only">
+                                        (correta)
+                                      </span>
+                                    </>
                                   ) : state === "bad" ? (
-                                    <X
-                                      className="h-4 w-4 text-danger"
-                                      aria-label="incorreta"
-                                    />
+                                    <>
+                                      <X
+                                        className="h-4 w-4 text-danger"
+                                        aria-hidden
+                                      />
+                                      <span className="sr-only">
+                                        (incorreta)
+                                      </span>
+                                    </>
                                   ) : (
-                                    String.fromCharCode(65 + j)
+                                    <span aria-hidden>
+                                      {String.fromCharCode(65 + j)}
+                                    </span>
                                   )}
                                 </span>
                                 {o}
@@ -607,23 +727,25 @@ function LessonReader({
                             );
                           })}
                         </div>
-                        {answered ? (
-                          <p
-                            className={cn(
-                              "mt-2 text-xs",
-                              answers[i] === q.answer
-                                ? "text-success"
-                                : "text-danger",
-                            )}
-                          >
-                            {answers[i] === q.answer
-                              ? "Correto. "
-                              : "Não é essa. "}
-                            <span className="text-muted-foreground">
-                              {q.why}
-                            </span>
-                          </p>
-                        ) : null}
+                        <div role="status">
+                          {answered ? (
+                            <p
+                              className={cn(
+                                "mt-2 text-xs",
+                                answers[i] === q.answer
+                                  ? "text-success"
+                                  : "text-danger",
+                              )}
+                            >
+                              {answers[i] === q.answer
+                                ? "Correto. "
+                                : "Não é essa. "}
+                              <span className="text-muted-foreground">
+                                {q.why}
+                              </span>
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
                     );
                   })}
@@ -659,14 +781,24 @@ function LessonReader({
                         {score}/{lesson.quiz.length} corretas
                       </Badge>
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {loggedIn
-                        ? "Progresso salvo na sua conta."
-                        : "Progresso salvo neste navegador."}
-                      {score < lesson.quiz.length
-                        ? " Vale reler a parte da pergunta que você errou."
-                        : ""}
-                    </p>
+                    <div aria-live="polite">
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {saveMsg}
+                        {score < lesson.quiz.length
+                          ? " Vale reler a parte da pergunta que você errou."
+                          : ""}
+                      </p>
+                      {loggedIn && saveStatus === "error" ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={onRetrySave}
+                        >
+                          Tentar de novo
+                        </Button>
+                      ) : null}
+                    </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {next ? (
                         <Button onClick={() => onOpen(next.slug)}>

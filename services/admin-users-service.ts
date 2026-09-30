@@ -172,6 +172,20 @@ function audit(tx: Prisma.TransactionClient, actor: Actor, target: { id: string;
   return tx.adminAuditLog.create({ data: { adminId: actor.id, adminEmail: actor.email, targetUserId: target.id, targetEmail: target.email, action, details } });
 }
 
+/**
+ * Pausa as automações da conta (agentes ativos → PAUSED, alertas e monitores ativos → inativos) na mesma transação do
+ * bloqueio/encerramento, para não seguir enviando avisos. Desbloquear/liberar acesso não retoma: o usuário reativa.
+ */
+async function pauseAutomations(tx: Prisma.TransactionClient, userId: string, why: string) {
+  const agents = await tx.agent.updateMany({ where: { userId, status: "ACTIVE" }, data: { status: "PAUSED" } });
+  const alerts = await tx.alert.updateMany({ where: { userId, active: true }, data: { active: false } });
+  const monitors = await tx.monitor.updateMany({ where: { userId, active: true }, data: { active: false, lastError: `pausado: ${why}` } });
+  return { agents: agents.count, alerts: alerts.count, monitors: monitors.count };
+}
+
+/** Registro: automações pausadas não voltam sozinhas ao desbloquear/liberar acesso. */
+const MANUAL_RESUME = { automations: "manual_resume" } as const;
+
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 const subSnapshot = (s: { plan: string; status: string; provider: string | null; trialEndsAt: Date | null; currentPeriodEnd: Date | null } | null) => (s ? { plan: s.plan, status: s.status, provider: s.provider, trialEndsAt: iso(s.trialEndsAt), currentPeriodEnd: iso(s.currentPeriodEnd) } : null);
 
@@ -190,7 +204,7 @@ export async function grantAccess(actor: Actor, userId: string, plan: "PRO" | "E
       update: { plan, status: "ACTIVE", provider: "manual", currentPeriodEnd, cancelAtPeriodEnd: false },
     });
     await tx.user.update({ where: { id: userId }, data: { plan: plan === "ELITE" ? "PLATINUM" : "PRO" } });
-    await audit(tx, actor, target, "grant", { plan, days, currentPeriodEnd: iso(currentPeriodEnd), before: subSnapshot(before) });
+    await audit(tx, actor, target, "grant", { plan, days, currentPeriodEnd: iso(currentPeriodEnd), before: subSnapshot(before), ...MANUAL_RESUME });
   });
 }
 
@@ -224,18 +238,20 @@ export async function revokeAccess(actor: Actor, userId: string) {
     if (before) await tx.subscription.update({ where: { userId }, data: { status: "EXPIRED", currentPeriodEnd: now, cancelAtPeriodEnd: false } });
     else await tx.subscription.create({ data: { userId, plan: "PRO", status: "EXPIRED", currentPeriodEnd: now } });
     await tx.user.update({ where: { id: userId }, data: { plan: "FREE" } });
-    await audit(tx, actor, target, "revoke", { before: subSnapshot(before) });
+    const paused = await pauseAutomations(tx, userId, "acesso encerrado");
+    await audit(tx, actor, target, "revoke", { before: subSnapshot(before), paused });
   });
 }
 
-/** Bloqueia a conta: não entra mais e as sessões abertas caem na hora. */
+/** Bloqueia a conta: não entra mais, as sessões abertas caem na hora e as automações são pausadas. */
 export async function blockUser(actor: Actor, userId: string, reason: string) {
   const target = await loadTarget(actor, userId, "block");
   const prisma = requirePrisma();
   const now = new Date();
   await prisma.$transaction(async (tx) => {
     await tx.user.update({ where: { id: userId }, data: { blockedAt: now, blockedReason: reason || null, passwordChangedAt: now } });
-    await audit(tx, actor, target, "block", { reason: reason || null });
+    const paused = await pauseAutomations(tx, userId, "conta bloqueada");
+    await audit(tx, actor, target, "block", { reason: reason || null, paused });
   });
 }
 
@@ -244,7 +260,7 @@ export async function unblockUser(actor: Actor, userId: string) {
   const prisma = requirePrisma();
   await prisma.$transaction(async (tx) => {
     await tx.user.update({ where: { id: userId }, data: { blockedAt: null, blockedReason: null } });
-    await audit(tx, actor, target, "unblock", { wasBlockedAt: iso(target.blockedAt) });
+    await audit(tx, actor, target, "unblock", { wasBlockedAt: iso(target.blockedAt), ...MANUAL_RESUME });
   });
 }
 

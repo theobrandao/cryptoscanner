@@ -65,12 +65,13 @@ function Field({
   step?: number;
   fmt?: (v: number) => string;
 }) {
+  const shown = fmt ? fmt(value) : num(value, 0);
   return (
-    <label className="flex flex-col gap-1.5 text-xs">
+    <div className="flex flex-col gap-1.5 text-xs">
       <span className="flex justify-between text-muted-foreground">
         <span>{label}</span>
-        <span className="tabular font-semibold text-foreground">
-          {fmt ? fmt(value) : value}
+        <span className="tabular font-semibold text-foreground" aria-hidden>
+          {shown}
         </span>
       </span>
       <Slider
@@ -79,9 +80,10 @@ function Field({
         max={max}
         step={step}
         onValueChange={(v) => onChange(v[0] ?? value)}
-        aria-label={label}
+        thumbLabel={label}
+        valueText={shown}
       />
-    </label>
+    </div>
   );
 }
 
@@ -120,6 +122,7 @@ function CandleBuilder() {
       <svg
         viewBox="0 0 140 160"
         className="mx-auto h-40 w-32"
+        role="img"
         aria-label="Candle montado"
       >
         <line
@@ -184,11 +187,14 @@ function RsiZones() {
             };
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative h-8 overflow-hidden rounded-md border border-border">
+      <div
+        className="relative h-8 overflow-hidden rounded-md border border-border"
+        aria-hidden
+      >
         <div className="absolute inset-y-0 left-0 w-[30%] bg-success/20" />
         <div className="absolute inset-y-0 right-0 w-[30%] bg-danger/20" />
         <div
-          className="absolute inset-y-0 w-1 bg-foreground transition-all"
+          className="absolute inset-y-0 w-1 bg-foreground transition-[left] motion-reduce:transition-none"
           style={{ left: `calc(${v}% - 2px)` }}
         />
         <span className="absolute left-2 top-1.5 text-[11px] text-muted-foreground">
@@ -209,24 +215,41 @@ function RsiZones() {
   );
 }
 
+/** Campo numérico: guarda o texto digitado (dá para apagar e redigitar) e entrega ao cálculo o número, ou NaN se vazio. */
 function NumInput({
   label,
-  value,
+  name,
+  initial,
   onChange,
+  invalid,
+  errorId,
 }: {
   label: string;
-  value: number;
+  name: string;
+  initial: number;
   onChange: (v: number) => void;
+  invalid?: boolean;
+  errorId?: string;
 }) {
+  const [text, setText] = React.useState(String(initial));
   return (
     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
       {label}
       <input
         type="number"
         inputMode="decimal"
-        value={Number.isFinite(value) ? value : ""}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground tabular focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        name={name}
+        min={0}
+        step="any"
+        autoComplete="off"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          onChange(e.target.value.trim() === "" ? NaN : Number(e.target.value));
+        }}
+        aria-invalid={invalid || undefined}
+        aria-describedby={invalid ? errorId : undefined}
+        className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground tabular focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-invalid:border-danger"
       />
     </label>
   );
@@ -235,24 +258,32 @@ function NumInput({
 function FibCalc() {
   const [low, setLow] = React.useState(58000);
   const [high, setHigh] = React.useState(72000);
-  const valid = high > low && low > 0;
+  const errorId = React.useId();
+  const lowOk = low > 0;
+  const valid = high > low && lowOk;
   const levels = [0.236, 0.382, 0.5, 0.618, 0.786];
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-3">
         <NumInput
           label="Fundo do movimento (US$)"
-          value={low}
+          name="fundo"
+          initial={58000}
           onChange={setLow}
+          invalid={!lowOk}
+          errorId={errorId}
         />
         <NumInput
           label="Topo do movimento (US$)"
-          value={high}
+          name="topo"
+          initial={72000}
           onChange={setHigh}
+          invalid={lowOk && !valid}
+          errorId={errorId}
         />
       </div>
       {valid ? (
-        <div className="grid gap-1.5">
+        <div className="grid gap-1.5" aria-live="polite">
           {levels.map((l) => {
             const price = high - (high - low) * l;
             return (
@@ -281,8 +312,10 @@ function FibCalc() {
           </p>
         </div>
       ) : (
-        <p className="text-sm text-danger">
-          O topo precisa ser maior que o fundo.
+        <p id={errorId} role="alert" className="text-sm text-danger">
+          {lowOk
+            ? "O topo precisa ser maior que o fundo."
+            : "Informe um fundo maior que zero."}
         </p>
       )}
     </div>
@@ -295,8 +328,18 @@ function RiskCalc() {
   const [entry, setEntry] = React.useState(100);
   const [stop, setStop] = React.useState(95);
   const [target, setTarget] = React.useState(112);
+  const errorId = React.useId();
   const perUnit = entry - stop;
-  const valid = capital > 0 && entry > 0 && perUnit > 0 && target > entry;
+  const capitalOk = capital > 0;
+  const entryOk = entry > 0;
+  const stopOk = entryOk && perUnit > 0;
+  const targetOk = entryOk && target > entry;
+  const valid = capitalOk && entryOk && stopOk && targetOk;
+  const error = !capitalOk
+    ? "Informe um capital maior que zero."
+    : !entryOk
+      ? "Informe um preço de entrada maior que zero."
+      : "Para compra: stop abaixo da entrada e alvo acima dela.";
   const riskMoney = (capital * riskPct) / 100;
   const qty = valid ? riskMoney / perUnit : 0;
   const position = qty * entry;
@@ -305,10 +348,38 @@ function RiskCalc() {
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <NumInput label="Capital (R$)" value={capital} onChange={setCapital} />
-        <NumInput label="Entrada" value={entry} onChange={setEntry} />
-        <NumInput label="Stop" value={stop} onChange={setStop} />
-        <NumInput label="Alvo" value={target} onChange={setTarget} />
+        <NumInput
+          label="Capital (R$)"
+          name="capital"
+          initial={10000}
+          onChange={setCapital}
+          invalid={!capitalOk}
+          errorId={errorId}
+        />
+        <NumInput
+          label="Entrada"
+          name="entrada"
+          initial={100}
+          onChange={setEntry}
+          invalid={!entryOk}
+          errorId={errorId}
+        />
+        <NumInput
+          label="Stop"
+          name="stop"
+          initial={95}
+          onChange={setStop}
+          invalid={entryOk && !stopOk}
+          errorId={errorId}
+        />
+        <NumInput
+          label="Alvo"
+          name="alvo"
+          initial={112}
+          onChange={setTarget}
+          invalid={entryOk && !targetOk}
+          errorId={errorId}
+        />
       </div>
       <Field
         label="Risco por operação"
@@ -320,7 +391,7 @@ function RiskCalc() {
         fmt={(v) => `${num(v, 2)}%`}
       />
       {valid ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-live="polite">
           {[
             ["Perda máxima", brl(riskMoney), "text-danger"],
             ["Quantidade", num(qty, 4), ""],
@@ -344,8 +415,8 @@ function RiskCalc() {
           ))}
         </div>
       ) : (
-        <p className="text-sm text-danger">
-          Para compra: stop abaixo da entrada e alvo acima dela.
+        <p id={errorId} role="alert" className="text-sm text-danger">
+          {error}
         </p>
       )}
       {valid && levered ? (
@@ -397,7 +468,7 @@ function DcaDemo() {
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-2 text-sm">
+      <div className="grid grid-cols-3 gap-2 text-sm" aria-live="polite">
         <div className="rounded-md border border-border p-2">
           <div className="text-[11px] text-muted-foreground">Investido</div>
           <div className="tabular font-semibold">{brl(invested)}</div>

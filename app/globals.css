@@ -21,6 +21,10 @@
   --success: #12a66b;
   --danger: #e2445c;
   --warning: #d98a06;
+  /* tema claro: versões mais escuras das cores de estado para texto (contraste AA ≥ 4,5:1 sobre fundo, cartão e tons /10–/15) */
+  --success-text: #096b43;
+  --danger-text: #b51f36;
+  --warning-text: #8a5600;
   --ring: #6d3df5;
   --chart-up: #12a66b;
   --chart-down: #e2445c;
@@ -210,7 +214,9 @@ body {
   animation-play-state: paused;
 }
 @media (prefers-reduced-motion: reduce) {
-  .marquee-track {
+  .marquee-track,
+  .live-dot,
+  .skeleton {
     animation: none;
   }
 }
@@ -232,6 +238,20 @@ body {
 /* Contraste AA: no tema escuro o azul de fundo de botão (texto branco) é mais escuro que o azul usado como texto. */
 .dark .text-primary {
   color: var(--primary-text);
+}
+/* Contraste AA no tema claro: verde, vermelho e âmbar de estado ficam abaixo de 4,5:1 como texto; o escuro não muda. */
+:root:not(.dark) .text-success {
+  color: var(--success-text);
+}
+:root:not(.dark) .text-danger {
+  color: var(--danger-text);
+}
+:root:not(.dark) .text-warning {
+  color: var(--warning-text);
+}
+/* selo verde com texto branco no tema claro: fundo mais escuro (branco sobre #12a66b fica em 3,1:1) */
+:root:not(.dark) .bg-success.text-white {
+  background-color: var(--success-text);
 }
 
 /* Jornada: transição suave entre etapas da aula */

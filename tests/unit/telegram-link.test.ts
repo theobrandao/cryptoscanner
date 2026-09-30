@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { computeAckOffset, extractStartCode, generateLinkCode, pickMatches, telegramDeepLink } from "@/services/telegram-link";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// checkLink: banco e Bot API simulados; o cache é o de memória (sem REDIS_URL nos testes).
+const mocks = vi.hoisted(() => ({ userUpdate: vi.fn(), getUpdates: vi.fn(), send: vi.fn() }));
+vi.mock("@/database/client", () => ({ requirePrisma: () => ({ user: { update: mocks.userUpdate } }) }));
+vi.mock("@/services/telegram", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/services/telegram")>()), getTelegramUpdates: mocks.getUpdates, sendTelegramMessage: mocks.send }));
+
+import { getCache } from "@/lib/cache";
+import { checkLink, completeLink, computeAckOffset, createLinkCode, extractStartCode, generateLinkCode, pickMatches, telegramDeepLink } from "@/services/telegram-link";
 import { telegramErrorMessage, type TelegramUpdate } from "@/services/telegram";
 
 const CODE_A = "AbCdEfGhIjKlMnOpQrStUv12";
@@ -70,5 +77,53 @@ describe("Telegram link — computeAckOffset", () => {
 describe("Telegram — telegramErrorMessage", () => {
   it("remove o token do bot de mensagens de erro", () => {
     expect(telegramErrorMessage(new Error("falha em https://api.telegram.org/bot123456:AA-bb_CC/getUpdates"))).toBe("falha em https://api.telegram.org/bot<token>/getUpdates");
+  });
+});
+
+describe("Telegram link — conclusão e confirmação (offset)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.send.mockResolvedValue({ ok: true });
+    mocks.userUpdate.mockResolvedValue({});
+  });
+  const ackCalls = () => mocks.getUpdates.mock.calls.filter((c) => c[0]?.offset !== undefined).map((c) => c[0].offset);
+
+  it("completeLink: done na primeira vez, claimed_elsewhere se outra verificação já reivindicou, failed se o banco falhar", async () => {
+    const a = await createLinkCode("user-1");
+    expect(await completeLink({ updateId: 1, code: a.code, userId: "user-1", chatId: "10" })).toBe("done");
+    expect(await completeLink({ updateId: 1, code: a.code, userId: "user-1", chatId: "10" })).toBe("claimed_elsewhere");
+    const b = await createLinkCode("user-2");
+    mocks.userUpdate.mockRejectedValueOnce(new Error("banco fora"));
+    expect(await completeLink({ updateId: 2, code: b.code, userId: "user-2", chatId: "20" })).toBe("failed");
+    // a falha libera a reivindicação: a próxima verificação tenta de novo
+    expect(await completeLink({ updateId: 2, code: b.code, userId: "user-2", chatId: "20" })).toBe("done");
+  });
+
+  it("código reivindicado por outra verificação em andamento não é confirmado ao Telegram", async () => {
+    const { code } = await createLinkCode("user-3");
+    await getCache().incr(`tglink:claim:${code}`, 120); // outra verificação está concluindo este código
+    mocks.getUpdates.mockResolvedValueOnce([upd(30, "oi"), upd(31, `/start ${code}`, 99), upd(32, "tchau")]);
+    mocks.getUpdates.mockResolvedValue([]);
+    expect(await checkLink("user-3")).toEqual({ connected: false });
+    expect(mocks.userUpdate).not.toHaveBeenCalled();
+    expect(ackCalls()).toEqual([31]);
+  });
+
+  it("conexão concluída (e códigos desconhecidos) avançam o offset", async () => {
+    const { code } = await createLinkCode("user-4");
+    mocks.getUpdates.mockResolvedValueOnce([upd(40, `/start ${code}`, 55), upd(41, `/start ${"Q".repeat(24)}`)]);
+    mocks.getUpdates.mockResolvedValue([]);
+    expect(await checkLink("user-4")).toEqual({ connected: true });
+    expect(mocks.userUpdate).toHaveBeenCalledWith({ where: { id: "user-4" }, data: { telegramChatId: "55" } });
+    expect(ackCalls()).toEqual([42]);
+  });
+
+  it("falha ao gravar não confirma a atualização", async () => {
+    const { code } = await createLinkCode("user-5");
+    mocks.userUpdate.mockRejectedValueOnce(new Error("banco fora"));
+    mocks.getUpdates.mockResolvedValueOnce([upd(50, `/start ${code}`, 66)]);
+    mocks.getUpdates.mockResolvedValue([]);
+    expect(await checkLink("user-5")).toEqual({ connected: false });
+    expect(ackCalls()).toEqual([]);
   });
 });

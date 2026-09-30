@@ -65,6 +65,14 @@ export class TelegramWebhookConflictError extends Error {
   }
 }
 
+/** 409 transitório: outra leitura de getUpdates em andamento ("terminated by other getUpdates request"). Tentar de novo. */
+export class TelegramBusyError extends Error {
+  constructor() {
+    super("getUpdates em uso por outra verificação");
+    this.name = "TelegramBusyError";
+  }
+}
+
 /**
  * getUpdates sem long polling (timeout 0). Com `offset`, confirma ao Telegram todas as
  * atualizações com update_id < offset (elas deixam de ser entregues).
@@ -72,17 +80,26 @@ export class TelegramWebhookConflictError extends Error {
 export async function getTelegramUpdates(options: { offset?: number; limit?: number } = {}): Promise<TelegramUpdate[]> {
   if (!isTelegramConfigured()) throw new Error("TELEGRAM_BOT_TOKEN não configurado");
   const token = getEnv().TELEGRAM_BOT_TOKEN;
+  let res: Response;
   try {
-    const res = await fetchJson<{ ok: boolean; result?: TelegramUpdate[] }>(`https://api.telegram.org/bot${token}/getUpdates`, {
+    // fetch direto (sem fetchJson) para ler a descrição do erro: o 409 tem duas causas diferentes
+    res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { accept: "application/json", "content-type": "application/json" },
       body: JSON.stringify({ timeout: 0, allowed_updates: ["message"], limit: options.limit ?? 100, ...(options.offset !== undefined ? { offset: options.offset } : {}) }),
-      retries: 0,
-      noRetryStatuses: [400, 401, 403, 404, 409, 429],
+      signal: AbortSignal.timeout(getEnv().HTTP_TIMEOUT_MS),
+      redirect: "manual",
+      cache: "no-store",
     });
-    return res.result ?? [];
   } catch (err) {
-    if (err instanceof HttpError && err.status === 409) throw new TelegramWebhookConflictError();
     throw new Error(telegramErrorMessage(err));
   }
+  const body = (await res.json().catch(() => null)) as { ok?: boolean; result?: TelegramUpdate[]; description?: string } | null;
+  if (res.status === 409) {
+    // "can't use getUpdates method while webhook is active" → permanente; "terminated by other getUpdates request" → transitório
+    if (/webhook/i.test(body?.description ?? "")) throw new TelegramWebhookConflictError();
+    throw new TelegramBusyError();
+  }
+  if (!res.ok || !body) throw new Error(telegramErrorMessage(new HttpError(res.status, "getUpdates")));
+  return body.result ?? [];
 }
