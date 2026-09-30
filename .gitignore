@@ -44,3 +44,6 @@ next-env.d.ts
 # arquivos gerados pelo next dev para agentes de IA
 AGENTS.md
 CLAUDE.md
+
+# snapshot local do Redis
+dump.rdb
