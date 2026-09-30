@@ -113,7 +113,32 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  /**
+   * Verificação de propriedade nos buscadores (opcionais): só o valor do atributo `content` da meta tag
+   * (Google Search Console → "Tag HTML"; Bing Webmaster Tools → "Meta tag" msvalidate.01). Valor fora do formato é ignorado.
+   */
+  GOOGLE_SITE_VERIFICATION: z.string().trim().regex(/^[A-Za-z0-9_-]{10,128}$/).optional().catch(undefined),
+  BING_SITE_VERIFICATION: z.string().trim().regex(/^[A-Za-z0-9_-]{10,128}$/).optional().catch(undefined),
+  /** IndexNow (Bing, Yandex, Seznam…): chave de 8 a 128 caracteres (letras, números, hífen), servida em /indexnow-key.txt. */
+  INDEXNOW_KEY: z.string().trim().regex(/^[A-Za-z0-9-]{8,128}$/).optional().catch(undefined),
 });
+
+const GOOGLE_SITE_VERIFICATION_DEFAULT = "itO17eOlQLWE9pkG309GoHrJIheTLqqc4DkQpCNq2lA";
+
+/** Metadados de verificação dos buscadores (layout raiz). */
+export function siteVerification(): { google?: string; other?: Record<string, string> } | undefined {
+  let env: Env;
+  try {
+    env = getEnv();
+  } catch {
+    return undefined;
+  }
+  const out: { google?: string; other?: Record<string, string> } = {};
+  // valor público (vai no HTML); o dono enviou este código do Search Console. A variável de ambiente, se existir, tem prioridade.
+  out.google = env.GOOGLE_SITE_VERIFICATION ?? GOOGLE_SITE_VERIFICATION_DEFAULT;
+  if (env.BING_SITE_VERIFICATION) out.other = { "msvalidate.01": env.BING_SITE_VERIFICATION };
+  return out.google || out.other ? out : undefined;
+}
 
 export type Env = z.infer<typeof schema>;
 

@@ -45,7 +45,7 @@ function pageState(data: SubPayload | undefined) {
  * Página de planos. Título, cartões e preços chegam prontos do servidor (`initial`, de PRICE_*_BRL);
  * o que depende da conta (assinatura, avisos) entra depois num espaço já reservado.
  */
-export function PlansView({ initial }: { initial: PublicPrices }) {
+export function PlansView({ initial, faq }: { initial: PublicPrices; faq?: React.ReactNode }) {
   const { user, loading: sessionLoading } = useSession();
   const { toast } = useToast();
   const { data, mutate } = useSWR<SubPayload>(user ? "/api/billing/subscription?saved=1" : null);
@@ -217,6 +217,7 @@ export function PlansView({ initial }: { initial: PublicPrices }) {
           O acesso é liberado automaticamente para a conta com o e-mail usado no checkout da Kiwify: <strong>{user.email}</strong>.
         </Alert>
       ) : null}
+      {faq}
       <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
         {billingNote(provider)} (
         <Link href="/reembolso" className="underline">

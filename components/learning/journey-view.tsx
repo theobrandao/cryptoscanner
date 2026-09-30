@@ -188,6 +188,13 @@ export function JourneyView({ lessons, levelLabels }: { lessons: LessonCardData[
           </CardContent>
         </Card>
       ) : null}
+      <p className="mt-4 text-[13px] text-muted-foreground">
+        Os termos das aulas estão explicados no{" "}
+        <Link href="/glossario" className="text-primary-text hover:underline">
+          Glossário de análise técnica e cripto
+        </Link>
+        .
+      </p>
     </PageShell>
   );
 }

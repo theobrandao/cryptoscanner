@@ -349,7 +349,7 @@ export async function runAnalystChat(input: ChatRunInput, emit: (e: ChatEvent) =
       log.warn("contexto indisponível para a resposta automática", { symbol: input.selection.symbol, tf: input.selection.tf, error: (err as Error).message });
       text = `Não consegui montar o contexto de ${input.selection.symbol} ${input.selection.tf.toUpperCase()} agora. Os dados de mercado não responderam; tente de novo em alguns minutos.`;
     }
-    text += "\n\n_O modelo de linguagem não está configurado neste ambiente; esta é a leitura automática do contexto da tela, sem interpretação da pergunta._";
+    text += "\n\n_Resposta automática montada com os dados desta tela (estrutura, níveis e setup). Para perguntas abertas, use as sugestões acima._";
     emit({ type: "text", delta: text });
     await finish(text, { tools: ["contexto_ativo"], unverified: [], actions: [], model: null, llm: false });
     return;

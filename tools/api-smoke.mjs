@@ -1525,6 +1525,58 @@ if (preCookie) {
   });
 }
 
+await test("Páginas públicas", "/ajuda e /ajuda/scanner respondem 200 com o título", async () => {
+  const out = [];
+  for (const [p, re] of [["/ajuda", /<h1[^>]*>[\s\S]*?Como usar o[\s\S]*?CryptoScanner[\s\S]*?<\/h1>/], ["/ajuda/scanner", /<h1[^>]*id="tutorial-titulo"[^>]*>[\s\S]*?Scanner de padrões gráficos[\s\S]*?<\/h1>/]]) {
+    const r = await call("GET", p, { auth: false });
+    expectStatus(r, 200);
+    expect(re.test(r.text ?? ""), `h1 ausente em ${p}`);
+    out.push(`${p} ${r.ms}ms`);
+  }
+  const miss = await call("GET", "/ajuda/tutorial-que-nao-existe", { auth: false });
+  expect(miss.res.status === 404, `slug inexistente deu HTTP ${miss.res.status}`);
+  return out.join(" · ");
+});
+
+await test("Busca e IA", "/llms.txt e /llms-full.txt: 200, text/plain, com CryptoScanner", async () => {
+  const out = [];
+  for (const p of ["/llms.txt", "/llms-full.txt"]) {
+    const r = await call("GET", p, { auth: false });
+    expectStatus(r, 200);
+    const ct = r.res.headers.get("content-type") ?? "";
+    expect(/^text\/plain/.test(ct), `${p} content-type ${ct}`);
+    expect((r.text ?? "").startsWith("# CryptoScanner"), `${p} sem o título "# CryptoScanner"`);
+    expect(!/PLATINUM/i.test(r.text ?? ""), `${p} expõe a chave interna`);
+    out.push(`${p} ${Math.round((r.text ?? "").length / 1024)} KB`);
+  }
+  return out.join(" · ");
+});
+
+await test("Busca e IA", "/sobre e /glossario respondem 200 com h1 e JSON-LD", async () => {
+  const out = [];
+  for (const [p, re, ld] of [
+    ["/sobre", /<h1[^>]*>[\s\S]*?O que é o CryptoScanner[\s\S]*?<\/h1>/, /"@type":"FAQPage"/],
+    ["/glossario", /<h1[^>]*>[\s\S]*?Glossário de análise técnica e cripto[\s\S]*?<\/h1>/, /"@type":"DefinedTermSet"/],
+  ]) {
+    const r = await call("GET", p, { auth: false });
+    expectStatus(r, 200);
+    expect(re.test(r.text ?? ""), `h1 ausente em ${p}`);
+    expect(ld.test(r.text ?? ""), `JSON-LD ausente em ${p}`);
+    out.push(`${p} ${r.ms}ms`);
+  }
+  return out.join(" · ");
+});
+
+await test("Busca e IA", "/robots.txt libera GPTBot, ClaudeBot e PerplexityBot e aponta o sitemap", async () => {
+  const r = await call("GET", "/robots.txt", { auth: false });
+  expectStatus(r, 200);
+  const t = r.text ?? "";
+  for (const ua of ["GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended"]) expect(new RegExp(`User-Agent: ${ua}`, "i").test(t), `${ua} ausente`);
+  expect(/Sitemap: https?:\/\/\S+\/sitemap\.xml/i.test(t), "linha Sitemap ausente");
+  expect(!/Disallow: \/\s*$/m.test(t), "há um Disallow: / (bloqueio total)");
+  return "GPTBot, ClaudeBot, PerplexityBot, Google-Extended";
+});
+
 // ------------------------------------------------------------------ relatório
 const skipped = results.filter((r) => r.skipped).length;
 const failed = results.filter((r) => !r.ok).length;

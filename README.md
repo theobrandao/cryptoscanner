@@ -45,6 +45,8 @@ Edite `.env.local`/`.env` (ver `.env.example`, todos comentados). Principais:
 | `WORKER_CYCLE_SECONDS`, `AGENT_ALERT_COOLDOWN_MINUTES` | Ciclo do worker (300) e cooldown (30) |
 | `ALLOW_SELF_PLAN_CHANGE` | `true` permite ao usuário trocar o próprio plano em `/planos` (ambiente de teste; não há cobrança) |
 | `RATE_LIMIT_*` | Limites por minuto (público, autenticação, LLM) |
+| `GOOGLE_SITE_VERIFICATION`, `BING_SITE_VERIFICATION` | Opcionais. Valor do `content` da meta tag de verificação do Google Search Console (Tag HTML) e do Bing Webmaster Tools (`msvalidate.01`); saem no `<head>` de todas as páginas (layout raiz). Valor fora do formato é ignorado |
+| `INDEXNOW_KEY` | Opcional. Chave do IndexNow (8–128 caracteres: letras, números, hífen), servida em `/indexnow-key.txt`. Envio manual das URLs do sitemap: `INDEXNOW_KEY=... node tools/indexnow.mjs` (`--dry-run` só lista) |
 
 ## 3. APIs externas necessárias
 

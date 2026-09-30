@@ -1,0 +1,782 @@
+{
+  "primeiros-passos": {
+    "cover": "/tutoriais/primeiros-passos/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/primeiros-passos/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/primeiros-passos/video.mp4",
+    "poster": "/tutoriais/primeiros-passos/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/primeiros-passos/passo-1.webp",
+        "caption": "Abra a página de cadastro e preencha nome, e-mail e senha",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/primeiros-passos/passo-2.webp",
+        "caption": "Marque o aceite dos Termos e clique em Começar 3 dias grátis",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/primeiros-passos/passo-3.webp",
+        "caption": "No Início, siga a lista Primeiros passos",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/primeiros-passos/passo-4.webp",
+        "caption": "Logo abaixo, Seu painel mostra plano, agentes, alertas e aulas",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:22:18.588Z"
+  },
+  "inicio": {
+    "cover": "/tutoriais/inicio/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/inicio/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/inicio/video.mp4",
+    "poster": "/tutoriais/inicio/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/inicio/passo-1.webp",
+        "caption": "Seu painel mostra plano, agentes, alertas e progresso na Jornada",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/inicio/passo-2.webp",
+        "caption": "Acompanhe os sinais ativos do modelo validado",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/inicio/passo-3.webp",
+        "caption": "Filtre os sinais por timeframe: 4H ou 1D",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/inicio/passo-4.webp",
+        "caption": "Veja o Mercado agora e troque a lista em Maiores altas",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:23:19.512Z"
+  },
+  "scanner": {
+    "cover": "/tutoriais/scanner/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/scanner/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/scanner/video.mp4",
+    "poster": "/tutoriais/scanner/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/scanner/passo-1.webp",
+        "caption": "Escolha o timeframe 4H",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/scanner/passo-2.webp",
+        "caption": "Clique em Escanear agora",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/scanner/passo-3.webp",
+        "caption": "Veja os padrões encontrados com alvo, stop e taxa de acerto",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/scanner/passo-4.webp",
+        "caption": "Na Tabela em tempo real, clique numa coluna para ordenar (ex.: 24h)",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:24:01.638Z"
+  },
+  "scanner-setups": {
+    "cover": "/tutoriais/scanner-setups/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/scanner-setups/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/scanner-setups/video.mp4",
+    "poster": "/tutoriais/scanner-setups/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/scanner-setups/passo-1.webp",
+        "caption": "Escolha o timeframe (ex.: 1D)",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/scanner-setups/passo-2.webp",
+        "caption": "Filtre pelo estado do setup (ex.: Em formação)",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/scanner-setups/passo-3.webp",
+        "caption": "Ordene pela Nota (Confluence Score)",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:24:52.841Z"
+  },
+  "analise-completa": {
+    "cover": "/tutoriais/analise-completa/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/analise-completa/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/analise-completa/video.mp4",
+    "poster": "/tutoriais/analise-completa/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/analise-completa/passo-1.webp",
+        "caption": "No topo: ativo, corretora, mercado e timeframe",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/analise-completa/passo-2.webp",
+        "caption": "Troque entre as abas Análise, Indicadores e Alertas",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/analise-completa/passo-3.webp",
+        "caption": "Na aba Análise, confira o Confluence Score e o estado do setup",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/analise-completa/passo-4.webp",
+        "caption": "Use o painel de Gestão de risco para dimensionar a posição",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:25:27.756Z"
+  },
+  "graficos": {
+    "cover": "/tutoriais/graficos/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/graficos/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/graficos/video.mp4",
+    "poster": "/tutoriais/graficos/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/graficos/passo-1.webp",
+        "caption": "Escolha o ativo e o timeframe (ex.: 1D)",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/graficos/passo-2.webp",
+        "caption": "Ligue indicadores como MACD e Fibonacci",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/graficos/passo-3.webp",
+        "caption": "Veja suportes e resistências calculados",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/graficos/passo-4.webp",
+        "caption": "Confira os padrões detectados e clique num deles para desenhá-lo",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:26:10.614Z"
+  },
+  "fibonacci": {
+    "cover": "/tutoriais/fibonacci/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/fibonacci/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/fibonacci/video.mp4",
+    "poster": "/tutoriais/fibonacci/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/fibonacci/passo-1.webp",
+        "caption": "Escolha o ativo e o timeframe do swing (ex.: 4H)",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/fibonacci/passo-2.webp",
+        "caption": "Leia as retrações e extensões; o nível mais próximo fica destacado",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/fibonacci/passo-3.webp",
+        "caption": "Use a Calculadora manual com máxima e mínima próprias",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:26:53.410Z"
+  },
+  "panorama": {
+    "cover": "/tutoriais/panorama/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/panorama/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/panorama/video.mp4",
+    "poster": "/tutoriais/panorama/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/panorama/passo-1.webp",
+        "caption": "Comece pelo resumo executivo do dia",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/panorama/passo-2.webp",
+        "caption": "Veja os principais fatores e as manchetes",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/panorama/passo-3.webp",
+        "caption": "Compare os 30 ativos monitorados",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/panorama/passo-4.webp",
+        "caption": "Acompanhe o Medo & Ganância dos últimos dias",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:27:29.505Z"
+  },
+  "bolhas": {
+    "cover": "/tutoriais/bolhas/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/bolhas/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/bolhas/video.mp4",
+    "poster": "/tutoriais/bolhas/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/bolhas/passo-1.webp",
+        "caption": "Escolha o período da variação (ex.: 7d)",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/bolhas/passo-2.webp",
+        "caption": "Troque o tamanho das bolhas para capitalização",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/bolhas/passo-3.webp",
+        "caption": "Verde subiu e vermelho caiu no período; clique numa bolha para abrir o gráfico",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:28:14.744Z"
+  },
+  "carteira": {
+    "cover": "/tutoriais/carteira/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/carteira/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/carteira/video.mp4",
+    "poster": "/tutoriais/carteira/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/carteira/passo-1.webp",
+        "caption": "Seus favoritos e posições simuladas ficam na primeira aba",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/carteira/passo-2.webp",
+        "caption": "Adicione um ativo; quantidade e preço médio são opcionais",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/carteira/passo-3.webp",
+        "caption": "Na aba Alertas, crie e acompanhe alertas de preço",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/carteira/passo-4.webp",
+        "caption": "Em Análises salvas ficam as leituras de gráfico por IA",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:28:56.261Z"
+  },
+  "simulador": {
+    "cover": "/tutoriais/simulador/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/simulador/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/simulador/video.mp4",
+    "poster": "/tutoriais/simulador/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/simulador/passo-1.webp",
+        "caption": "Escolha BTC, DCA — aportes mensais e o período de 1 ano",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/simulador/passo-2.webp",
+        "caption": "Clique em Simular",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/simulador/passo-3.webp",
+        "caption": "Veja quanto o aporte teria rendido com preços diários reais",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:29:32.837Z"
+  },
+  "backtest": {
+    "cover": "/tutoriais/backtest/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/backtest/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/backtest/video.mp4",
+    "poster": "/tutoriais/backtest/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/backtest/passo-1.webp",
+        "caption": "Confira setup, timeframe e ativo e clique em Rodar backtest",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/backtest/passo-2.webp",
+        "caption": "Leia operações, expectativa, acerto e drawdown",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/backtest/passo-3.webp",
+        "caption": "Acompanhe a curva de capital e a lista de operações",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:30:08.147Z"
+  },
+  "construtor-estrategias": {
+    "cover": "/tutoriais/construtor-estrategias/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/construtor-estrategias/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/construtor-estrategias/video.mp4",
+    "poster": "/tutoriais/construtor-estrategias/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/construtor-estrategias/passo-1.webp",
+        "caption": "Abra um modelo validado como ponto de partida",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/construtor-estrategias/passo-2.webp",
+        "caption": "Ajuste as condições e a saída da estratégia",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/construtor-estrategias/passo-3.webp",
+        "caption": "Clique em Testar agora para ver se as condições batem hoje",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:30:43.904Z"
+  },
+  "monitores-alertas": {
+    "cover": "/tutoriais/monitores-alertas/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/monitores-alertas/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/monitores-alertas/video.mp4",
+    "poster": "/tutoriais/monitores-alertas/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/monitores-alertas/passo-1.webp",
+        "caption": "Em Novo monitor, escolha o ativo e o timeframe",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/monitores-alertas/passo-2.webp",
+        "caption": "Marque em quais estados do setup quer ser avisado",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/monitores-alertas/passo-3.webp",
+        "caption": "Clique em Criar monitor",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/monitores-alertas/passo-4.webp",
+        "caption": "Seus monitores aparecem na lista, com pausar e excluir",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:31:25.421Z"
+  },
+  "agentes-ia": {
+    "cover": "/tutoriais/agentes-ia/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/agentes-ia/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/agentes-ia/video.mp4",
+    "poster": "/tutoriais/agentes-ia/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/agentes-ia/passo-1.webp",
+        "caption": "Clique em Novo Agente",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/agentes-ia/passo-2.webp",
+        "caption": "Dê um nome ao agente e escolha um ícone",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/agentes-ia/passo-3.webp",
+        "caption": "Clique em Próximo e escolha ativos, tipo de operação e timeframe",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/agentes-ia/passo-4.webp",
+        "caption": "Selecione as estratégias que o agente vai vigiar",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/agentes-ia/passo-5.webp",
+        "caption": "Depois de criado, o agente aparece em Meus Agentes",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:32:03.575Z"
+  },
+  "sentinela": {
+    "cover": "/tutoriais/sentinela/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/sentinela/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/sentinela/video.mp4",
+    "poster": "/tutoriais/sentinela/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/sentinela/passo-1.webp",
+        "caption": "Escolha a moeda que o Sentinela vai vigiar",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/sentinela/passo-2.webp",
+        "caption": "Defina o tempo gráfico (4 horas é o recomendado) e a confiança mínima",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/sentinela/passo-3.webp",
+        "caption": "Clique em Criar Sentinela",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/sentinela/passo-4.webp",
+        "caption": "Ele aparece em Meus Sentinelas e roda 24h no servidor",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:32:59.026Z"
+  },
+  "analista-ia": {
+    "cover": "/tutoriais/analista-ia/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/analista-ia/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/analista-ia/video.mp4",
+    "poster": "/tutoriais/analista-ia/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/analista-ia/passo-1.webp",
+        "caption": "Abra o Analista IA e escolha uma pergunta sugerida",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/analista-ia/passo-2.webp",
+        "caption": "Clique na pergunta e aguarde a resposta",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/analista-ia/passo-3.webp",
+        "caption": "A resposta usa só os números do app: estrutura, níveis e setup",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:33:43.772Z"
+  },
+  "jornada": {
+    "cover": "/tutoriais/jornada/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/jornada/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/jornada/video.mp4",
+    "poster": "/tutoriais/jornada/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/jornada/passo-1.webp",
+        "caption": "Escolha uma aula na Jornada Trader",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/jornada/passo-2.webp",
+        "caption": "Leia cada etapa da aula no seu ritmo",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/jornada/passo-3.webp",
+        "caption": "Avance para a próxima etapa: Timeframes",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/jornada/passo-4.webp",
+        "caption": "Pratique com o exercício interativo",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/jornada/passo-5.webp",
+        "caption": "Responda o teste rápido para concluir a aula",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:34:18.908Z"
+  },
+  "planos-e-conta": {
+    "cover": "/tutoriais/planos-e-conta/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/planos-e-conta/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/planos-e-conta/video.mp4",
+    "poster": "/tutoriais/planos-e-conta/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/planos-e-conta/passo-1.webp",
+        "caption": "Em Planos, veja sua assinatura e compare PRO e ELITE",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/planos-e-conta/passo-2.webp",
+        "caption": "Em Preferências, ajuste nome, tema, moeda e timeframe padrão",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/planos-e-conta/passo-3.webp",
+        "caption": "Abra o menu da conta no canto superior direito",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:35:04.612Z"
+  },
+  "notificacoes-push": {
+    "cover": "/tutoriais/notificacoes-push/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/notificacoes-push/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": "/tutoriais/notificacoes-push/video.mp4",
+    "poster": "/tutoriais/notificacoes-push/video-poster.webp",
+    "posterWidth": 1280,
+    "posterHeight": 720,
+    "steps": [
+      {
+        "src": "/tutoriais/notificacoes-push/passo-1.webp",
+        "caption": "Em Preferências, encontre o cartão Notificações no navegador",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/notificacoes-push/passo-2.webp",
+        "caption": "Clique em Ativar notificações e permita no aviso do navegador",
+        "width": 1600,
+        "height": 900
+      },
+      {
+        "src": "/tutoriais/notificacoes-push/passo-3.webp",
+        "caption": "Depois de ativar, use Enviar teste para conferir",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:35:40.716Z"
+  },
+  "conectar-telegram": {
+    "cover": "/tutoriais/conectar-telegram/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/conectar-telegram/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": null,
+    "poster": null,
+    "posterWidth": null,
+    "posterHeight": null,
+    "steps": [
+      {
+        "src": "/tutoriais/conectar-telegram/passo-1.webp",
+        "caption": "Em Preferências, encontre o cartão Alertas no Telegram",
+        "width": 1600,
+        "height": 900
+      }
+    ],
+    "capturedAt": "2026-09-30T20:36:12.157Z"
+  },
+  "instalar-app": {
+    "cover": "/tutoriais/instalar-app/capa.webp",
+    "coverWidth": 1600,
+    "coverHeight": 900,
+    "mobile": "/tutoriais/instalar-app/celular.webp",
+    "mobileWidth": 780,
+    "mobileHeight": 1688,
+    "video": null,
+    "poster": null,
+    "posterWidth": null,
+    "posterHeight": null,
+    "steps": [
+      {
+        "src": "/tutoriais/instalar-app/passo-1.webp",
+        "caption": "Depois de instalado, o CryptoScanner abre pelo ícone, em tela cheia",
+        "width": 1200,
+        "height": 675
+      }
+    ],
+    "capturedAt": "2026-09-30T20:38:35.959Z"
+  }
+}

@@ -6,6 +6,7 @@ import { PwaRegister } from "@/components/providers/pwa-register";
 import { themeInitScript } from "@/components/providers/theme-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { SITE_URL } from "@/lib/site";
+import { siteVerification } from "@/lib/env";
 
 /**
  * Inter variável servida pelo próprio site (um arquivo por subconjunto cobre todos os pesos; pré-carrega só o latino).
@@ -22,6 +23,8 @@ export const metadata: Metadata = {
   openGraph: { type: "website", locale: "pt_BR", siteName: "CryptoScanner" },
   twitter: { card: "summary_large_image" },
   formatDetection: { telephone: false },
+  // GOOGLE_SITE_VERIFICATION / BING_SITE_VERIFICATION (opcionais): meta tags de verificação do Search Console e do Bing Webmaster
+  verification: siteVerification(),
 };
 
 export const viewport: Viewport = {

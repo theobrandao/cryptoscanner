@@ -453,8 +453,7 @@ function ExecutiveReport() {
           <CardContent className="flex flex-col gap-3 text-sm">
             {d.derivatives.items.length === 0 ? (
               <Alert variant="warning">
-                Derivativos indisponíveis:{" "}
-                {d.derivatives.error ?? "sem resposta"}.
+                Derivativos indisponíveis no momento. Tentaremos novamente automaticamente.
               </Alert>
             ) : (
               d.derivatives.items.map((x) => {
@@ -536,7 +535,8 @@ function ExecutiveReport() {
             </CardHeader>
             <CardContent className="flex flex-col gap-1 text-xs text-muted-foreground">
               {d.notAvailable.map((n) => (
-                <p key={n}>• {n}</p>
+                // só o nome do dado; a causa técnica (HTTP, provedor) fica no log do servidor
+                <p key={n}>• {n.startsWith("Derivativos") ? "Derivativos (Binance Futures) — tentaremos novamente automaticamente." : n}</p>
               ))}
             </CardContent>
           </Card>

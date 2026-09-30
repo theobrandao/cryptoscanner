@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { Activity, Bell, Briefcase, CandlestickChart, HelpCircle, Settings } from "lucide-react";
+import { Activity, Bell, Briefcase, CandlestickChart, GraduationCap, HelpCircle, Settings } from "lucide-react";
 import { toolIconComponent } from "@/components/layout/tool-icon";
 import { ADVANCED_TOOLS, MAIN_TOOLS, type Tool } from "@/lib/tools";
 
@@ -16,6 +16,7 @@ export const ADVANCED_NAV: NavLink[] = ADVANCED_TOOLS.map(fromTool);
 
 export const FOOT_NAV: NavLink[] = [
   { href: "/planos", label: "Planos", icon: Briefcase },
+  { href: "/ajuda", label: "Tutoriais", icon: GraduationCap },
   { href: "/suporte", label: "Suporte", icon: HelpCircle },
   { href: "/preferencias", label: "Preferências", icon: Settings },
 ];

@@ -17,7 +17,7 @@ Cópia fiel da origem, exceto os ajustes listados. Para atualizar: clonar a orig
 | auth-implementation-patterns, error-handling-patterns, e2e-testing-patterns, code-review-excellence | wshobson/agents `plugins/developer-essentials/skills` (156b7a5) | MIT | — |
 | prompt-engineering-patterns, llm-evaluation | wshobson/agents `plugins/llm-application-dev/skills` (156b7a5) | MIT | — (usadas no Analista IA) |
 | writing-plans, systematic-debugging, verification-before-completion, requesting-code-review, test-driven-development | obra/superpowers `skills/` (8ca22db) | MIT | removidos de systematic-debugging os arquivos de teste da própria skill (`test-*.md`, `CREATION-LOG.md`) |
-| product-marketing, copywriting, signup, onboarding, pricing, paywalls, analytics, ab-testing, churn-prevention, launch, seo-audit | coreyhaines31/marketingskills `skills/` (5b2c000) | MIT | pastas `evals/` não copiadas; contexto do produto em `.agents/product-marketing.md` |
+| product-marketing, copywriting, signup, onboarding, pricing, paywalls, analytics, ab-testing, churn-prevention, launch, seo-audit, ai-seo, schema | coreyhaines31/marketingskills `skills/` (5b2c000) | MIT | pastas `evals/` não copiadas; contexto do produto em `.agents/product-marketing.md` |
 
 ## Agentes (`.claude/agents/<nome>.md`) — wshobson/agents (156b7a5), MIT
 

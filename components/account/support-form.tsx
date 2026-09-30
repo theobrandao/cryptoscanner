@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { BookOpen, CircleCheck, ClipboardList, Inbox, LifeBuoy, Lock, Send, Ticket, Trash2, Zap, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, BookOpen, CircleCheck, GraduationCap, ClipboardList, Inbox, LifeBuoy, Lock, Send, Ticket, Trash2, Zap, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
@@ -91,6 +92,16 @@ export function SupportForm({ initialSubject = "" }: { initialSubject?: string }
         title="Central de Atendimento"
         description="Dúvidas sobre o scanner, agentes, planos ou dados? Consulte a FAQ, abra um chamado ou gerencie sua conta."
       />
+      <Link href="/ajuda" className="group mb-6 flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm transition-colors duration-150 hover:border-primary/50 motion-reduce:transition-none">
+        <span aria-hidden className="icon-tile grid h-9 w-9 shrink-0 place-items-center rounded-lg">
+          <GraduationCap className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Veja os tutoriais</span>
+          <span className="block text-muted-foreground">Passo a passo para instalar o app, ativar os avisos e usar cada ferramenta.</span>
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden />
+      </Link>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
           {loading ? null : (

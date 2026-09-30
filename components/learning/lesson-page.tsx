@@ -4,7 +4,9 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { termsForLesson } from "@/lib/content/glossary";
 import { LESSONS, LEVEL_LABEL, lessonPath, type Lesson, type LessonLevel } from "@/lib/content/lessons";
+import { GlossaryTerms } from "@/components/help/glossary-terms";
 import { cn } from "@/lib/utils";
 import { LessonArt } from "./lesson-art";
 import { hasLab, stepHeadingId } from "./lesson-lab-meta";
@@ -85,6 +87,8 @@ export function LessonPage({ lesson }: { lesson: Lesson }) {
         </Card>
 
         <LessonStepper steps={steps} panels={panels} prev={prev} />
+
+        <GlossaryTerms terms={termsForLesson(lesson.slug)} title="Termos desta aula" id="termos-aula" />
 
         <nav aria-label="Outras aulas" className="mt-2 grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
           {prev ? (

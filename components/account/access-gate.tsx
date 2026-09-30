@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { BookOpen, Gem, Lock, RotateCw } from "lucide-react";
+import { BookOpen, Gem, GraduationCap, Lock, RotateCw } from "lucide-react";
 import { ELITE_BORDER, ELITE_CTA, ELITE_SOFT_BG, ELITE_TEXT, PREMIUM_CTA } from "@/components/account/plan-tier";
 import { cn } from "@/lib/utils";
 import { TRIAL_DAYS } from "@/lib/entitlements";
@@ -11,6 +11,7 @@ import { usePathname } from "next/navigation";
 import { useSession } from "@/hooks/use-session";
 import { trackClient } from "@/lib/analytics-client";
 import { formatBRL, gateCopy } from "@/lib/plans-copy";
+import { tutorialForPath } from "@/lib/content/tutorial-paths";
 import type { AccessView } from "@/services/subscription-service";
 
 export interface AccessPayload extends AccessView {
@@ -45,6 +46,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
   const path = usePathname();
   const next = encodeURIComponent(path ?? "/");
   const copy = gateCopy(feature);
+  const help = tutorialForPath(path);
   // visitante não tem /api/billing/subscription: os preços públicos vêm de /api/billing/prices
   const { data: pub } = useSWR<{ prices: { PRO: number; ELITE: number } }>(!loading && !user ? "/api/billing/prices" : null, { revalidateOnFocus: false });
   const state: GateState | null = loading ? null : !user ? "visitante" : !access ? null : !access.entitlements.core ? "sem_plano" : need === "elite" && !access.entitlements.elite ? "elite" : null;
@@ -53,7 +55,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
   if (!user) {
     const pro = pub?.prices.PRO;
     return (
-      <Gate title={copy.title} benefit={copy.benefit} text={`Disponível no teste grátis de ${TRIAL_DAYS} dias do PRO, sem cartão, e nos planos PRO e ELITE.`} price={pro != null ? `Depois do teste, a partir de ${formatBRL(pro)}/mês. Cancele quando quiser.` : null}>
+      <Gate help={help} title={copy.title} benefit={copy.benefit} text={`Disponível no teste grátis de ${TRIAL_DAYS} dias do PRO, sem cartão, e nos planos PRO e ELITE.`} price={pro != null ? `Depois do teste, a partir de ${formatBRL(pro)}/mês. Cancele quando quiser.` : null}>
         <Link href={`/registro?next=${next}`} onClick={() => trackClient("cta_click", { origin: "bloqueio", target: "registro" })} className={cn(primaryBtn, PREMIUM_CTA)}>
           Testar {TRIAL_DAYS} dias grátis
         </Link>
@@ -80,7 +82,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
   const prices = access.billing.prices;
   if (!access.entitlements.core)
     return (
-      <Gate title={copy.title} benefit={copy.benefit} text="Esta ferramenta faz parte dos planos PRO e ELITE. Sua conta, favoritos, estratégias e monitores continuam salvos." price={`A partir de ${formatBRL(prices.PRO)}/mês. Cancele quando quiser.`}>
+      <Gate help={help} title={copy.title} benefit={copy.benefit} text="Esta ferramenta faz parte dos planos PRO e ELITE. Sua conta, favoritos, estratégias e monitores continuam salvos." price={`A partir de ${formatBRL(prices.PRO)}/mês. Cancele quando quiser.`}>
         <Link href="/planos" onClick={() => trackClient("cta_click", { origin: "bloqueio", target: "planos" })} className={cn(primaryBtn, PREMIUM_CTA)}>
           Ver planos
         </Link>
@@ -93,6 +95,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
     return (
       <Gate
         icon="elite"
+        help={help}
         title={`${copy.title} — ELITE`}
         benefit={copy.benefit}
         text={`Este recurso faz parte do plano ELITE, que não tem teste grátis. ${access.tier === "TRIAL" ? "Seu teste do PRO" : "Seu plano PRO"} continua igual.`}
@@ -106,7 +109,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
   return <>{children}</>;
 }
 
-function Gate({ title, benefit, text, price, icon = "lock", children }: { title: string; benefit?: string; text: string; price?: string | null; icon?: "lock" | "elite"; children: React.ReactNode }) {
+function Gate({ title, benefit, text, price, icon = "lock", help, children }: { title: string; benefit?: string; text: string; price?: string | null; icon?: "lock" | "elite"; help?: { href: string; title: string } | null; children: React.ReactNode }) {
   const Icon = icon === "elite" ? Gem : Lock;
   return (
     <div className={cn("mx-auto mt-10 max-w-lg rounded-xl border bg-card p-6 text-center", icon === "elite" ? ELITE_BORDER : "border-border")}>
@@ -118,6 +121,11 @@ function Gate({ title, benefit, text, price, icon = "lock", children }: { title:
       <p className="mt-2 text-sm text-muted-foreground">{text}</p>
       {price !== undefined ? <p className="mt-3 min-h-5 text-sm font-semibold tabular">{price ?? ""}</p> : null}
       <div className="mt-5 flex flex-wrap justify-center gap-2">{children}</div>
+      {help ? (
+        <Link href={help.href} className="mt-4 inline-flex min-h-6 items-center gap-1.5 text-sm text-primary-text hover:underline">
+          <GraduationCap className="h-4 w-4" aria-hidden /> Como usar: tutorial {help.title}
+        </Link>
+      ) : null}
     </div>
   );
 }

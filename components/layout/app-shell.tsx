@@ -577,6 +577,7 @@ function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuItem onSelect={() => router.push("/preferencias")}>Preferências</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => router.push("/planos")}>Planos e pagamento</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => router.push("/ajuda")}>Tutoriais</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => router.push("/status")}>Estado do sistema</DropdownMenuItem>
         {user.role === "ADMIN" ? <DropdownMenuItem onSelect={() => router.push("/admin")}>Painel de controle</DropdownMenuItem> : null}
         <DropdownMenuSeparator />
@@ -648,6 +649,18 @@ function SalesShell({ children }: { children: React.ReactNode }) {
             </Link>
             <Link href="/suporte" className="inline-flex min-h-6 items-center hover:text-foreground">
               Suporte
+            </Link>
+            <Link href="/ajuda" className="inline-flex min-h-6 items-center hover:text-foreground">
+              Tutoriais
+            </Link>
+            <Link href="/jornada" className="inline-flex min-h-6 items-center hover:text-foreground">
+              Jornada
+            </Link>
+            <Link href="/glossario" className="inline-flex min-h-6 items-center hover:text-foreground">
+              Glossário
+            </Link>
+            <Link href="/sobre" className="inline-flex min-h-6 items-center hover:text-foreground">
+              Sobre
             </Link>
             <Link href="/login?next=/" className="inline-flex min-h-6 items-center hover:text-foreground">
               Entrar
@@ -774,7 +787,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span>
             Conteúdo técnico e educacional, não é recomendação de investimento. Dados: Binance, Bybit, OKX, Kraken, CoinGecko, CoinPaprika, BCB (PTAX), alternative.me. Confluence Score mede qualidade de confluência, não probabilidade.
           </span>
-          <nav className="flex gap-3" aria-label="Documentos legais">
+          <nav className="flex flex-wrap gap-x-3" aria-label="Rodapé">
             <Link href="/termos" className="inline-flex min-h-6 items-center hover:text-foreground">
               Termos
             </Link>
@@ -786,6 +799,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
             <Link href="/planos" className="inline-flex min-h-6 items-center hover:text-foreground">
               Planos
+            </Link>
+            <Link href="/ajuda" className="inline-flex min-h-6 items-center hover:text-foreground">
+              Tutoriais
+            </Link>
+            <Link href="/jornada" className="inline-flex min-h-6 items-center hover:text-foreground">
+              Jornada
+            </Link>
+            <Link href="/glossario" className="inline-flex min-h-6 items-center hover:text-foreground">
+              Glossário
+            </Link>
+            <Link href="/sobre" className="inline-flex min-h-6 items-center hover:text-foreground">
+              Sobre
             </Link>
           </nav>
         </footer>

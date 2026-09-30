@@ -316,7 +316,7 @@ export function DerivativesPanel({ ctx, onSwitchPerp }: { ctx: MarketContext; on
           ) : null}
         </>
       ) : !d ? (
-        <Unavailable>{ctx.derivativesError ?? "Derivativos indisponíveis."}</Unavailable>
+        <Unavailable>Derivativos indisponíveis no momento para esta corretora. Tentaremos novamente automaticamente.</Unavailable>
       ) : (
         <>
           <MetricRow label="Open Interest" value={<>{d.openInterestUsd != null ? formatCompact(d.openInterestUsd) : "—"} {d.openInterestChange24hPct != null ? <Change value={d.openInterestChange24hPct} decimals={1} /> : null}</>} />

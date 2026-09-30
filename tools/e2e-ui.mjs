@@ -586,6 +586,25 @@ await step("Login com conta excluída falha (401 na interface)", async () => {
   return `mensagem exibida: ${msg.slice(0, 80)}`;
 });
 
+await step("Tutoriais: /ajuda → busca \"scanner\" → tutorial do Scanner com passo a passo e vídeo (ou espaço reservado)", async () => {
+  await goto("/ajuda");
+  await page.waitForFunction(() => /Como usar o CryptoScanner/.test(document.querySelector("h1")?.textContent ?? ""), null, { timeout: 20_000 });
+  await page.fill("#busca-tutorial", "scanner");
+  await page.waitForFunction(() => /tutoria(l|is) para “scanner”/.test(document.body.innerText), null, { timeout: 10_000 });
+  await page.locator('a[href="/ajuda/scanner"]').first().click();
+  await page.waitForURL(/\/ajuda\/scanner$/, { timeout: 20_000 });
+  await page.waitForFunction(() => /Como usar/.test(document.body.innerText) && !!document.querySelector("#como-usar"), null, { timeout: 20_000 });
+  const video = await page.locator("video source").count();
+  const placeholder = await page.locator('[role="img"][aria-label^="Ilustração:"]').count();
+  const screens = await page.locator('button[aria-label^="Ampliar imagem"]').count();
+  expect(video > 0 || placeholder > 0 || screens > 0, "sem vídeo, imagem ou espaço reservado");
+  await page.setViewportSize({ width: 390, height: 844 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  await page.setViewportSize({ width: 1400, height: 900 });
+  expect(overflow <= 1, `rolagem horizontal em 390 px (${overflow}px)`);
+  return `${await shot("tutorial-scanner")} · vídeo ${video} · imagens ${screens} · reservado ${placeholder}`;
+});
+
 await browser.close();
 
 const ok = results.filter((r) => r.ok).length;

@@ -15,6 +15,8 @@ import { MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 import { ELITE_BORDER, ELITE_CTA, ELITE_TEXT, EliteBadge, PREMIUM_CTA, ProBadge } from "@/components/account/plan-tier";
 import { captureAffiliateParams, withAffiliateParams } from "@/lib/affiliate-params";
+import { landingFaq } from "@/lib/marketing/faq";
+import { FaqList } from "@/components/marketing/faq-list";
 
 export interface Prices {
   prices: { PRO: number; ELITE: number };
@@ -46,35 +48,6 @@ const LEVELS: Array<{ key: Level; label: string; tone: string; text: string }> =
   { key: "intermediario", label: "Intermediário", tone: "bg-primary/15 text-primary", text: "Indicadores, padrões do scanner, Fibonacci e gestão de risco." },
   { key: "avancado", label: "Avançado", tone: "bg-muted text-foreground", text: "Derivativos, automação com agentes, psicologia e backtests." },
 ];
-
-const faq = (trial: number) => [
-  ["O CryptoScanner recomenda compra ou venda?", "Não. As ferramentas calculam padrões, níveis e sinais com regras fixas e mostram de onde vem cada número. A decisão é sua. Não é recomendação de investimento."],
-  ["O que quer dizer \"testado fora da amostra\"?", "As regras do modelo foram escolhidas com dados de um período e medidas em outro período, que não foi usado na escolha. Só publicamos o modelo porque o resultado nesse segundo período foi positivo, já descontando taxa e slippage. O setup que não passou nesse teste não é vendido como estratégia."],
-  ["Preciso conectar minha corretora ou informar chaves de API?", "Não. Usamos apenas dados públicos de mercado. O CryptoScanner nunca pede chaves de API nem executa ordens."],
-  ["O teste grátis pede cartão?", `Não. O teste libera as funções do PRO por ${trial} dias (o ELITE não tem teste). Ao final, o acesso é pausado até você escolher um plano; seus dados ficam salvos.`],
-  ["Como cancelo?", "A qualquer momento, sem multa. O acesso segue até o fim do período pago. Na primeira contratação, o pedido em até 7 dias garante reembolso integral."],
-  ["Funciona no celular?", "Sim. O site é responsivo e os avisos chegam por push no navegador e pelo Telegram."],
-] as const;
-
-/** Perguntas frequentes com todas as respostas no HTML (details/summary); a primeira começa aberta. */
-export function FaqList({ items, compact }: { items: ReadonlyArray<readonly [string, string]>; compact?: boolean }) {
-  return (
-    <div className="mt-6 divide-y divide-border rounded-2xl border border-border bg-card">
-      {items.map(([q, a], i) => (
-        <details key={q} open={i === 0} className="group">
-          <summary className={cn("flex w-full cursor-pointer list-none items-center justify-between gap-3 text-left text-[14px] font-semibold [&::-webkit-details-marker]:hidden", compact ? "min-h-[52px] px-4 py-3 sm:px-5" : "px-5 py-4")}>
-            <span className="min-w-0">{q}</span>
-            <span className="shrink-0 text-muted-foreground" aria-hidden>
-              <span className="group-open:hidden">+</span>
-              <span className="hidden group-open:inline">−</span>
-            </span>
-          </summary>
-          <p className={cn("pb-4 text-[13.5px] leading-relaxed text-muted-foreground", compact ? "px-4 sm:px-5" : "px-5")}>{a}</p>
-        </details>
-      ))}
-    </div>
-  );
-}
 
 export type CtaOrigin = "hero" | "cartao_ferramenta" | "rodape" | "fixo_celular" | "final";
 
@@ -245,7 +218,7 @@ export function Landing({ content }: { content: LandingData }) {
   React.useEffect(() => captureAffiliateParams(window.location.search), []);
   const { data } = useSWR<Prices>("/api/billing/prices", { revalidateOnFocus: false });
   const trial = data?.trialDays ?? 3;
-  const FAQ = faq(trial);
+  const FAQ = landingFaq(trial);
   const main = content.validated[0];
   // CTA fixo do celular aparece depois que o botão do topo sai da tela
   const heroRef = React.useRef<HTMLElement>(null);
@@ -383,6 +356,12 @@ export function Landing({ content }: { content: LandingData }) {
         <section id="faq" aria-label="Perguntas frequentes" className="mx-auto w-full max-w-3xl scroll-mt-20">
           <SectionHeading eyebrow="Dúvidas" title="Perguntas" accent="frequentes" />
           <FaqList items={FAQ} />
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Dúvida sobre como usar uma ferramenta?{" "}
+            <Link href="/ajuda" className="inline-flex min-h-6 items-center font-medium text-primary-text hover:underline">
+              Ver tutoriais
+            </Link>
+          </p>
         </section>
 
         <section className="card-glow rounded-3xl border border-border p-8 text-center sm:p-12">

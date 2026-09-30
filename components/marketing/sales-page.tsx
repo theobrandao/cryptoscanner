@@ -5,7 +5,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import Image from "next/image";
 import { ArrowRight, BellRing, Check, CircleSlash, ListChecks, ScrollText, ShieldCheck, Smartphone, Sparkles, Target, UserPlus, X } from "lucide-react";
-import { FaqList, PlanCards, StickyTrialCta, trackCta, trackCtaInside, type LandingData, type Prices } from "@/components/marketing/landing";
+import { PlanCards, StickyTrialCta, trackCta, trackCtaInside, type LandingData, type Prices } from "@/components/marketing/landing";
 import { fmtR, ValidatedModels } from "@/components/marketing/validated-models";
 import { Eyebrow, LineChart, SectionHeading, StatTile, TickerMarquee, ToolsGrid } from "@/components/ui/showcase";
 import { billingNote } from "@/lib/plans-copy";
@@ -14,6 +14,8 @@ import { ENTITLEMENTS } from "@/lib/entitlements";
 import { MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 import { PREMIUM_CTA } from "@/components/account/plan-tier";
+import { FaqList } from "@/components/marketing/faq-list";
+import { salesFaq } from "@/lib/marketing/faq";
 
 /**
  * Página de vendas (/vendas): destino dos anúncios e URL da página de vendas na Kiwify.
@@ -43,28 +45,6 @@ const FOR_WHO = {
   no: ["Quem procura promessa de lucro garantido", "Quem quer que alguém opere por você: o app não executa ordens nem pede chaves da corretora", "Quem não aceita risco de perda: cripto tem alta volatilidade"],
 };
 
-function faq(trial: number, kiwify: boolean): Array<[string, string]> {
-  return [
-    [
-      "Como recebo o acesso depois de comprar?",
-      kiwify
-        ? "Crie a conta (ou entre) com o mesmo e-mail usado no checkout da Kiwify. O plano é liberado automaticamente quando o pagamento é confirmado; se você comprou antes de criar a conta, o acesso entra no momento do cadastro."
-        : "Assine pela página Planos, dentro da sua conta. O plano é liberado automaticamente quando o pagamento é confirmado.",
-    ],
-    ["O teste grátis vale para qual plano?", `Para o PRO, por ${trial} dias, sem cartão. O ELITE não tem teste. Ao final do teste, o acesso é pausado até você escolher um plano; nada é cobrado automaticamente.`],
-    ["O CryptoScanner recomenda compra ou venda?", "Não. As ferramentas calculam padrões, níveis e sinais com regras fixas e mostram de onde vem cada número. A decisão é sua. Não é recomendação de investimento."],
-    ["Os resultados do modelo são garantidos?", "Não. Os números são históricos, medidos em um período fora da amostra e descontando custos. Resultado passado não garante resultado futuro."],
-    ["Preciso conectar minha corretora?", "Não. O CryptoScanner usa apenas dados públicos de mercado, nunca pede chaves de API e não executa ordens."],
-    ["Funciona no celular?", "Sim. O site se adapta a qualquer tela e os avisos chegam por push no navegador e pelo Telegram."],
-    [
-      "Como cancelo? E a garantia?",
-      kiwify
-        ? "Cancele a qualquer momento pelos canais da Kiwify indicados no e-mail da compra ou pelo nosso suporte; o acesso segue até o fim do período pago. Pedido em até 7 dias da compra: reembolso integral."
-        : "Cancele a qualquer momento em Planos; o acesso segue até o fim do período pago. Pedido em até 7 dias da primeira cobrança: reembolso integral.",
-    ],
-  ];
-}
-
 export function SalesPage({ content, initialPrices }: { content: LandingData; initialPrices?: Prices }) {
   // valor do servidor (canal de venda, preços) já no HTML: a FAQ da Kiwify não depende do carregamento no navegador
   const { data } = useSWR<Prices>("/api/billing/prices", { revalidateOnFocus: false, fallbackData: initialPrices });
@@ -72,7 +52,7 @@ export function SalesPage({ content, initialPrices }: { content: LandingData; in
   const kiwify = data?.provider === "kiwify";
   const main = content.validated[0];
   const m = main?.validation.metrics;
-  const FAQ = faq(trial, kiwify);
+  const FAQ = salesFaq(trial, kiwify);
   const cta = "/registro?next=/";
   const t = ENTITLEMENTS.TRIAL;
   React.useEffect(() => captureAffiliateParams(window.location.search), []);
@@ -244,6 +224,12 @@ export function SalesPage({ content, initialPrices }: { content: LandingData; in
         <section id="faq" aria-label="Perguntas frequentes" className="mx-auto w-full max-w-3xl scroll-mt-20">
           <SectionHeading eyebrow="Dúvidas" title="Perguntas" accent="frequentes" />
           <FaqList items={FAQ} compact />
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Dúvida sobre como usar uma ferramenta?{" "}
+            <Link href="/ajuda" className="inline-flex min-h-6 items-center font-medium text-primary-text hover:underline">
+              Ver tutoriais
+            </Link>
+          </p>
         </section>
 
         {/* CTA FINAL */}
