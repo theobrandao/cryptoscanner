@@ -8,10 +8,12 @@ import { useAccess } from "@/components/account/access-gate";
 import { useFavorites, useLocalStorage } from "@/hooks/use-local-storage";
 import { TIER_LABEL, useSession } from "@/hooks/use-session";
 import { useTickers } from "@/hooks/use-tickers";
-import { ASSETS } from "@/lib/assets";
-import { LESSONS } from "@/lib/content/lessons";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
+import { LESSONS, lessonPath } from "@/lib/content/lessons";
 import { formatPct, formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { trackClient } from "@/lib/analytics-client";
+import { postJson } from "@/lib/client-api";
 
 type ProgressMap = Record<string, { done: boolean; score: number; at: string }>;
 interface AgentsPayload {
@@ -293,7 +295,7 @@ function JourneyCard({ d }: { d: PanelData }) {
   const total = LESSONS.length;
   const next = d.nextLesson;
   return (
-    <Link href={next ? `/jornada?aula=${next.slug}` : "/jornada"} className={cardCls}>
+    <Link href={next ? lessonPath(next.slug) : "/jornada"} className={cardCls}>
       <CardHead icon={GraduationCap} label="Jornada" />
       {d.learningLoading ? (
         <Lines />
@@ -343,7 +345,7 @@ function FavoritesCard({ d }: { d: PanelData }) {
             return (
               <li key={sym}>
                 <Link href={`/graficos?symbol=${sym}`} className="flex h-[52px] items-center gap-2 rounded-xl border border-border bg-card/60 px-3 transition-colors hover:border-primary/50">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-[12px]">{asset?.glyph}</span>
+                  <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-[12px] ${GLYPH_FONT_CLASS}`}>{asset?.glyph}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] font-bold leading-tight">{sym}</span>
                     <span className="tabular block truncate text-[11.5px] text-muted-foreground">{t ? formatPrice(t.price) : "—"}</span>
@@ -361,49 +363,138 @@ function FavoritesCard({ d }: { d: PanelData }) {
 
 /* ───────────────────────── primeiros passos ───────────────────────── */
 
+type StepKey = "conta" | "sinais" | "favorito" | "agente" | "alerta" | "aula";
+interface OnboardingPayload {
+  dismissed: boolean;
+  steps: Array<{ key: StepKey; label: string; href: string; done: boolean }>;
+}
+
+/** Chave local de "viu a seção de sinais" (cache; o registro que vale em todo aparelho é o evento `onboarding_step`). */
+const SIGNALS_SEEN_KEY = "cs-onboarding-sinais";
+
+/**
+ * Marca "Ver os sinais do modelo" quando a seção de sinais aparece na tela (pelo menos 30% visível) ou recebe um clique.
+ * Registra o evento uma vez; `attach` vai no `ref` da seção e `mark` no clique.
+ */
+export function useSignalsSeen() {
+  const [seen, setSeen] = useLocalStorage<boolean>(SIGNALS_SEEN_KEY, false);
+  const onboarding = useSWR<OnboardingPayload>("/api/onboarding");
+  const already = seen || Boolean(onboarding.data?.steps.find((s) => s.key === "sinais")?.done);
+  const mark = React.useCallback(() => {
+    if (already) return;
+    setSeen(true);
+    trackClient("onboarding_step", { step: "sinais" });
+  }, [already, setSeen]);
+  const [el, setEl] = React.useState<HTMLElement | null>(null);
+  React.useEffect(() => {
+    if (already || !onboarding.data || !el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e?.isIntersecting) mark();
+    }, { threshold: 0.3 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [el, already, onboarding.data, mark]);
+  return { attach: setEl, mark };
+}
+
 function Onboarding({ d }: { d: PanelData }) {
-  const [dismissed, setDismissed] = useLocalStorage<boolean>("cs-onboarding-dismissed", false);
-  const ready = !d.agents.loading && !d.monitors.loading && !d.alerts.loading && !d.favoritesLoading && !d.learningLoading;
-  if (dismissed || !ready) return null;
-  const items = [
-    { label: "Criar um agente", href: "/agentes", done: d.agents.total > 0 },
-    { label: "Ativar um alerta ou monitor", href: "/monitor", done: d.monitors.active + d.alerts.active > 0 },
-    { label: "Favoritar um ativo", href: "/scanner", done: d.favorites.length > 0 },
-    { label: "Concluir 1 aula da Jornada", href: "/jornada", done: d.lessonsDone > 0 },
-    { label: "Conectar o Telegram", href: "/preferencias", done: d.telegramConnected },
-  ];
+  const { user } = useSession();
+  const [dismissedLocal, setDismissedLocal] = useLocalStorage<boolean>("cs-onboarding-dismissed", false);
+  const [signalsSeen] = useLocalStorage<boolean>(SIGNALS_SEEN_KEY, false);
+  const [fired, setFired] = useLocalStorage<string[]>("cs-onboarding-fired", []);
+  const onboarding = useSWR<OnboardingPayload>(user ? "/api/onboarding" : null, { revalidateOnFocus: false });
+  const ready = Boolean(onboarding.data) && !d.agents.loading && !d.monitors.loading && !d.alerts.loading && !d.favoritesLoading && !d.learningLoading;
+
+  // o que o aparelho sabe e o servidor ainda não (favoritos e aulas no navegador, contagens recém-carregadas)
+  const local: Record<StepKey, boolean> = {
+    conta: true,
+    sinais: signalsSeen,
+    favorito: d.favorites.length > 0,
+    agente: d.agents.total > 0,
+    alerta: d.monitors.active + d.alerts.active > 0,
+    aula: d.lessonsDone > 0,
+  };
+  const items = (onboarding.data?.steps ?? []).map((s) => ({ ...s, done: s.done || local[s.key] }));
   const n = items.filter((i) => i.done).length;
-  if (n === items.length) return null;
+  const complete = ready && items.length > 0 && n === items.length;
+  const dismissed = dismissedLocal || Boolean(onboarding.data?.dismissed);
+
+  const dismiss = React.useCallback(() => {
+    setDismissedLocal(true);
+    void postJson("/api/onboarding", {}).catch(() => undefined);
+  }, [setDismissedLocal]);
+
+  // dispensa antiga só no navegador: leva para a conta
+  React.useEffect(() => {
+    if (dismissedLocal && onboarding.data && !onboarding.data.dismissed) void postJson("/api/onboarding", {}).catch(() => undefined);
+  }, [dismissedLocal, onboarding.data]);
+
+  // lista concluída: grava na conta e some
+  React.useEffect(() => {
+    if (complete && !dismissed) dismiss();
+  }, [complete, dismissed, dismiss]);
+
+  // evento `onboarding_step` uma vez por passo concluído ("sinais" é registrado no momento em que a seção é vista)
+  const newlyDone = ready ? items.filter((i) => i.done && i.key !== "conta" && i.key !== "sinais" && !fired.includes(i.key)).map((i) => i.key) : [];
+  const newlyKey = newlyDone.join(",");
+  React.useEffect(() => {
+    if (!newlyKey) return;
+    const keys = newlyKey.split(",");
+    for (const step of keys) trackClient("onboarding_step", { step });
+    setFired((prev) => [...new Set([...prev, ...keys])]);
+  }, [newlyKey, setFired]);
+
+  if (dismissed || complete || (onboarding.data && !items.length)) return null;
   return (
     <section aria-label="Primeiros passos" className="rounded-2xl border border-border bg-card p-4 sm:p-5">
       <div className="flex items-start gap-3">
         <Tile icon={Sparkles} />
         <div className="min-w-0 flex-1">
           <h2 className="text-[15px] font-bold leading-tight">Primeiros passos</h2>
-          <p className="tabular text-[12.5px] text-muted-foreground">
-            {n} de {items.length} concluídos
-          </p>
+          <p className="tabular h-5 text-[12.5px] text-muted-foreground">{ready ? `${n} de ${items.length} concluídos` : " "}</p>
         </div>
-        <button onClick={() => setDismissed(true)} className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Ocultar primeiros passos">
+        <button onClick={dismiss} className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Ocultar primeiros passos">
           <X aria-hidden className="h-4 w-4" />
         </button>
       </div>
       <div className="mt-3">
-        <Bar pct={(n / items.length) * 100} />
+        <Bar pct={ready && items.length ? (n / items.length) * 100 : 0} />
       </div>
-      <ul className="mt-3 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-5">
-        {items.map((i) => (
-          <li key={i.label}>
-            <Link href={i.href} className={cn("flex h-10 items-center gap-2 rounded-lg border px-3 text-[13px] transition-colors", i.done ? "border-success/30 bg-success/5 text-muted-foreground" : "border-border hover:border-primary/50 hover:text-foreground")}>
-              <span aria-hidden className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-full border", i.done ? "border-success bg-success text-white dark:text-background" : "border-muted-foreground/40")}>{i.done ? <Check className="h-3 w-3" /> : null}</span>
-              <span className={cn("truncate", i.done && "line-through decoration-muted-foreground/40")}>
-                {i.label}
-                <span className="sr-only"> {i.done ? "(concluído)" : "(pendente)"}</span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {!onboarding.data ? (
+        <div className="mt-3 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3" role="status" aria-busy="true">
+          <span className="sr-only">Carregando primeiros passos…</span>
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <span key={i} className="skeleton h-10 rounded-lg" />
+          ))}
+        </div>
+      ) : (
+        <ol className="mt-3 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((i) => {
+            const done = ready && i.done;
+            const body = (
+              <>
+                <span aria-hidden className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-full border", done ? "border-success bg-success text-white dark:text-background" : "border-muted-foreground/40")}>{done ? <Check className="h-3 w-3" /> : null}</span>
+                <span className={cn("truncate", done && "line-through decoration-muted-foreground/40")}>
+                  {i.label}
+                  <span className="sr-only"> {done ? "(concluído)" : "(pendente)"}</span>
+                </span>
+              </>
+            );
+            const cls = cn("flex h-10 items-center gap-2 rounded-lg border px-3 text-[13px] transition-colors", done ? "border-success/30 bg-success/5 text-muted-foreground" : "border-border hover:border-primary/50 hover:text-foreground");
+            return (
+              <li key={i.key}>
+                {i.key === "conta" ? (
+                  <div className={cls}>{body}</div>
+                ) : (
+                  <Link href={i.href} className={cls}>
+                    {body}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </section>
   );
 }
@@ -431,11 +522,12 @@ export function QuickActions() {
   );
 }
 
-/** "Seu painel": acesso, agentes, alertas, jornada e favoritos com dados reais + checklist de primeiros passos. */
+/** Checklist de primeiros passos (enquanto houver item pendente) + "Seu painel": acesso, agentes, alertas, jornada e favoritos com dados reais. */
 export function MyPanel() {
   const d = usePanelData();
   return (
     <>
+      <Onboarding d={d} />
       <section aria-label="Seu painel" className="flex flex-col gap-3">
         <h2 className="text-[13px] font-bold uppercase tracking-wide text-muted-foreground">Seu painel</h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -446,7 +538,6 @@ export function MyPanel() {
           <FavoritesCard d={d} />
         </div>
       </section>
-      <Onboarding d={d} />
     </>
   );
 }

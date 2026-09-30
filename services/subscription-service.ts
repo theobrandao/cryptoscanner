@@ -1,7 +1,11 @@
 import { getPrisma } from "@/database/client";
-import { ApiError, requireUser } from "@/lib/api";
+import { accessRowFor, ApiError, requireUser, type UserAccessRow } from "@/lib/api";
+import { allowsTimeframe, canUse, type Feature } from "@/lib/access-policy";
 import type { SessionUser } from "@/lib/auth";
 import { ENTITLEMENTS, effectiveStatus, legacyPlanFor, tierFor, TRIAL_DAYS, type Entitlements, type SubscriptionStatus, type Tier } from "@/lib/entitlements";
+import { TIMEFRAME_LABEL } from "@/lib/timeframes";
+import { timeframesOf, type StrategyDefinition } from "@/lib/strategies/definition";
+import type { Timeframe } from "@/types/market";
 
 export interface AccessView {
   tier: Tier;
@@ -32,11 +36,12 @@ export async function startTrial(userId: string) {
 /**
  * Acesso efetivo do usuário, relido do banco (plano/papel do JWT não são confiáveis por 7 dias).
  * Contas anteriores ao modelo comercial ganham o trial na primeira leitura. Sincroniza User.plan.
+ * `row`: usuário + assinatura já lidos por `requireUser` na mesma requisição (evita a segunda leitura).
  */
-export async function getAccess(userId: string): Promise<AccessView> {
+export async function getAccess(userId: string, row?: UserAccessRow): Promise<AccessView> {
   const prisma = getPrisma();
   if (!prisma) return view(tierFor(null, "USER"), null);
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, plan: true, subscription: true } });
+  const user = row ?? (await prisma.user.findUnique({ where: { id: userId }, select: { role: true, plan: true, subscription: true } }));
   if (!user) throw new ApiError(401, "Sessão inválida", "unauthorized");
   let sub = user.subscription;
   if (!sub && user.role !== "ADMIN") sub = await startTrial(userId);
@@ -44,6 +49,7 @@ export async function getAccess(userId: string): Promise<AccessView> {
   const tier = tierFor(sub, user.role, now);
   if (sub) {
     const eff = effectiveStatus(sub, now);
+    // grava só na transição (teste vencido, período encerrado); leituras comuns não escrevem
     if (eff !== sub.status) sub = await prisma.subscription.update({ where: { id: sub.id }, data: { status: eff } });
   }
   const legacy = legacyPlanFor(tier);
@@ -71,15 +77,37 @@ function view(tier: Tier, sub: { plan: string; status: string; trialEndsAt: Date
 /** Exige acesso ao produto (trial/PRO/ELITE/admin). `elite` exige ELITE. */
 export async function requireEntitlement(user: SessionUser, need: "core" | "elite" = "core"): Promise<AccessView> {
   // sem banco (testes/ambiente local sem Postgres) só o papel assinado no token decide: ADMIN passa, o resto não
-  const access = getPrisma() ? await getAccess(user.id) : view(tierFor(null, user.role), null);
+  const access = getPrisma() ? await getAccess(user.id, accessRowFor(user)) : view(tierFor(null, user.role), null);
   if (need === "core" && !access.entitlements.core) throw new ApiError(402, "Seu período de teste terminou. Escolha um plano para continuar.", "subscription_required");
   if (need === "elite" && !access.entitlements.elite) throw new ApiError(402, "Recurso do plano ELITE.", "elite_required");
   return access;
 }
 
-/** Usuário logado COM acesso ao produto (teste/PRO/ELITE/admin). Conta sem plano recebe 402. */
-export async function requireCoreUser(req: Request, need: "core" | "elite" = "core"): Promise<SessionUser> {
+export type CoreUser = SessionUser & { access: AccessView };
+
+/**
+ * Usuário logado COM acesso ao produto (teste/PRO/ELITE/admin). Conta sem plano recebe 402.
+ * Devolve também o acesso efetivo; `plan` já vem sincronizado com o tier (limites legados de agentes/Sentinelas).
+ */
+export async function requireCoreUser(req: Request, need: "core" | "elite" = "core"): Promise<CoreUser> {
   const user = await requireUser(req);
-  await requireEntitlement(user, need);
-  return user;
+  const access = await requireEntitlement(user, need);
+  return { ...user, plan: getPrisma() ? legacyPlanFor(access.tier) : user.plan, access };
+}
+
+/**
+ * Regra única de timeframe por recurso (`lib/access-policy.ts`): abaixo de 4H só no ELITE.
+ * Mesmo código e texto em todas as rotas (scanner, agentes, Sentinelas, monitores, Analista, análises).
+ */
+export function requireTimeframe(access: Pick<AccessView, "tier">, tf: Timeframe | string, feature: Feature): void {
+  if (!canUse(access.tier, feature)) throw new ApiError(402, "Seu período de teste terminou. Escolha um plano para continuar.", "subscription_required");
+  if (!allowsTimeframe(access.tier, tf, feature)) {
+    const label = TIMEFRAME_LABEL[tf as Timeframe] ?? String(tf).toUpperCase();
+    throw new ApiError(403, `Timeframe ${label} disponível apenas no plano ELITE.`, "plan_required");
+  }
+}
+
+/** Estratégia (condições multi-timeframe): cada timeframe usado passa pela mesma regra de `requireTimeframe`. */
+export function requireStrategyTimeframes(access: Pick<AccessView, "tier">, def: StrategyDefinition, feature: Feature): void {
+  for (const tf of timeframesOf(def)) requireTimeframe(access, tf, feature);
 }

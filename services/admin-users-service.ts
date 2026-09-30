@@ -3,10 +3,11 @@ import { requirePrisma } from "@/database/client";
 import { ApiError } from "@/lib/api";
 import type { SessionUser } from "@/lib/auth";
 import { isOwnerEmail } from "@/lib/env";
-import type { Tier } from "@/lib/entitlements";
+import { PAST_DUE_GRACE_DAYS, type Tier } from "@/lib/entitlements";
 import { actionBlockedReason, classifyUser, extendedTrialEnd, grantPeriodEnd, matchesFilter, STATUS_LABEL_ADMIN, TIER_LABEL_ADMIN, toCsv, validityLabel, type AdminAction, type AdminSort, type AdminStatus } from "@/lib/admin-users";
 import { logAccess } from "@/services/access-log-service";
 import { sendPasswordResetLink } from "@/services/password-reset-service";
+import { legacyPlanForSalePlan } from "@/lib/access-policy";
 
 /**
  * Painel de controle — gestão de usuários pelo dono (somente ADMIN; a rota confere o papel).
@@ -107,12 +108,97 @@ async function filteredRows(params: ListParams) {
   return { rows, totals };
 }
 
+const searchWhere = (q?: string): Prisma.UserWhereInput => {
+  const t = q?.trim();
+  return t ? { OR: [{ email: { contains: t, mode: "insensitive" } }, { name: { contains: t, mode: "insensitive" } }] } : {};
+};
+
+/**
+ * Condição no banco equivalente a `tierFor` (lib/entitlements.ts) — permite contar e paginar por acesso sem carregar
+ * todos os usuários. Coberta por teste que confronta as duas regras (tests/unit/admin-users-paging.test.ts).
+ */
+export function tierWhere(tier: Tier, now: Date): Prisma.UserWhereInput {
+  if (tier === "ADMIN") return { role: "ADMIN" };
+  const graceStart = new Date(now.getTime() - PAST_DUE_GRACE_DAYS * 86_400_000);
+  const trial: Prisma.SubscriptionWhereInput = { status: "TRIALING", OR: [{ trialEndsAt: null }, { trialEndsAt: { gte: now } }] };
+  const paying: Prisma.SubscriptionWhereInput[] = [
+    { status: "ACTIVE", OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { gte: graceStart } }] },
+    // `not: null` explícito: sem ele, NULL >= x vira NULL e o NOT do tier NONE descartaria a linha (lógica de 3 valores)
+    { status: "CANCELLED", currentPeriodEnd: { not: null, gte: now } },
+    { status: "PAST_DUE", currentPeriodEnd: { not: null, gte: graceStart } },
+  ];
+  const user: Prisma.UserWhereInput = { role: { not: "ADMIN" } };
+  if (tier === "TRIAL") return { ...user, subscription: { is: trial } };
+  if (tier === "PRO" || tier === "ELITE") return { ...user, subscription: { is: { plan: tier === "ELITE" ? "ELITE" : { not: "ELITE" }, OR: paying } } };
+  return { ...user, NOT: [{ subscription: { is: trial } }, { subscription: { is: { OR: paying } } }] };
+}
+
+/** Totais por acesso (chips do painel) com COUNT no banco, respeitando a busca. */
+async function countTotals(base: Prisma.UserWhereInput, now: Date): Promise<Record<"all" | Tier | "blocked", number>> {
+  const prisma = requirePrisma();
+  const and = (w: Prisma.UserWhereInput): Prisma.UserWhereInput => ({ AND: [base, w] });
+  const [all, ADMIN, TRIAL, PRO, ELITE, blocked] = await Promise.all([
+    prisma.user.count({ where: base }),
+    prisma.user.count({ where: and(tierWhere("ADMIN", now)) }),
+    prisma.user.count({ where: and(tierWhere("TRIAL", now)) }),
+    prisma.user.count({ where: and(tierWhere("PRO", now)) }),
+    prisma.user.count({ where: and(tierWhere("ELITE", now)) }),
+    prisma.user.count({ where: and({ blockedAt: { not: null } }) }),
+  ]);
+  return { all, TRIAL, PRO, ELITE, NONE: Math.max(0, all - ADMIN - TRIAL - PRO - ELITE), ADMIN, blocked };
+}
+
+/** Cadastros considerados quando a lista precisa de cálculo por linha (filtro de situação, ordem por nome ou último acesso). */
+export const IN_MEMORY_CAP = 5000;
+
+/**
+ * Lista do painel. Caminho padrão (sem filtro de situação, ordem por cadastro): filtro, ordem e página no banco
+ * (skip/take + índice em User.createdAt); contagens e último acesso só das linhas da página; totais por COUNT.
+ * Filtro de situação e ordens que dependem de cálculo usam o caminho em memória, limitado a IN_MEMORY_CAP cadastros.
+ */
 export async function listUsers(params: ListParams) {
+  const prisma = requirePrisma();
   const pageSize = params.pageSize ?? 25;
-  const { rows, totals } = await filteredRows(params);
-  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
-  const page = Math.min(Math.max(1, params.page ?? 1), pages);
-  return { rows: rows.slice((page - 1) * pageSize, page * pageSize), total: rows.length, page, pageSize, pages, totals };
+  const now = new Date();
+  const base = searchWhere(params.q);
+  const sort = params.sort ?? "recentes";
+  const totals = await countTotals(base, now);
+  const clampPage = (total: number) => {
+    const pages = Math.max(1, Math.ceil(total / pageSize));
+    return { pages, page: Math.min(Math.max(1, params.page ?? 1), pages) };
+  };
+
+  if (!params.status && sort === "recentes") {
+    const where: Prisma.UserWhereInput = params.tier ? { AND: [base, tierWhere(params.tier, now)] } : base;
+    const total = params.tier ? totals[params.tier] : totals.all;
+    const { pages, page } = clampPage(total);
+    const users = await prisma.user.findMany({ where, select: userSelect, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (page - 1) * pageSize, take: pageSize });
+    const last = await lastAccessMap(users.map((u) => u.id));
+    return { rows: users.map((u) => toRow(u, last.get(u.id) ?? null, now)), total, page, pageSize, pages, totals };
+  }
+
+  const light = await prisma.user.findMany({
+    where: base,
+    select: { id: true, name: true, createdAt: true, role: true, blockedAt: true, subscription: { select: { plan: true, status: true, trialEndsAt: true, currentPeriodEnd: true } } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: IN_MEMORY_CAP,
+  });
+  let rows = light.map((u) => ({ ...u, ...classifyUser(u, now), lastAccessAt: null as Date | null })).filter((r) => matchesFilter(r, { tier: params.tier, status: params.status }));
+  let last: Map<string, Date> | null = null;
+  if (sort === "ultimo_acesso") {
+    last = await lastAccessMap(rows.map((r) => r.id));
+    rows = rows.map((r) => ({ ...r, lastAccessAt: last?.get(r.id) ?? null }));
+    rows.sort((a, b) => (b.lastAccessAt?.getTime() ?? -Infinity) - (a.lastAccessAt?.getTime() ?? -Infinity) || b.createdAt.getTime() - a.createdAt.getTime());
+  } else if (sort === "nome") rows.sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" }));
+  const { pages, page } = clampPage(rows.length);
+  const ids = rows.slice((page - 1) * pageSize, page * pageSize).map((r) => r.id);
+  const [full, lastPage] = await Promise.all([prisma.user.findMany({ where: { id: { in: ids } }, select: userSelect }), last ? Promise.resolve(last) : lastAccessMap(ids)]);
+  const byId = new Map(full.map((u) => [u.id, u]));
+  const pageRows = ids.flatMap((id) => {
+    const u = byId.get(id);
+    return u ? [toRow(u, lastPage.get(id) ?? null, now)] : [];
+  });
+  return { rows: pageRows, total: rows.length, page, pageSize, pages, totals };
 }
 
 const fmtDate = (d: Date | null) => (d ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(d) : "");
@@ -203,7 +289,7 @@ export async function grantAccess(actor: Actor, userId: string, plan: "PRO" | "E
       create: { userId, plan, status: "ACTIVE", provider: "manual", currentPeriodEnd, cancelAtPeriodEnd: false },
       update: { plan, status: "ACTIVE", provider: "manual", currentPeriodEnd, cancelAtPeriodEnd: false },
     });
-    await tx.user.update({ where: { id: userId }, data: { plan: plan === "ELITE" ? "PLATINUM" : "PRO" } });
+    await tx.user.update({ where: { id: userId }, data: { plan: legacyPlanForSalePlan(plan) } });
     await audit(tx, actor, target, "grant", { plan, days, currentPeriodEnd: iso(currentPeriodEnd), before: subSnapshot(before), ...MANUAL_RESUME });
   });
 }
@@ -295,10 +381,14 @@ export async function deleteUser(actor: Actor, userId: string, confirmEmail: str
   if (confirmEmail.trim().toLowerCase() !== target.email.toLowerCase()) throw new ApiError(400, "O e-mail digitado não confere com o da conta.", "confirm_mismatch");
   const prisma = requirePrisma();
   await logAccess(req, target.id, "account_deleted");
-  await prisma.$transaction(async (tx) => {
-    await audit(tx, actor, target, "delete", { name: target.name, subscription: subSnapshot(target.subscription) });
-    await tx.user.delete({ where: { id: userId } });
-  });
+  // cascata em muitas tabelas (logs, execuções, eventos): prazo de 30 s em vez dos 5 s padrão do Prisma
+  await prisma.$transaction(
+    async (tx) => {
+      await audit(tx, actor, target, "delete", { name: target.name, subscription: subSnapshot(target.subscription) });
+      await tx.user.delete({ where: { id: userId } });
+    },
+    { timeout: 30_000, maxWait: 10_000 },
+  );
 }
 
 export async function listAudit(page = 1, pageSize = 30) {

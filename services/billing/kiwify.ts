@@ -4,6 +4,7 @@ import { getEnv } from "@/lib/env";
 import { createLogger } from "@/lib/logger";
 import { track } from "@/services/analytics-service";
 import { sendTemplate } from "@/services/email-service";
+import { legacyPlanForSalePlan } from "@/lib/access-policy";
 
 /**
  * Kiwify — venda do acesso por links de checkout da Kiwify.
@@ -51,6 +52,8 @@ export interface ParsedKiwifyEvent {
   planName: string | null;
   subscriptionId: string | null;
   nextPayment: Date | null;
+  /** data do evento no corpo (ordena reentregas fora de ordem); null quando o corpo não traz data */
+  eventAt: Date | null;
 }
 
 type Json = Record<string, unknown>;
@@ -73,6 +76,15 @@ function str(obj: unknown, paths: string[]): string | null {
   return null;
 }
 
+/** Data da Kiwify; sem fuso ("2026-09-01 10:00") é tratada como horário de Brasília (-03:00). Só serve para ordenar eventos. */
+export function parseKiwifyDate(v: string | null): Date | null {
+  if (!v) return null;
+  const t = v.trim();
+  const local = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(:\d{2})?(\.\d+)?$/.exec(t);
+  const d = local ? new Date(`${local[1]}T${local[2]}${local[3] ?? ":00"}${local[4] ?? ""}-03:00`) : /^\d{4}-\d{2}-\d{2}T/.test(t) ? new Date(t) : null;
+  return d && !Number.isNaN(d.getTime()) ? d : null;
+}
+
 /** Lê o evento com tolerância a variações de nome de campo (a Kiwify não publica o esquema do webhook de vendas). */
 export function parseKiwifyEvent(body: unknown): ParsedKiwifyEvent {
   const typeRaw = str(body, ["webhook_event_type", "event", "trigger", "type"]);
@@ -92,7 +104,18 @@ export function parseKiwifyEvent(body: unknown): ParsedKiwifyEvent {
     planName: str(body, ["Subscription.plan.name", "subscription.plan.name", "plan.name", "Product.plan_name"]),
     subscriptionId: str(body, ["subscription_id", "Subscription.id", "subscription.id"]),
     nextPayment: nextDate && !Number.isNaN(nextDate.getTime()) ? nextDate : null,
+    eventAt: parseKiwifyDate(str(body, ["updated_at", "Order.updated_at", "order.updated_at", "refunded_at", "approved_date", "Order.approved_date", "created_at", "Order.created_at", "order.created_at"])),
   };
+}
+
+/**
+ * Evento fora de ordem: mais antigo que o último aplicado na mesma assinatura, ou aprovação/renovação do mesmo pedido
+ * que já foi reembolsado/estornado (vale mesmo sem data no corpo). Evento na mesma data do último é aplicado.
+ */
+export function isStaleKiwifyEvent(prev: { lastEventAt: Date | null; status: string; lastOrderId: string | null } | null, ev: { kind: Exclude<KiwifyEventKind, "ignored">; eventAt: Date | null; orderId: string | null }): boolean {
+  if (!prev) return false;
+  if (prev.lastEventAt && ev.eventAt && ev.eventAt.getTime() < prev.lastEventAt.getTime()) return true;
+  return prev.status === "EXPIRED" && (ev.kind === "approved" || ev.kind === "renewed") && Boolean(ev.orderId) && ev.orderId === prev.lastOrderId;
 }
 
 /**
@@ -244,7 +267,7 @@ async function applyToUser(userId: string, grant: { externalId: string; plan: st
   const data = { plan: grant.plan, status: grant.status, provider: "kiwify", providerSubscriptionId, currentPeriodEnd: grant.currentPeriodEnd, cancelAtPeriodEnd: grant.status === "CANCELLED", lastPaymentStatus: grant.lastEvent };
   await prisma.subscription.upsert({ where: { userId }, create: { userId, ...data }, update: data });
   const current = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-  const legacy = current?.role === "ADMIN" ? {} : grant.status === "ACTIVE" ? { plan: grant.plan === "ELITE" ? ("PLATINUM" as const) : ("PRO" as const) } : grant.status === "EXPIRED" ? { plan: "FREE" as const } : {};
+  const legacy = current?.role === "ADMIN" ? {} : grant.status === "ACTIVE" ? { plan: legacyPlanForSalePlan(grant.plan) } : grant.status === "EXPIRED" ? { plan: "FREE" as const } : {};
   const u = await prisma.user.update({ where: { id: userId }, data: legacy, select: { email: true, name: true } });
   if (before?.status !== grant.status || before?.plan !== grant.plan) {
     if (grant.status === "ACTIVE") {
@@ -257,18 +280,28 @@ async function applyToUser(userId: string, grant: { externalId: string; plan: st
   }
 }
 
-/** Registra a compra pelo e-mail e aplica à conta, se existir. Devolve o userId quando aplicou. */
-export async function recordKiwifyGrant(input: { externalId: string; email: string; plan: Plan; kind: Exclude<KiwifyEventKind, "ignored">; orderId: string | null; nextPayment: Date | null }): Promise<{ userId: string | null; status: string }> {
+/**
+ * Registra a compra pelo e-mail e aplica à conta, se existir. Devolve o userId quando aplicou.
+ * Evento mais antigo que o último aplicado (ou aprovação de pedido já reembolsado) não muda nada: `stale: true`.
+ */
+export async function recordKiwifyGrant(input: { externalId: string; email: string; plan: Plan; kind: Exclude<KiwifyEventKind, "ignored">; orderId: string | null; nextPayment: Date | null; eventAt?: Date | null }): Promise<{ userId: string | null; status: string; stale?: boolean }> {
   const prisma = getPrisma();
   if (!prisma) throw new Error("Banco indisponível");
   const email = input.email.toLowerCase();
   const prev = await prisma.externalGrant.findUnique({ where: { provider_externalId: { provider: "kiwify", externalId: input.externalId } } });
+  if (isStaleKiwifyEvent(prev, { kind: input.kind, eventAt: input.eventAt ?? null, orderId: input.orderId })) {
+    log.warn("evento fora de ordem ignorado", { externalId: input.externalId, kind: input.kind, eventAt: input.eventAt?.toISOString() ?? null, lastEventAt: prev?.lastEventAt?.toISOString() ?? null, status: prev?.status });
+    return { userId: prev?.appliedUserId ?? null, status: prev!.status, stale: true };
+  }
+  // só datas do próprio evento entram na ordenação (hora de recebimento misturaria relógios); nunca volta a data já gravada
+  const eventAt = input.eventAt ?? null;
+  const lastEventAt = eventAt && !(prev?.lastEventAt && prev.lastEventAt > eventAt) ? eventAt : (prev?.lastEventAt ?? null);
   const state = grantStateFor(input.kind, prev, input.nextPayment);
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   const grant = await prisma.externalGrant.upsert({
     where: { provider_externalId: { provider: "kiwify", externalId: input.externalId } },
-    create: { provider: "kiwify", externalId: input.externalId, email, plan: input.plan, status: state.status, currentPeriodEnd: state.currentPeriodEnd, lastEvent: input.kind, lastOrderId: input.orderId, appliedUserId: user?.id ?? null, appliedAt: user ? new Date() : null },
-    update: { email, plan: input.plan, status: state.status, currentPeriodEnd: state.currentPeriodEnd, lastEvent: input.kind, lastOrderId: input.orderId ?? prev?.lastOrderId ?? null, ...(user ? { appliedUserId: user.id, appliedAt: new Date() } : {}) },
+    create: { provider: "kiwify", externalId: input.externalId, email, plan: input.plan, status: state.status, currentPeriodEnd: state.currentPeriodEnd, lastEvent: input.kind, lastEventAt, lastOrderId: input.orderId, appliedUserId: user?.id ?? null, appliedAt: user ? new Date() : null },
+    update: { email, plan: input.plan, status: state.status, currentPeriodEnd: state.currentPeriodEnd, lastEvent: input.kind, lastEventAt, lastOrderId: input.orderId ?? prev?.lastOrderId ?? null, ...(user ? { appliedUserId: user.id, appliedAt: new Date() } : {}) },
   });
   if (user) await applyToUser(user.id, grant);
   log.info("concessão registrada", { externalId: input.externalId, kind: input.kind, plan: input.plan, status: state.status, applied: Boolean(user), emailFp: emailFingerprint(email) });

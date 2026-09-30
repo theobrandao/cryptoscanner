@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { publicPageMetadata } from "@/lib/seo/metadata";
 import Link from "next/link";
 import { connection } from "next/server";
 import { EntityBlock, LegalDoc, legalEntity } from "@/components/legal/legal-doc";
 
-export const metadata: Metadata = { title: "Termos de Uso" };
+export const metadata: Metadata = publicPageMetadata({ path: "/termos", title: "Termos de Uso", description: "Termos de Uso do CryptoScanner: conta, teste grátis, planos e pagamento, cancelamento e responsabilidade. O conteúdo não é recomendação de investimento." });
 
 export default async function TermsPage() {
   await connection();

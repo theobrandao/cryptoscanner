@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { useTickers } from "@/hooks/use-tickers";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import {
   formatCompact,
   formatDateTime,
@@ -203,7 +203,7 @@ export function PanoramaView() {
                           href={`/graficos?symbol=${asset.symbol}`}
                           className="hover:underline"
                         >
-                          <span className="text-muted-foreground">
+                          <span className={`text-muted-foreground ${GLYPH_FONT_CLASS}`}>
                             {asset.glyph}
                           </span>{" "}
                           <span className="font-semibold">{asset.symbol}</span>{" "}

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { publicPageMetadata } from "@/lib/seo/metadata";
 import Link from "next/link";
 import { connection } from "next/server";
 import { EntityBlock, LegalDoc, legalEntity } from "@/components/legal/legal-doc";
 
-export const metadata: Metadata = { title: "Cancelamento e Reembolso" };
+export const metadata: Metadata = publicPageMetadata({ path: "/reembolso", title: "Cancelamento e Reembolso", description: "Como cancelar a assinatura do CryptoScanner e pedir reembolso: arrependimento em até 7 dias com reembolso integral e acesso até o fim do período pago." });
 
 export default async function RefundPage() {
   await connection();

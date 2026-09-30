@@ -11,7 +11,7 @@ export const GET = withApi(async (req) => {
   await connection();
   const url = new URL(req.url);
   if (!isGoogleLoginConfigured()) return NextResponse.redirect(new URL("/login?erro=google_indisponivel", url.origin));
-  await enforceRateLimit(req, "auth");
+  await enforceRateLimit(req, "google");
   const start = startGoogleLogin({ next: url.searchParams.get("next"), acceptTerms: url.searchParams.get("accept") === "1" });
   const res = NextResponse.redirect(start.url);
   res.cookies.set(GOOGLE_STATE_COOKIE, start.cookie, { httpOnly: true, sameSite: "lax", secure: url.protocol === "https:", path: "/api/auth/google", maxAge: 600 });

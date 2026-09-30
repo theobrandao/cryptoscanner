@@ -1,0 +1,711 @@
+{
+  "meta": {
+    "name": "CryptoScanner Design System",
+    "version": "1.0.0",
+    "language": "pt-BR",
+    "purpose": "Guia oficial de design, UI/UX e identidade visual para toda a aplicação CryptoScanner.",
+    "product_type": "SaaS de análise técnica, scanner de padrões, alertas, backtests, inteligência de mercado e recursos de IA para criptomoedas.",
+    "core_positioning": [
+      "tecnologia",
+      "precisão",
+      "inteligência",
+      "velocidade",
+      "confiança",
+      "análise técnica",
+      "inteligência de mercado",
+      "produto premium"
+    ]
+  },
+  "brand_strategy": {
+    "desired_perception": "Plataforma profissional de inteligência de mercado e análise técnica; não parecer cassino, NFT, hype ou aplicativo cripto genérico.",
+    "visual_benchmark_direction": [
+      "TradingView",
+      "Bloomberg Terminal",
+      "Linear",
+      "Stripe",
+      "CoinMarketCap",
+      "SaaS financeiro premium"
+    ],
+    "brand_principle": "O produto deve parecer caro antes mesmo de o usuário ler o preço.",
+    "decision_rule": "Antes de adicionar qualquer elemento visual, perguntar: isso ajuda o usuário a compreender o mercado ou apenas deixa a tela mais chamativa? Se for apenas decorativo, não adicionar."
+  },
+  "logo": {
+    "official_symbol": {
+      "description": "Símbolo C geométrico do CryptoScanner com três candlesticks internos.",
+      "meaning": {
+        "C": "CryptoScanner",
+        "candlesticks": "análise técnica",
+        "ascending_movement": "detecção de tendências e oportunidades",
+        "open_structure": "scanner procurando sinais no mercado"
+      },
+      "recommended_uses": [
+        "favicon",
+        "PWA",
+        "avatar",
+        "sidebar recolhida",
+        "loading",
+        "notificações",
+        "ícone de aplicativo",
+        "cards pequenos",
+        "áreas onde o nome CryptoScanner já esteja visível"
+      ]
+    },
+    "primary_lockup": "[símbolo C] CryptoScanner",
+    "tier_rule": "PRO e ELITE não possuem logos diferentes. Existe uma única marca CryptoScanner; PRO e ELITE entram como badges/submarcas.",
+    "protection_area": "0.25x da largura do símbolo ao redor.",
+    "forbidden": [
+      "esticar",
+      "inclinar",
+      "adicionar sombras pesadas",
+      "adicionar bordas arbitrárias",
+      "alterar a proporção",
+      "mudar as cores sem necessidade",
+      "adicionar candlesticks extras",
+      "colocar Bitcoin ou moedas dentro do símbolo"
+    ],
+    "required_variants": [
+      "gradient",
+      "branca",
+      "preta",
+      "monocromática azul",
+      "monocromática clara"
+    ],
+    "style_rule": "A logo precisa funcionar sem glow. O glow é efeito da interface, não parte essencial da identidade."
+  },
+  "color_system": {
+    "background": {
+      "primary": "#070B14",
+      "secondary": "#0B1120",
+      "tertiary": "#101827",
+      "rule": "Evitar preto absoluto #000000 em grandes áreas."
+    },
+    "surfaces": {
+      "surface_1": "#0D1424",
+      "surface_2": "#111A2C",
+      "surface_3": "#162033",
+      "surface_hover": "#19253A"
+    },
+    "borders": {
+      "default": "rgba(148, 163, 184, 0.12)",
+      "hover": "rgba(56, 189, 248, 0.28)",
+      "active": "rgba(34, 211, 238, 0.50)"
+    },
+    "brand": {
+      "cyan": "#22D3EE",
+      "blue": "#1687FF",
+      "blue_primary": "#2563EB",
+      "violet": "#7C3AED",
+      "violet_light": "#8B5CF6"
+    },
+    "text": {
+      "primary": "#F8FAFC",
+      "secondary": "#94A3B8",
+      "muted": "#64748B",
+      "disabled": "#475569"
+    },
+    "financial": {
+      "positive": "#10B981",
+      "positive_soft": "rgba(16,185,129,.12)",
+      "negative": "#EF4444",
+      "negative_soft": "rgba(239,68,68,.12)",
+      "warning": "#F59E0B",
+      "info": "#38BDF8",
+      "rule": "Verde e vermelho devem carregar significado financeiro, nunca serem usados apenas como decoração."
+    },
+    "elite": {
+      "base": "#F4C460",
+      "light": "#FFD980",
+      "dark": "#B98932",
+      "gradient": "linear-gradient(135deg, #FFD980, #DDAA48, #FFF1B8)",
+      "usage_limit": "Menos de 10% da composição visual.",
+      "positioning": "Exclusividade sem ostentação."
+    },
+    "pro": {
+      "gradient": "linear-gradient(135deg, #1687FF, #7C3AED)",
+      "gold_allowed": false
+    },
+    "official_brand_gradient": "linear-gradient(135deg, #22D3EE 0%, #1687FF 38%, #3655FF 65%, #8B2CFF 100%)"
+  },
+  "typography": {
+    "primary_font": "Inter",
+    "fallbacks": [
+      "system-ui",
+      "sans-serif"
+    ],
+    "alternative": "Geist",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "avoid_weights": [
+      800,
+      900
+    ],
+    "hierarchy": {
+      "h1": {
+        "font_size": "32px",
+        "font_weight": 700,
+        "letter_spacing": "-0.035em"
+      },
+      "h2": {
+        "font_size": "24px",
+        "font_weight": 650,
+        "letter_spacing": "-0.025em"
+      },
+      "h3": {
+        "font_size": "18px",
+        "font_weight": 600
+      },
+      "body": {
+        "font_size": "14px",
+        "line_height": 1.5
+      },
+      "small_data": {
+        "font_size": "12px",
+        "font_weight": 500
+      }
+    },
+    "financial_numbers": {
+      "font_variant_numeric": "tabular-nums",
+      "font_feature_settings": "\"tnum\"",
+      "reason": "Evitar números pulando horizontalmente quando valores mudam."
+    }
+  },
+  "layout": {
+    "desktop_grid": "12 colunas",
+    "container_max_width": "1440px",
+    "page_padding": {
+      "desktop": "32px",
+      "tablet": "24px",
+      "mobile": "16px"
+    },
+    "spacing_scale_px": [
+      4,
+      8,
+      12,
+      16,
+      20,
+      24,
+      32,
+      40,
+      48,
+      64
+    ],
+    "rule": "Não utilizar espaçamentos arbitrários fora da escala."
+  },
+  "radii": {
+    "cards": "12px",
+    "modals": "16px",
+    "inputs": "8px",
+    "badges": "999px",
+    "rule": "Evitar interfaces excessivamente arredondadas."
+  },
+  "elevation_and_effects": {
+    "card_shadow": "0 8px 30px rgba(0,0,0,.22)",
+    "brand_glow": "0 0 30px rgba(34,211,238,.14)",
+    "background_ambient_glow": "radial-gradient(circle at 20% 0%, rgba(37,99,235,.08), transparent 35%)",
+    "glassmorphism": {
+      "allowed_for": [
+        "modal",
+        "command palette",
+        "tooltip",
+        "dropdown",
+        "overlays",
+        "cards especiais"
+      ],
+      "background": "rgba(15,23,42,.70)",
+      "backdrop_filter": "blur(16px)",
+      "border": "1px solid rgba(255,255,255,.08)",
+      "rule": "Não transformar todo o dashboard em vidro."
+    },
+    "gradient_rule": "Gradientes apenas em logo, CTA premium, badges, IA e destaques. Não aplicar em todos os cards."
+  },
+  "components": {
+    "card": {
+      "background": "#0D1424",
+      "border": "1px solid rgba(148,163,184,.12)",
+      "border_radius": "12px",
+      "hover": {
+        "border_color": "rgba(34,211,238,.30)",
+        "transform": "translateY(-1px)"
+      },
+      "rule": "Evitar sombras grandes."
+    },
+    "button_primary": {
+      "background": "linear-gradient(135deg, #1687FF, #2563EB)",
+      "color": "#FFFFFF",
+      "hover": "brightness(1.08)",
+      "rule": "Sem glow excessivo."
+    },
+    "button_secondary": {
+      "background": "#111A2C",
+      "border": "1px solid rgba(148,163,184,.16)",
+      "color": "#CBD5E1"
+    },
+    "button_premium": {
+      "background": "linear-gradient(135deg, #2563EB, #7C3AED)",
+      "allowed_for": [
+        "Upgrade",
+        "Ativar PRO",
+        "Testar recurso premium"
+      ]
+    },
+    "input": {
+      "height": "40px",
+      "background": "#0B1120",
+      "border": "1px solid rgba(148,163,184,.16)",
+      "border_radius": "8px",
+      "focus": {
+        "border_color": "#1687FF",
+        "box_shadow": "0 0 0 3px rgba(22,135,255,.12)"
+      }
+    },
+    "tooltip": {
+      "purpose": [
+        "explicar indicadores",
+        "explicar padrões",
+        "explicar scores",
+        "explicar timeframes"
+      ],
+      "rule": "Permitir compreensão sem obrigar o usuário a sair da tela."
+    },
+    "toast": {
+      "position": "top-right",
+      "types": [
+        "success",
+        "warning",
+        "error",
+        "info"
+      ],
+      "duration": "4–6 segundos"
+    },
+    "command_palette": {
+      "shortcut": "Ctrl+K",
+      "search_examples": [
+        "BTC",
+        "Scanner",
+        "Alertas",
+        "Configurações"
+      ],
+      "purpose": "Aumentar velocidade e percepção premium."
+    },
+    "global_search": {
+      "accepted_examples": [
+        "BTC",
+        "Bitcoin",
+        "BTCUSDT"
+      ],
+      "behavior": "Resultado imediato."
+    }
+  },
+  "navigation": {
+    "sidebar": {
+      "expanded_width": "240–260px",
+      "collapsed_width": "68–72px",
+      "active_item": {
+        "background": "rgba(37,99,235,.12)",
+        "color": "#F8FAFC",
+        "indicator": "2px solid #22D3EE"
+      },
+      "style": "Terminal profissional."
+    },
+    "recommended_groups": [
+      "Dashboard",
+      "Scanner",
+      "Mercado",
+      "Alertas",
+      "Backtest",
+      "IA",
+      "Watchlist",
+      "Portfólio",
+      "Configurações"
+    ],
+    "rule": "Não criar dezenas de itens simultaneamente."
+  },
+  "dashboard": {
+    "primary_questions_to_answer": [
+      "O que está acontecendo no mercado agora?",
+      "Existe alguma oportunidade relevante?",
+      "O scanner encontrou algo?",
+      "Tenho alertas?",
+      "Quais ativos devo observar?"
+    ],
+    "visual_priority": [
+      "mercado em tempo real",
+      "scanner",
+      "gráfico principal",
+      "IA / insights",
+      "alertas",
+      "watchlist / movimentos"
+    ],
+    "recommended_structure": {
+      "top_bar": [
+        "busca global",
+        "resumo BTC/ETH",
+        "notificações",
+        "avatar/plano"
+      ],
+      "top_metrics": [
+        "criptomoedas monitoradas",
+        "sinais detectados",
+        "taxa de acerto",
+        "atividade do usuário ou scans"
+      ],
+      "main_chart": [
+        "par",
+        "preço",
+        "variação",
+        "timeframe",
+        "indicadores",
+        "candlesticks",
+        "volume"
+      ],
+      "right_column": [
+        "insights da IA",
+        "alertas recentes",
+        "maiores movimentações"
+      ],
+      "scanner_table": [
+        "ativo",
+        "preço",
+        "variação",
+        "timeframe",
+        "padrão",
+        "confiança",
+        "status",
+        "ações"
+      ]
+    }
+  },
+  "scanner": {
+    "importance": "Coração do produto.",
+    "columns": [
+      "Ativo",
+      "Timeframe",
+      "Pattern",
+      "Direção",
+      "Confiança",
+      "Volume",
+      "Status",
+      "Horário"
+    ],
+    "confidence": {
+      "visual": "barra discreta + percentual",
+      "avoid_language": [
+        "BUY NOW",
+        "100% CERTAIN",
+        "GUARANTEED"
+      ],
+      "tone": "Profissional, analítico e não sensacionalista."
+    }
+  },
+  "charts": {
+    "principle": "O gráfico deve dominar a tela quando aberto.",
+    "avoid": [
+      "cards competindo com o gráfico",
+      "glow excessivo",
+      "gradientes atrás do candle",
+      "animações desnecessárias"
+    ],
+    "grid_color": "rgba(148,163,184,.06)",
+    "candlesticks": {
+      "up": "#10B981",
+      "down": "#EF4444",
+      "wick_rule": "Usar a mesma tonalidade do candle."
+    },
+    "indicator_palette": [
+      "cyan",
+      "blue",
+      "purple",
+      "yellow"
+    ],
+    "max_simultaneous_indicator_colors": 5,
+    "detected_pattern_overlay": {
+      "allowed": [
+        "linha",
+        "zona",
+        "label",
+        "marcador"
+      ],
+      "avoid": "Não pintar grandes áreas do gráfico.",
+      "example_label": "Triangle detected"
+    }
+  },
+  "market_cards": {
+    "example": {
+      "pair": "BTC/USDT",
+      "price": "$64,182.42",
+      "change": "+2.41%",
+      "volume_24h": "$28.4B"
+    },
+    "rule": "Não poluir com dezenas de informações; detalhes sob demanda."
+  },
+  "ai": {
+    "visual_identity": {
+      "colors": [
+        "violet",
+        "cyan"
+      ],
+      "icon_language": [
+        "spark",
+        "circuit",
+        "AI"
+      ],
+      "avoid": [
+        "robô 3D",
+        "cérebro 3D",
+        "personagens"
+      ]
+    },
+    "insight_card_example": {
+      "title": "AI Insight",
+      "asset": "BTC/USDT",
+      "message": "Possible breakout structure detected on 4H.",
+      "confidence": "84%"
+    },
+    "rule": "Visual simples e institucional."
+  },
+  "plans": {
+    "hierarchy": [
+      "Free",
+      "PRO",
+      "ELITE"
+    ],
+    "pro": {
+      "role": "Principal opção comercial.",
+      "badge": {
+        "background": "rgba(37,99,235,.12)",
+        "border": "1px solid rgba(59,130,246,.35)",
+        "color": "#60A5FA",
+        "text": "PRO"
+      }
+    },
+    "elite": {
+      "role": "Plano mais avançado.",
+      "badge": {
+        "background": "rgba(244,196,96,.10)",
+        "border": "1px solid rgba(244,196,96,.40)",
+        "color": "#F4C460",
+        "text": "ELITE"
+      },
+      "card_rule": "Usar dourado apenas em border, badge, CTA e pequenos detalhes; não transformar o card inteiro em dourado."
+    }
+  },
+  "icons": {
+    "library": "Lucide Icons",
+    "stroke": "1.5–2px",
+    "sizes": [
+      "16px",
+      "18px",
+      "20px",
+      "24px"
+    ],
+    "rule": "Não misturar várias bibliotecas de ícones na mesma aplicação.",
+    "avoid": "Ícones 3D dentro da UI funcional."
+  },
+  "illustrations": {
+    "marketing_allowed_style": [
+      "dark",
+      "cyan",
+      "blue",
+      "violet",
+      "soft 3D",
+      "dashboard",
+      "charts",
+      "scanner",
+      "AI"
+    ],
+    "product_ui_rule": "A UI real deve permanecer flat, clean e funcional."
+  },
+  "motion": {
+    "durations": {
+      "microinteraction": "150ms",
+      "hover": "200ms",
+      "dropdown": "250ms",
+      "modal": "300ms"
+    },
+    "easing": "cubic-bezier(.4,0,.2,1)",
+    "scanner_animation": {
+      "allowed": [
+        "radial sweep",
+        "horizontal scan"
+      ],
+      "duration": "2–4 segundos",
+      "rule": "Não usar continuamente em toda a tela."
+    },
+    "loading": {
+      "preferred": "Símbolo CryptoScanner com scan sutil.",
+      "avoid": "Spinner genérico sempre que houver alternativa de marca."
+    },
+    "skeleton": {
+      "background": "linear-gradient(90deg, #111827, #1E293B, #111827)"
+    }
+  },
+  "tables": {
+    "header": "sticky quando necessário",
+    "row_height": "44–48px",
+    "hover": "rgba(255,255,255,.025)",
+    "avoid": "Zebra striping forte."
+  },
+  "responsive": {
+    "target_widths": [
+      1440,
+      1280,
+      1024,
+      768,
+      390
+    ],
+    "desktop_priority": true,
+    "mobile_priority_features": [
+      "Watchlist",
+      "Scanner",
+      "Alertas",
+      "Ativos",
+      "AI Insights"
+    ],
+    "chart_mobile_rule": "Gráficos avançados podem abrir em fullscreen."
+  },
+  "ux_writing": {
+    "empty_state_bad_example": "No data.",
+    "empty_state_good_example": "Nenhuma oportunidade encontrada neste filtro. Experimente outro timeframe ou mercado.",
+    "error_message_rule": [
+      "informar o que ocorreu",
+      "informar o impacto",
+      "informar o que fazer"
+    ],
+    "error_example": "Não foi possível atualizar BTC/USDT. Tentaremos novamente automaticamente."
+  },
+  "accessibility": {
+    "contrast": "WCAG AA",
+    "color_rule": "Nunca transmitir informação apenas pela cor.",
+    "example": "Usar ↑ +2.4% além da cor verde."
+  },
+  "interactions": {
+    "hover_required": true,
+    "avoid_scale": "Evitar scale(1.1) em componentes comuns.",
+    "preferred_hover_effects": [
+      "border",
+      "background",
+      "opacity",
+      "translateY(-1px)"
+    ],
+    "cursor": {
+      "clickable": "pointer",
+      "non_clickable_text": "default"
+    }
+  },
+  "z_index": {
+    "dropdown": 10,
+    "sticky": 20,
+    "overlay": 30,
+    "modal": 40,
+    "toast": 50,
+    "command_palette": 60
+  },
+  "information_density": {
+    "principle": "Denso sem parecer confuso.",
+    "priority_rule": "Dados importantes primeiro; contexto depois; detalhes sob demanda.",
+    "screen_focus_rule": "Cada tela precisa possuir uma ação principal."
+  },
+  "anti_patterns": [
+    "estética de cassino",
+    "hype cripto",
+    "neon excessivo",
+    "glow em excesso",
+    "gradientes em todos os cards",
+    "glassmorphism em toda a UI",
+    "Bitcoin como elemento decorativo recorrente",
+    "moedas 3D por toda parte",
+    "robôs de IA",
+    "cérebro 3D",
+    "CTAs competindo entre si",
+    "verde/vermelho sem significado financeiro",
+    "ícones de bibliotecas diferentes",
+    "layouts cheios sem hierarquia",
+    "texto branco em tudo",
+    "efeitos visuais sem função",
+    "animações contínuas desnecessárias"
+  ],
+  "design_tokens_css": {
+    ":root": {
+      "--cs-bg": "#070B14",
+      "--cs-bg-secondary": "#0B1120",
+      "--cs-surface-1": "#0D1424",
+      "--cs-surface-2": "#111A2C",
+      "--cs-surface-3": "#162033",
+      "--cs-border": "rgba(148,163,184,.12)",
+      "--cs-border-hover": "rgba(34,211,238,.28)",
+      "--cs-text-primary": "#F8FAFC",
+      "--cs-text-secondary": "#94A3B8",
+      "--cs-text-muted": "#64748B",
+      "--cs-blue": "#1687FF",
+      "--cs-cyan": "#22D3EE",
+      "--cs-violet": "#7C3AED",
+      "--cs-positive": "#10B981",
+      "--cs-negative": "#EF4444",
+      "--cs-warning": "#F59E0B",
+      "--cs-elite": "#F4C460",
+      "--cs-radius-sm": "8px",
+      "--cs-radius-md": "12px",
+      "--cs-radius-lg": "16px"
+    }
+  },
+  "implementation_rules_for_agents": {
+    "mandatory": [
+      "Manter dark premium institucional em toda a aplicação.",
+      "Usar navy quase preto como base.",
+      "Usar azul elétrico, cyan e violeta como cores de marca.",
+      "Usar verde/vermelho exclusivamente para significado financeiro.",
+      "Usar dourado exclusivamente para ELITE.",
+      "Usar Inter e Lucide Icons.",
+      "Usar grid de 4px e espaçamentos padronizados.",
+      "Usar radius moderado.",
+      "Usar bordas discretas e microinterações rápidas.",
+      "Manter gráficos, scanner e dados como prioridade visual.",
+      "Garantir responsividade em desktop e mobile.",
+      "Garantir acessibilidade WCAG AA.",
+      "Preservar consistência entre componentes.",
+      "Não criar componentes visualmente isolados do restante do sistema.",
+      "Usar a mesma marca CryptoScanner nos planos; variar apenas badges."
+    ],
+    "agent_prompt": "CryptoScanner deve seguir uma interface dark premium de nível institucional, focada em análise técnica e inteligência de mercado. Utilizar fundo navy quase preto, surfaces discretamente elevadas, azul elétrico, cyan e violeta como cores da marca, verde/vermelho exclusivamente para comportamento financeiro e dourado exclusivamente para recursos ELITE. Priorizar clareza, hierarquia, densidade de informação bem organizada, gráficos, tabelas e scanner. Evitar estética de cassino, excesso de neon, glow, gradientes, Glassmorphism ou elementos decorativos relacionados a Bitcoin. O símbolo oficial é o C CryptoScanner com candlesticks internos. Utilizar Inter, Lucide Icons, grid de 4 px, bordas discretas, radius moderado e microinterações rápidas. Todo componente novo deve parecer parte do mesmo terminal financeiro premium, funcionar em desktop e mobile e preservar acessibilidade WCAG AA. PRO utiliza azul/violeta; ELITE utiliza pequenos detalhes dourados. A experiência deve transmitir tecnologia, precisão, inteligência e confiança."
+  },
+  "visual_reference_dashboard": {
+    "overall_style": "Dashboard desktop dark premium, com sidebar esquerda, topbar compacta, cards de métricas, grande gráfico central, painel de IA à direita, alertas, movers e tabela do scanner.",
+    "sidebar": {
+      "logo_position": "top-left",
+      "active_item": "Dashboard",
+      "sections": [
+        "principal",
+        "produto",
+        "conta"
+      ],
+      "bottom_plan_card": "Plano atual com badge ELITE e CTA de gerenciamento"
+    },
+    "topbar": {
+      "left": "Busca global",
+      "center": "BTC e ETH resumidos",
+      "right": "Notificações + avatar + plano"
+    },
+    "main_content": {
+      "header": "Visão Geral do Mercado",
+      "subheader": "Análises de criptomoedas com inteligência técnica em tempo real.",
+      "metrics_row": [
+        "Criptomoedas",
+        "Sinais Detectados",
+        "Taxa de Acerto",
+        "Usuários/Scans Ativos",
+        "Plano ELITE"
+      ],
+      "chart_area": "BTCUSDT com candlesticks, EMAs, volume e timeframes",
+      "right_panels": [
+        "Insights da IA",
+        "Alertas Recentes",
+        "Maiores Movimentações"
+      ],
+      "bottom_table": "Resultados do Scanner com filtros e confidence bars"
+    }
+  }
+}

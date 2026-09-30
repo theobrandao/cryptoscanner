@@ -32,7 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { fibonacciLevels } from "@/lib/fibonacci";
 import { formatNumber, formatPct } from "@/lib/format";
 import { TIMEFRAME_LABEL } from "@/lib/timeframes";
@@ -97,7 +97,7 @@ export function FibonacciView() {
                     <SelectContent>
                       {ASSETS.map((a) => (
                         <SelectItem key={a.symbol} value={a.symbol}>
-                          {a.glyph} {a.symbol}
+                          <span className={GLYPH_FONT_CLASS}>{a.glyph}</span> {a.symbol}
                         </SelectItem>
                       ))}
                     </SelectContent>

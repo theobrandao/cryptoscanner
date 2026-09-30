@@ -2,34 +2,44 @@ import { connection } from "next/server";
 import { ok, requireUser, withApi } from "@/lib/api";
 import { requirePrisma } from "@/database/client";
 
-/** Checklist do primeiro uso, derivado do que a conta já fez (sem marcação manual). */
+type OnboardingStepKey = "conta" | "sinais" | "favorito" | "agente" | "alerta" | "aula";
+
+/**
+ * Primeiros passos da tela Início, na ordem de valor (fonte única dos rótulos e da ordem).
+ * `done` vem do que a conta já fez no servidor; o painel ainda soma o que só existe no aparelho
+ * (favoritos e aulas salvos no navegador, seção de sinais vista agora).
+ * `dismissed`: lista ocultada ou concluída (User.onboardedAt), vale em todos os aparelhos.
+ */
 export const GET = withApi(async (req) => {
   await connection();
   const user = await requireUser(req);
   const prisma = requirePrisma();
-  const [u, wl, mon, strat, bt, ctxChange, analyst] = await Promise.all([
+  const [u, signals, favorites, agents, monitors, alerts, pref] = await Promise.all([
     prisma.user.findUnique({ where: { id: user.id }, select: { onboardedAt: true } }),
+    prisma.analyticsEvent.count({ where: { userId: user.id, name: "onboarding_step", props: { path: ["step"], equals: "sinais" } } }),
     prisma.watchlistItem.count({ where: { watchlist: { userId: user.id } } }),
-    prisma.monitor.count({ where: { userId: user.id } }),
-    prisma.strategy.count({ where: { userId: user.id } }),
-    prisma.analyticsEvent.count({ where: { userId: user.id, name: "backtest_run" } }),
-    prisma.analyticsEvent.count({ where: { userId: user.id, name: "context_change" } }),
-    prisma.analyticsEvent.count({ where: { userId: user.id, name: "analyst_open" } }),
+    prisma.agent.count({ where: { userId: user.id } }),
+    prisma.monitor.count({ where: { userId: user.id, active: true } }),
+    prisma.alert.count({ where: { userId: user.id, active: true } }),
+    prisma.userPreference.findUnique({ where: { userId: user.id }, select: { learning: true } }),
   ]);
-  const steps = [
-    { key: "context", label: "Troque exchange, instrumento ou timeframe no Dashboard", done: ctxChange > 0, href: "/" },
-    { key: "watchlist", label: "Adicione um ativo à watchlist (estrela no cabeçalho)", done: wl > 0, href: "/" },
-    { key: "monitor", label: "Crie um monitor (botão Monitor no cabeçalho)", done: mon > 0, href: "/monitor" },
-    { key: "strategy", label: "Salve uma estratégia a partir de um modelo", done: strat > 0, href: "/strategies" },
-    { key: "backtest", label: "Rode um backtest com custos", done: bt > 0, href: "/backtest" },
-    { key: "analyst", label: "Abra o AI Analyst no contexto atual", done: analyst > 0, href: "/" },
+  const learning = (pref?.learning as Record<string, { done?: boolean }> | null) ?? {};
+  const lessonDone = Object.values(learning).some((l) => Boolean(l?.done));
+  const steps: Array<{ key: OnboardingStepKey; label: string; href: string; done: boolean }> = [
+    { key: "conta", label: "Conta criada", href: "/", done: true },
+    { key: "sinais", label: "Ver os sinais do modelo", href: "/#sinais", done: signals > 0 },
+    { key: "favorito", label: "Favoritar um ativo", href: "/scanner", done: favorites > 0 },
+    { key: "agente", label: "Criar um agente", href: "/agentes", done: agents > 0 },
+    { key: "alerta", label: "Ativar um alerta ou monitor", href: "/monitor", done: monitors + alerts > 0 },
+    { key: "aula", label: "Concluir 1 aula da Jornada", href: "/jornada", done: lessonDone },
   ];
   return ok({ dismissed: Boolean(u?.onboardedAt), steps, done: steps.filter((s) => s.done).length });
 });
 
+/** Oculta a lista de primeiros passos nesta conta (vale em todos os aparelhos). */
 export const POST = withApi(async (req) => {
   await connection();
   const user = await requireUser(req);
-  await requirePrisma().user.update({ where: { id: user.id }, data: { onboardedAt: new Date() } });
+  await requirePrisma().user.updateMany({ where: { id: user.id, onboardedAt: null }, data: { onboardedAt: new Date() } });
   return ok({ dismissed: true });
 });

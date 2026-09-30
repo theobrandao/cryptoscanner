@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { z } from "zod";
 import { requirePrisma } from "@/database/client";
-import { ok, parseQuery, withApi } from "@/lib/api";
+import { okPrivate, parseQuery, withApi } from "@/lib/api";
 import { requireCoreUser } from "@/services/subscription-service";
 
 const querySchema = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) });
@@ -13,7 +13,7 @@ export const GET = withApi(async (req) => {
   const q = parseQuery(req, querySchema);
   const prisma = requirePrisma();
   const items = await prisma.scanHistoryEntry.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: q.limit });
-  return ok({ items });
+  return okPrivate({ items });
 });
 
 export const DELETE = withApi(async (req) => {
@@ -21,5 +21,5 @@ export const DELETE = withApi(async (req) => {
   const user = await requireCoreUser(req);
   const prisma = requirePrisma();
   const { count } = await prisma.scanHistoryEntry.deleteMany({ where: { userId: user.id } });
-  return ok({ deleted: count });
+  return okPrivate({ deleted: count });
 });

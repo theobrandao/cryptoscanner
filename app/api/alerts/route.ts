@@ -2,7 +2,7 @@ import { connection } from "next/server";
 import { z } from "zod";
 import { symbolSchema } from "@/agents/schemas";
 import { requirePrisma } from "@/database/client";
-import { ApiError, ok, parseBody, withApi } from "@/lib/api";
+import { ApiError, enforceRateLimit, ok, parseBody, withApi } from "@/lib/api";
 import { ASSETS } from "@/lib/assets";
 import { PATTERN_KEYS } from "@/lib/patterns/catalog";
 import { PLANS } from "@/lib/plans";
@@ -50,6 +50,7 @@ export const GET = withApi(async (req) => {
 export const POST = withApi(async (req) => {
   await connection();
   const user = await requireCoreUser(req);
+  await enforceRateLimit(req, "alert_create", `u:${user.id}`);
   const body = await parseBody(req, createSchema);
   if (body.channel !== "log" && !PLANS[user.plan].telegramAlerts)
     throw new ApiError(

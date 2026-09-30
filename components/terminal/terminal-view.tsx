@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, Skeleton } from "@/components/ui/misc";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { formatDateTime, formatNumber, formatPrice } from "@/lib/format";
 import { TIMEFRAME_LABEL, TIMEFRAME_MS as TF_MS } from "@/lib/timeframes";
 import { cn } from "@/lib/utils";
@@ -71,7 +71,7 @@ export function TerminalView() {
               <SelectContent>
                 {ASSETS.map((a) => (
                   <SelectItem key={a.symbol} value={a.symbol}>
-                    {a.glyph} {a.symbol}
+                    <span className={GLYPH_FONT_CLASS}>{a.glyph}</span> {a.symbol}
                   </SelectItem>
                 ))}
               </SelectContent>

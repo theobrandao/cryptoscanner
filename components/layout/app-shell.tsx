@@ -1,34 +1,15 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import useSWR from "swr";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  Activity,
-  Bell,
-  Briefcase,
-  CandlestickChart,
-  ChevronDown,
-  HelpCircle,
-  Home,
-  LogIn,
-  LogOut,
-  Menu,
-  Moon,
-  Radar,
-  Search,
-  Eye,
-  EyeOff,
-  Settings,
-  ShieldCheck,
-  Sun,
-  X,
-} from "lucide-react";
-import { ADVANCED_TOOLS, MAIN_TOOLS, TOOL_CATEGORIES, type Tool } from "@/lib/tools";
-import { toolIconComponent } from "@/components/layout/tool-icon";
+import { ArrowRight, Bell, Bot, Briefcase, CandlestickChart, ChevronDown, Clock, Home, LogIn, LogOut, Menu, Moon, Radar, Search, Eye, EyeOff, ShieldCheck, Sun } from "lucide-react";
+import { ADVANCED_TOOLS, MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
 import { RouteProgress } from "@/components/layout/route-progress";
-import { AiAnalystButton } from "@/components/terminal/ai-analyst";
+import { ADVANCED_NAV, FOOT_NAV, PRIMARY_NAV, type NavLink } from "@/components/layout/nav-links";
 import { useActiveSelection } from "@/hooks/use-market-selection";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { timeAgo } from "@/lib/format";
@@ -38,35 +19,34 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { useTheme } from "@/components/providers/theme-provider";
 import { TIER_LABEL, useSession } from "@/hooks/use-session";
 import { useTickers } from "@/hooks/use-tickers";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
+import { trackClient } from "@/lib/analytics-client";
+import { SUPPORT_PATHS } from "@/lib/plans-copy";
 import { apiFetch } from "@/lib/client-api";
 import { formatPct, formatPrice } from "@/lib/format";
+import { isOpenRoute, prefetchFor } from "@/lib/site";
 import type { VenueStatus } from "@/services/market/venues";
 import { cn } from "@/lib/utils";
 import { AccessGate } from "@/components/account/access-gate";
 
-type NavLink = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match?: string[]; exact?: boolean; badge?: string; category?: string };
+/** Busca global e painel do Analista: código baixado só na primeira interação (não pesa nas páginas públicas). */
+const loadSearch = () => import("@/components/layout/global-search");
+const GlobalSearch = dynamic(loadSearch, { ssr: false });
+const loadAnalyst = () => import("@/components/terminal/ai-analyst");
+const AiAnalystPanel = dynamic(() => loadAnalyst().then((m) => m.AiAnalystPanel), { ssr: false });
 
-const fromTool = (t: Tool): NavLink => ({ href: t.href, label: t.name, icon: toolIconComponent(t.icon), match: t.match, exact: t.exact, badge: t.badge, category: t.category });
-
-/** Menu principal: uma ferramenta por finalidade (lib/tools.ts). */
-const PRIMARY_NAV: NavLink[] = MAIN_TOOLS.map(fromTool);
-
-/** Grupo recolhido "Avançado": análise profunda. */
-const ADVANCED_NAV: NavLink[] = ADVANCED_TOOLS.map(fromTool);
-
-const FOOT_NAV: NavLink[] = [
-  { href: "/planos", label: "Planos", icon: Briefcase },
-  { href: "/suporte", label: "Suporte", icon: HelpCircle },
-  { href: "/preferencias", label: "Preferências", icon: Settings },
-];
-
-/** Páginas fora do menu, acessíveis pela busca global. */
-const EXTRA_PAGES: NavLink[] = [
-  { href: "/terminal", label: "Terminal", icon: CandlestickChart },
-  { href: "/carteira?tab=alerts", label: "Alertas de preço", icon: Bell },
-  { href: "/status", label: "Estado do sistema", icon: Activity },
-];
+/** true quando a media query casa; no servidor e na hidratação, false (nada que dependa disso vai no HTML). */
+function useMediaQuery(query: string) {
+  const subscribe = React.useCallback(
+    (cb: () => void) => {
+      const m = window.matchMedia(query);
+      m.addEventListener("change", cb);
+      return () => m.removeEventListener("change", cb);
+    },
+    [query],
+  );
+  return React.useSyncExternalStore(subscribe, () => window.matchMedia(query).matches, () => false);
+}
 
 const MOBILE_NAV: NavLink[] = [
   { href: "/", label: "Início", icon: Home, exact: true },
@@ -83,12 +63,8 @@ function isActive(pathname: string, l: NavLink) {
 export function BrandMark({ compact }: { compact?: boolean }) {
   return (
     <Link href="/" className="flex min-h-10 items-center gap-2" aria-label="CryptoScanner — início">
-      <svg viewBox="0 0 24 24" className="h-7 w-7 text-primary" aria-hidden>
-        <rect x="2" y="11" width="4" height="9" rx="1" fill="currentColor" opacity="0.55" />
-        <rect x="8" y="6" width="4" height="14" rx="1" fill="currentColor" opacity="0.8" />
-        <rect x="14" y="3" width="4" height="17" rx="1" fill="currentColor" />
-        <path d="M2 9 L9 4 L14 6 L22 1" stroke="currentColor" strokeWidth="1.6" fill="none" />
-      </svg>
+      {/* logo oficial (public/brand); 96 px para telas de alta densidade */}
+      <Image src="/brand/logo-96.png" alt="" width={32} height={32} priority className="h-8 w-8" />
       {!compact ? <span className="text-[17px] font-bold tracking-tight">CryptoScanner</span> : null}
     </Link>
   );
@@ -99,60 +75,119 @@ interface SubscriptionView {
   plan: string;
   daysLeft: number | null;
   trialDays: number;
+  trialEndsAt: string | null;
 }
 
+type TrialLevel = "low" | "mid" | "high";
+type TrialState = { kind: "trial"; level: TrialLevel; daysLeft: number; day: number; pct: number; ending: string | null } | { kind: "ended"; status: "EXPIRED" | "PAST_DUE" };
+
+const DAY_MS = 86_400_000;
+const hourLabel = (d: Date) => d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
 /**
- * Trial discreto: "Trial · N days left" + barra fina + View Plans. A ênfase cresce no fim do teste:
- * dias 1–3 neutro, 4–5 destaque leve, 6–7 aviso; expirado → "Choose Your Plan".
+ * Estado do teste grátis para o cartão da barra lateral e a faixa do celular. A ênfase vem do tempo que falta
+ * (o teste tem TRIAL_DAYS = 3 dias): último dia (menos de 24 h) → aviso, botão principal e "termina hoje/amanhã às…";
+ * entre 24 e 48 h → botão principal; antes disso, discreto.
  */
-function TrialCard() {
+function useTrialState(): TrialState | null {
   const { user } = useSession();
-  const { data } = useSWR<SubscriptionView>(user && user.role !== "ADMIN" ? "/api/billing/subscription" : null, { revalidateOnFocus: false });
-  if (!user || user.role === "ADMIN" || !data || (data.status !== "TRIALING" && data.status !== "EXPIRED" && data.status !== "PAST_DUE")) return null;
-  if (data.status !== "TRIALING")
+  const enabled = !!user && user.role !== "ADMIN";
+  const { data } = useSWR<SubscriptionView>(enabled ? "/api/billing/subscription" : null, { revalidateOnFocus: false });
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    if (!enabled) return;
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, [enabled]);
+  if (!enabled || !data) return null;
+  if (data.status === "EXPIRED" || data.status === "PAST_DUE") return { kind: "ended", status: data.status };
+  if (data.status !== "TRIALING") return null;
+  const total = data.trialDays * DAY_MS;
+  const end = data.trialEndsAt ? new Date(data.trialEndsAt) : null;
+  const msLeft = end ? Math.max(0, end.getTime() - now) : (data.daysLeft ?? 0) * DAY_MS;
+  const daysLeft = Math.ceil(msLeft / DAY_MS);
+  const day = Math.min(data.trialDays, Math.max(1, data.trialDays - daysLeft + 1));
+  const level: TrialLevel = msLeft <= DAY_MS ? "high" : msLeft <= 2 * DAY_MS ? "mid" : "low";
+  let ending: string | null = null;
+  if (end && level === "high") {
+    const today = new Date(now);
+    const tomorrow = new Date(now + DAY_MS);
+    const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+    ending = same(end, today) ? `Termina hoje às ${hourLabel(end)}` : same(end, tomorrow) ? `Termina amanhã às ${hourLabel(end)}` : null;
+  }
+  return { kind: "trial", level, daysLeft, day, pct: Math.max(0, Math.min(100, (msLeft / total) * 100)), ending };
+}
+
+const daysText = (n: number) => `${n} ${n === 1 ? "dia" : "dias"}`;
+
+/** Cartão do teste na barra lateral: "Teste grátis · N dias" + barra fina + Ver planos; teste encerrado → Escolher plano; pagamento pendente → suporte. */
+function TrialCard() {
+  const trial = useTrialState();
+  if (!trial) return null;
+  if (trial.kind === "ended")
     return (
       <div className="mx-3 rounded-lg border border-warning/40 bg-warning/10 p-3">
-        <div className="text-[13px] font-semibold">{data.status === "PAST_DUE" ? "Pagamento pendente" : "Teste encerrado"}</div>
+        <div className="text-[13px] font-semibold">{trial.status === "PAST_DUE" ? "Pagamento pendente" : "Teste encerrado"}</div>
         <div className="mt-0.5 text-[11px] text-muted-foreground">Sua conta e configurações continuam salvas.</div>
-        <Link href="/planos" className="mt-2 flex h-8 items-center justify-center rounded-md bg-primary text-[12.5px] font-semibold text-primary-foreground hover:brightness-110">
-          Escolher plano
+        <Link href={trial.status === "PAST_DUE" ? SUPPORT_PATHS.payment : "/planos"} onClick={() => trackClient("trial_card_click", { origin: "barra_lateral", level: trial.status === "PAST_DUE" ? "pagamento_pendente" : "encerrado" })} className="mt-2 flex h-8 items-center justify-center rounded-md bg-primary text-[12.5px] font-semibold text-primary-foreground hover:brightness-110">
+          {trial.status === "PAST_DUE" ? "Resolver pagamento" : "Escolher plano"}
         </Link>
       </div>
     );
-  const left = data.daysLeft ?? 0;
-  const day = Math.min(data.trialDays, Math.max(1, data.trialDays - left + 1)); // dia do teste (1..7)
-  const level = day >= 6 ? "high" : day >= 4 ? "mid" : "low";
-  const pct = Math.max(0, Math.min(100, (left / data.trialDays) * 100));
+  const high = trial.level === "high";
   return (
-    <div className={cn("mx-3 rounded-lg border p-3", level === "high" ? "border-warning/40 bg-warning/5" : "border-border bg-elevated")}>
+    <div className={cn("mx-3 rounded-lg border p-3", high ? "border-warning/50 bg-warning/10" : trial.level === "mid" ? "border-primary/30 bg-elevated" : "border-border bg-elevated")}>
       <div className="flex items-center justify-between text-[12.5px]">
         <span className="font-semibold">Teste grátis</span>
-        <span className={cn("tabular", level === "high" ? "text-warning" : "text-muted-foreground")}>
-          {left} {left === 1 ? "dia" : "dias"}
-        </span>
+        <span className={cn("tabular", high ? "font-semibold text-warning" : "text-muted-foreground")}>{high && trial.ending ? "último dia" : daysText(trial.daysLeft)}</span>
       </div>
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
-        <div className={cn("h-full rounded-full", level === "high" ? "bg-warning" : "bg-primary/70")} style={{ width: `${pct}%` }} />
+        <div className={cn("h-full rounded-full", high ? "bg-warning" : "bg-primary/70")} style={{ width: `${trial.pct}%` }} />
       </div>
+      {high && trial.ending ? (
+        <p className="mt-1.5 flex items-center gap-1 text-[11.5px] font-medium text-warning">
+          <Clock className="h-3 w-3" aria-hidden /> {trial.ending}
+        </p>
+      ) : null}
       <Link
         href="/planos"
-        className={cn(
-          "mt-2 flex h-8 items-center justify-center rounded-md text-[12.5px] font-semibold",
-          level === "low" ? "border border-border text-muted-foreground hover:text-foreground" : "bg-primary text-primary-foreground hover:brightness-110",
-        )}
+        onClick={() => trackClient("trial_card_click", { origin: "barra_lateral", day: trial.day, level: trial.level })}
+        className={cn("mt-2 flex h-8 items-center justify-center rounded-md text-[12.5px] font-semibold", trial.level === "low" ? "border border-border text-muted-foreground hover:text-foreground" : "bg-primary text-primary-foreground hover:brightness-110")}
       >
-        Ver planos
+        {high ? "Escolher plano" : "Ver planos"}
       </Link>
     </div>
   );
 }
 
+/** Faixa discreta do teste no celular (a barra lateral só aparece no menu): dias restantes e link para /planos. */
+function MobileTrialStrip({ trial }: { trial: Extract<TrialState, { kind: "trial" }> }) {
+  const high = trial.level === "high";
+  return (
+    <Link
+      href="/planos"
+      onClick={() => trackClient("trial_card_click", { origin: "faixa_celular", day: trial.day, level: trial.level })}
+      className={cn("fixed inset-x-0 bottom-14 z-30 flex h-9 items-center gap-2 border-t px-4 text-[12.5px] backdrop-blur lg:hidden", high ? "border-warning/50 bg-warning/15 text-foreground" : "border-border bg-card/95 text-muted-foreground")}
+    >
+      <Clock className={cn("h-3.5 w-3.5 shrink-0", high ? "text-warning" : "text-primary")} aria-hidden />
+      <span className="min-w-0 truncate">
+        <span className="font-semibold text-foreground">Teste grátis</span> · {high && trial.ending ? trial.ending.toLowerCase() : `${daysText(trial.daysLeft)} restantes`}
+      </span>
+      <span className={cn("ml-auto inline-flex shrink-0 items-center gap-1 font-semibold", high ? "text-warning" : "text-primary")}>
+        Ver planos <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+      </span>
+    </Link>
+  );
+}
+
 function SideLink({ l, pathname, onClick, badge }: { l: NavLink; pathname: string; onClick?: () => void; badge?: number }) {
+  const { user } = useSession();
   const active = isActive(pathname, l);
   const Icon = l.icon;
   return (
     <Link
       href={l.href}
+      prefetch={prefetchFor(l.href, !!user)}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
@@ -242,21 +277,29 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
 
 const STRIP = ["BTC", "ETH", "SOL"];
 
+/** Cotações no topo (só em telas xl): montada apenas quando visível; oculta pelo usuário, fica só o botão. */
 function TickerStrip({ hidden, onToggle }: { hidden: boolean; onToggle: () => void }) {
-  const { bySymbol } = useTickers();
   return (
-    <div className="hidden min-w-0 items-center gap-4 overflow-hidden xl:flex" aria-label="Cotações">
+    <div className="flex min-w-0 items-center gap-4 overflow-hidden" aria-label="Cotações">
       <button onClick={onToggle} className="grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={hidden ? "Mostrar cotações" : "Ocultar cotações"} title={hidden ? "Mostrar cotações" : "Ocultar cotações"}>
         {hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
       </button>
-      {hidden ? null : (
-        <>
+      {hidden ? null : <TickerStripItems />}
+    </div>
+  );
+}
+
+function TickerStripItems() {
+  const { user } = useSession();
+  const { bySymbol } = useTickers();
+  return (
+    <>
       {STRIP.map((s) => {
         const t = bySymbol.get(s);
         const a = ASSETS.find((x) => x.symbol === s);
         return (
-          <Link key={s} href={`/graficos?symbol=${s}`} className="flex items-center gap-2 text-xs hover:opacity-80">
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-muted text-[12px]">{a?.glyph}</span>
+          <Link key={s} href={`/graficos?symbol=${s}`} prefetch={prefetchFor("/graficos", !!user)} className="flex items-center gap-2 text-xs hover:opacity-80">
+            <span className={cn("grid h-6 w-6 place-items-center rounded-full bg-muted text-[12px]", GLYPH_FONT_CLASS)}>{a?.glyph}</span>
             <span className="leading-tight">
               <span className="block font-semibold text-muted-foreground">{s}</span>
               <span className="tabular">
@@ -267,9 +310,7 @@ function TickerStrip({ hidden, onToggle }: { hidden: boolean; onToggle: () => vo
           </Link>
         );
       })}
-        </>
-      )}
-    </div>
+    </>
   );
 }
 
@@ -280,7 +321,9 @@ const STATUS_TONE: Record<string, string> = { LIVE: "text-success", DELAYED: "te
  * latência e última atualização, stream de preços e o contexto ativo.
  */
 function MarketDataStatus() {
-  const { data, connected } = useTickers();
+  // o botão só aparece a partir de sm: no celular não abre o stream de preços
+  const visible = useMediaQuery("(min-width: 640px)");
+  const { data, connected } = useTickers(visible);
   const { selection } = useActiveSelection();
   const [open, setOpen] = React.useState(false);
   const { data: st } = useSWR<{ checkedAt: number; venues: VenueStatus[] }>(open ? "/api/markets/status" : null, { refreshInterval: open ? 30_000 : 0 });
@@ -442,71 +485,9 @@ function UserMenu() {
   );
 }
 
-function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const [q, setQ] = React.useState("");
-  const router = useRouter();
-  const term = q.trim().toLowerCase();
-  const assets = ASSETS.filter((a) => !term || a.symbol.toLowerCase().includes(term) || a.name.toLowerCase().includes(term)).slice(0, 8);
-  const pages = [...PRIMARY_NAV, ...ADVANCED_NAV, ...FOOT_NAV, ...EXTRA_PAGES].filter((n) => term && n.label.toLowerCase().includes(term));
-  const INDICATORS = ["EMA", "RSI", "MACD", "ATR", "Bollinger", "StochRSI"].filter((i) => term && i.toLowerCase().includes(term));
-  const go = (href: string) => {
-    onOpenChange(false);
-    setQ("");
-    router.push(href);
-  };
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="top-[12%] translate-y-0 p-0">
-        <DialogHeader className="p-3 pb-0">
-          <DialogTitle className="sr-only">Buscar</DialogTitle>
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <input
-              autoFocus
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && assets[0] && go(`/graficos?symbol=${assets[0].symbol}`)}
-              placeholder="Buscar ativo, ferramenta ou indicador…"
-              className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-9 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
-            />
-            {q ? (
-              <button className="absolute right-3 top-3 opacity-60 hover:opacity-100" onClick={() => setQ("")} aria-label="Limpar">
-                <X className="h-4 w-4" />
-              </button>
-            ) : null}
-          </div>
-        </DialogHeader>
-        <div className="max-h-80 overflow-y-auto p-2 text-sm">
-          {pages.map((p) => (
-            <button key={p.label} onClick={() => go(p.href)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
-              <p.icon className="h-4 w-4 text-muted-foreground" /> {p.label}
-            </button>
-          ))}
-          {INDICATORS.map((i) => (
-            <button key={i} onClick={() => go(`/graficos`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
-              <CandlestickChart className="h-4 w-4 text-muted-foreground" /> {i} <span className="ml-auto text-xs text-muted-foreground">indicador · Gráficos</span>
-            </button>
-          ))}
-          <div className="px-2 pb-1 pt-2 text-[11px] uppercase tracking-wide text-muted-foreground">Ativos</div>
-          {assets.map((a) => (
-            <button key={a.symbol} onClick={() => go(`/graficos?symbol=${a.symbol}`)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted">
-              <span className="w-5 text-center text-muted-foreground">{a.glyph}</span>
-              <span className="font-semibold">{a.symbol}/USDT</span>
-              <span className="text-muted-foreground">{a.name}</span>
-            </button>
-          ))}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /** Rotas de venda: sem menu do produto (foco na oferta). */
 const SALES_ROUTES = ["/vendas"];
 
-/** Páginas abertas sem plano: venda, conta, documentos e estado do sistema. Todo o resto exige teste ativo ou plano pago. */
-const OPEN_ROUTES = ["/jornada", "/vendas", "/planos", "/login", "/registro", "/esqueci-senha", "/redefinir-senha", "/termos", "/privacidade", "/reembolso", "/status", "/suporte", "/preferencias", "/admin"];
-const isOpenRoute = (p: string) => p === "/" || OPEN_ROUTES.some((r) => p === r || p.startsWith(r + "/"));
 function featureName(p: string) {
   const t = [...MAIN_TOOLS, ...ADVANCED_TOOLS].find((x) => p === x.href || p.startsWith(x.href + "/"));
   return t?.name ?? "Esta ferramenta";
@@ -569,6 +550,32 @@ function SalesShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Botão do Analista IA: o painel (chat, markdown etc.) só é baixado no primeiro clique; hover/foco já adiantam o download. */
+function AnalystLauncher() {
+  const [open, setOpen] = React.useState(false);
+  const [loaded, setLoaded] = React.useState(false);
+  const preload = () => void loadAnalyst();
+  return (
+    <>
+      <button
+        onClick={() => {
+          setLoaded(true);
+          setOpen(true);
+          trackClient("analyst_open");
+        }}
+        onPointerEnter={preload}
+        onFocus={preload}
+        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-foreground hover:border-primary/50 hover:bg-muted"
+        aria-label="Analista IA"
+      >
+        <Bot className="h-4 w-4 text-primary" />
+        <span className="hidden md:inline">Analista IA</span>
+      </button>
+      {loaded ? <AiAnalystPanel open={open} onOpenChange={setOpen} /> : null}
+    </>
+  );
+}
+
 /**
  * Casca do produto: sidebar compacta (desktop), barra superior com busca global (Ctrl/Cmd+K),
  * cotações, estado do dado, notificações, tema e conta; navegação inferior no celular.
@@ -576,19 +583,28 @@ function SalesShell({ children }: { children: React.ReactNode }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
+  const { user } = useSession();
   const [menu, setMenu] = React.useState(false);
   const [search, setSearch] = React.useState(false);
+  const [searchLoaded, setSearchLoaded] = React.useState(false);
   const [hideTickers, setHideTickers] = useLocalStorage<boolean>("cs-hide-tickers", false);
+  const wide = useMediaQuery("(min-width: 1280px)");
+  const trial = useTrialState();
+  const trialStrip = trial?.kind === "trial" ? trial : null;
+  const openSearch = React.useCallback(() => {
+    setSearchLoaded(true);
+    setSearch(true);
+  }, []);
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setSearch(true);
+        openSearch();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [openSearch]);
   if (SALES_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"))) return <SalesShell>{children}</SalesShell>;
   return (
     <div className="flex min-h-screen">
@@ -605,18 +621,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <BrandMark compact />
           </span>
           <button
-            onClick={() => setSearch(true)}
+            onClick={openSearch}
+            onPointerEnter={() => void loadSearch()}
+            onFocus={() => void loadSearch()}
             className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 text-left text-sm text-muted-foreground hover:border-primary/40 md:max-w-sm"
-            aria-label="Buscar (Ctrl+K)"
+            aria-label="Buscar ativo, ferramenta ou indicador (Ctrl+K)"
           >
             <Search className="h-4 w-4 shrink-0" />
             <span className="truncate">Buscar ativo, ferramenta ou indicador…</span>
             <kbd className="ml-auto hidden rounded border border-border px-1.5 text-[10px] sm:inline">⌘ K</kbd>
           </button>
-          <TickerStrip hidden={hideTickers} onToggle={() => setHideTickers(!hideTickers)} />
+          {wide ? <TickerStrip hidden={hideTickers} onToggle={() => setHideTickers(!hideTickers)} /> : null}
           <div className="ml-auto flex items-center gap-1.5">
             <MarketDataStatus />
-            <AiAnalystButton />
+            <AnalystLauncher />
             <NotificationsBell />
             <button onClick={toggle} className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted max-[359px]:hidden" aria-label="Alternar tema">
               {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
@@ -624,7 +642,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <UserMenu />
           </div>
         </header>
-        <main id="conteudo" className="min-w-0 flex-1 pb-16 lg:pb-0">
+        <main id="conteudo" className={cn("min-w-0 flex-1 lg:pb-0", trialStrip ? "pb-24" : "pb-16")}>
           <div key={pathname} className="page-enter">
             {isOpenRoute(pathname) ? children : <AccessGate feature={featureName(pathname)}>{children}</AccessGate>}
           </div>
@@ -650,12 +668,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </footer>
       </div>
 
+      {trialStrip ? <MobileTrialStrip trial={trialStrip} /> : null}
+
       {/* navegação inferior (celular) */}
       <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-card/95 backdrop-blur lg:hidden" aria-label="Navegação móvel">
         {MOBILE_NAV.map((l) => {
           const active = isActive(pathname, l);
           return (
-            <Link key={l.href} href={l.href} className={cn("flex h-14 flex-col items-center justify-center gap-0.5 text-[11px]", active ? "text-primary" : "text-muted-foreground")}>
+            <Link key={l.href} href={l.href} prefetch={prefetchFor(l.href, !!user)} className={cn("flex h-14 flex-col items-center justify-center gap-0.5 text-[11px]", active ? "text-primary" : "text-muted-foreground")}>
               <l.icon className="h-5 w-5" />
               {l.label}
             </Link>
@@ -675,7 +695,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarContent pathname={pathname} onNavigate={() => setMenu(false)} />
         </DialogContent>
       </Dialog>
-      <GlobalSearch open={search} onOpenChange={setSearch} />
+      {searchLoaded ? <GlobalSearch open={search} onOpenChange={setSearch} /> : null}
     </div>
   );
 }

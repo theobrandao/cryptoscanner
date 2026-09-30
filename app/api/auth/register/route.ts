@@ -1,9 +1,8 @@
 import { connection } from "next/server";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { requirePrisma } from "@/database/client";
 import { ApiError, enforceRateLimit, parseBody, withApi } from "@/lib/api";
-import { createSessionToken, hashPassword, passwordPolicy, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
+import { createSessionToken, hashPassword, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 import { getEnv, isInviteRequired, isOwnerEmail } from "@/lib/env";
 import { track } from "@/services/analytics-service";
 import { logAccess } from "@/services/access-log-service";
@@ -11,15 +10,7 @@ import { sendTemplate } from "@/services/email-service";
 import { canRegister } from "@/lib/invite";
 import { startTrial } from "@/services/subscription-service";
 import { applyPendingGrants } from "@/services/billing/kiwify";
-
-const bodySchema = z.object({
-  name: z.string().trim().min(2).max(80),
-  email: z.string().trim().toLowerCase().email(),
-  password: passwordPolicy,
-  invite: z.string().trim().max(200).optional(),
-  /** aceite explícito dos Termos, Privacidade e Reembolso (versão vigente gravada no usuário) */
-  acceptTerms: z.literal(true, { message: "É preciso aceitar os Termos de Uso e a Política de Privacidade" }),
-});
+import { registerSchema } from "@/lib/validation/auth";
 
 /** Informa ao formulário se o cadastro exige convite (uso pessoal). */
 export const GET = withApi(async () => {
@@ -29,8 +20,9 @@ export const GET = withApi(async () => {
 
 export const POST = withApi(async (req) => {
   await connection();
-  await enforceRateLimit(req, "auth");
-  const body = await parseBody(req, bodySchema);
+  await enforceRateLimit(req, "register");
+  // mensagens em português por campo (mesmas do formulário); aceite dos termos obrigatório
+  const body = await parseBody(req, registerSchema);
   // E-mail do dono (OWNER_EMAILS) nunca é cadastrado por senha: o cadastro não prova posse do e-mail e daria ADMIN a quem
   // chegasse primeiro. A conta do dono nasce pelo login com Google (e-mail verificado).
   if (isOwnerEmail(body.email)) throw new ApiError(403, "Para esta conta, entre com o Google.", "owner_use_google");

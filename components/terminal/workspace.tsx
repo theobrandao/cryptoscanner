@@ -14,8 +14,9 @@ import { useToast } from "@/components/providers/toast-provider";
 import { useTickers } from "@/hooks/use-tickers";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useSession } from "@/hooks/use-session";
+import { allowsTimeframe } from "@/lib/access-policy";
 import { DEFAULT_SELECTION, selectionFromParams, selectionKey, setActiveSelection, SELECTION_TFS, useActiveSelection, type MarketSelection } from "@/hooks/use-market-selection";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { formatCompact, formatDateTime, formatNumber, formatPct, formatPrice, timeAgo } from "@/lib/format";
 import { TIMEFRAME_LABEL } from "@/lib/timeframes";
 import { INSTRUMENT_LABEL, INSTRUMENTS, VENUE_LABEL, VENUES } from "@/lib/venues";
@@ -24,7 +25,6 @@ import { apiFetch, ApiClientError, postJson } from "@/lib/client-api";
 import type { MarketContext } from "@/services/market-context-service";
 import type { SetupRow } from "@/services/market-overview-service";
 import type { Timeframe } from "@/types/market";
-import { OnboardingCard } from "@/components/terminal/onboarding-card";
 import { trackClient } from "@/lib/analytics-client";
 import { DATA_STATUS_PT, poolShort, pt, REGIME_PT, VOLATILITY_PT } from "@/lib/display-labels";
 
@@ -106,7 +106,7 @@ function AssetHeader({ ctx, sel, onChange, live }: { ctx: MarketContext; sel: Ma
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-full bg-muted text-lg font-bold">{a?.glyph}</span>
+          <span className={`grid h-10 w-10 place-items-center rounded-full bg-muted text-lg font-bold ${GLYPH_FONT_CLASS}`}>{a?.glyph}</span>
           <div>
             <h1 className="text-xl font-bold leading-tight tracking-tight">{ctx.symbol}/USDT</h1>
             <div className="text-[12px] text-muted-foreground">
@@ -397,7 +397,7 @@ function RightColumn({ ctx, overlays, setOverlays, onViewChart, onSwitchPerp }: 
 
 /* ------------------------------------------------------------------ Access gate */
 
-function AccessOrError({ error, sel, onReset }: { error: unknown; sel: MarketSelection; onReset: () => void }) {
+function AccessOrError({ error, sel, onReset, onUseBase }: { error: unknown; sel: MarketSelection; onReset: () => void; onUseBase: () => void }) {
   const status = error instanceof ApiClientError ? error.status : 0;
   const next = encodeURIComponent(`/charts/${sel.symbol}?tf=${sel.timeframe}&exchange=${sel.exchange}&instrument=${sel.instrument}`);
   if (status === 401)
@@ -428,10 +428,25 @@ function AccessOrError({ error, sel, onReset }: { error: unknown; sel: MarketSel
         </Link>
       </div>
     );
+  if (status === 403 && error instanceof ApiClientError && (error.code === "plan_required" || error.code === "elite_required"))
+    return (
+      <div className="mx-auto mt-10 max-w-lg rounded-xl border border-border bg-card p-6 text-center">
+        <h1 className="text-xl font-bold">Timeframe {TIMEFRAME_LABEL[sel.timeframe]} é do plano ELITE</h1>
+        <p className="mt-2 text-sm text-muted-foreground">No seu plano a análise completa funciona em 4H, 1D e 1W.</p>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <button onClick={onUseBase} className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">
+            Ver em 4H
+          </button>
+          <Link href="/planos" className="inline-flex h-10 items-center rounded-md border border-border px-5 text-sm">
+            Conhecer o ELITE
+          </Link>
+        </div>
+      </div>
+    );
   return (
     <div className="flex flex-col gap-2">
       <Unavailable>
-        DADOS INDISPONÍVEIS — {sel.symbol}/USDT {VENUE_LABEL[sel.exchange]} {INSTRUMENT_LABEL[sel.instrument]} {TIMEFRAME_LABEL[sel.timeframe]}: {error instanceof Error ? error.message : "nenhuma fonte respondeu"}.
+        DADOS INDISPONÍVEIS — {sel.symbol}/USDT {VENUE_LABEL[sel.exchange]} {INSTRUMENT_LABEL[sel.instrument]} {TIMEFRAME_LABEL[sel.timeframe]}: {error instanceof Error ? error.message.replace(/\.$/, "") : "nenhuma fonte respondeu"}.
       </Unavailable>
       <button onClick={onReset} className="h-8 self-start rounded-md border border-border px-3 text-[12px] hover:bg-muted">
         Voltar para Binance Spot
@@ -452,7 +467,10 @@ export function TerminalWorkspace({ symbol: routeSymbol, mode = "dashboard" }: {
   const params = useSearchParams();
   const { selection: stored } = useActiveSelection();
   const parsed = selectionFromParams(new URLSearchParams(params.toString()), stored ?? DEFAULT_SELECTION, routeSymbol);
-  const valid: MarketSelection = ASSETS.some((a) => a.symbol === parsed.symbol) ? parsed : { ...parsed, symbol: DEFAULT_SELECTION.symbol };
+  const { tier } = useSession();
+  const known: MarketSelection = ASSETS.some((a) => a.symbol === parsed.symbol) ? parsed : { ...parsed, symbol: DEFAULT_SELECTION.symbol };
+  // timeframe fora do plano (ex.: 1H salvo de uma sessão ELITE ou link compartilhado) cai para 4H em vez de travar a tela
+  const valid: MarketSelection = tier && !allowsTimeframe(tier, known.timeframe, "analysis") ? { ...known, timeframe: "4h" } : known;
   const key = selectionKey(valid);
   // identidade estável por chave (evita recriar callbacks a cada render)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -510,7 +528,7 @@ export function TerminalWorkspace({ symbol: routeSymbol, mode = "dashboard" }: {
 
   return (
     <div className="flex flex-col gap-3 p-3">
-      {showError ? <AccessOrError error={shownError} sel={sel} onReset={() => update({ exchange: "binance", instrument: "spot" })} /> : null}
+      {showError ? <AccessOrError error={shownError} sel={sel} onReset={() => update({ exchange: "binance", instrument: "spot" })} onUseBase={() => update({ timeframe: "4h" })} /> : null}
       {!consistent && !showError ? (
         <div className="flex flex-col gap-3" aria-busy="true" aria-label="Carregando contexto">
           <div className="skeleton h-[108px] rounded-lg" />
@@ -520,7 +538,6 @@ export function TerminalWorkspace({ symbol: routeSymbol, mode = "dashboard" }: {
           </div>
         </div>
       ) : null}
-      {consistent && mode === "dashboard" ? <OnboardingCard /> : null}
       {consistent ? (
         <>
           <AssetHeader ctx={consistent} sel={sel} onChange={update} live={liveT ? { price: liveT.price, changePct24h: liveT.changePct24h } : null} />

@@ -10,9 +10,9 @@ import { Landing, type LandingData } from "@/components/marketing/landing";
 import { MarketStrip, MoversCard, NewsCard } from "@/components/market/market-now";
 import { Alert } from "@/components/ui/misc";
 import { Eyebrow, PillGroup, StatTile, TickerMarquee } from "@/components/ui/showcase";
-import { Greeting, MyPanel, QuickActions } from "@/components/home/my-panel";
+import { Greeting, MyPanel, QuickActions, useSignalsSeen } from "@/components/home/my-panel";
 import { useSession } from "@/hooks/use-session";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { formatDateTime, formatPrice, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ActiveSignal, SignalsBoard } from "@/services/signals-service";
@@ -40,7 +40,7 @@ function SignalCard({ s }: { s: ActiveSignal }) {
   return (
     <Link href={`/graficos?symbol=${s.symbol}`} className="card-glow flex flex-col gap-3 rounded-2xl border border-border p-4 transition-colors hover:border-primary/50">
       <div className="flex items-center gap-2">
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-muted text-[14px]">{asset?.glyph}</span>
+        <span className={`grid h-8 w-8 place-items-center rounded-full bg-muted text-[14px] ${GLYPH_FONT_CLASS}`}>{asset?.glyph}</span>
         <span className="min-w-0 flex-1">
           <span className="block font-bold leading-tight">{s.symbol}</span>
           <span className="block truncate text-[11px] text-muted-foreground">{asset?.name}</span>
@@ -87,8 +87,9 @@ function Signals() {
   const sumR = recent.reduce((s, r) => s + r.rNet, 0);
   const avgOpen = active.length ? active.reduce((s, a) => s + a.openR, 0) / active.length : null;
   const cards = [...rows].sort((a, b) => Number(b.isNew) - Number(a.isNew) || b.entryTime - a.entryTime).slice(0, 8);
+  const { attach, mark } = useSignalsSeen();
   return (
-    <section className="flex flex-col gap-4" aria-label="Sinais ativos">
+    <section id="sinais" ref={attach} onClickCapture={mark} className="flex scroll-mt-20 flex-col gap-4" aria-label="Sinais ativos">
       <div className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
           <Eyebrow tone="warning">Modelo de sinais</Eyebrow>

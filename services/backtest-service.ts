@@ -7,7 +7,7 @@ import { backtestSetup } from "@/lib/engines/setup-backtest";
 import { executionTf, timeframesOf, type StrategyDefinition, type StrategyTf } from "@/lib/strategies/definition";
 import { getVenueHistory } from "@/services/market/venues";
 import { assertBacktestable } from "@/services/strategy-service";
-import type { AccessView } from "@/services/subscription-service";
+import { requireStrategyTimeframes, requireTimeframe, type AccessView } from "@/services/subscription-service";
 import type { Candle, Timeframe } from "@/types/market";
 
 export const MAX_BACKTEST_BARS = 3000;
@@ -46,6 +46,9 @@ const barsFor = (tf: Timeframe, days: number) => Math.min(MAX_BACKTEST_BARS, Mat
 export function checkBacktestAccess(access: AccessView, req: BacktestRequest) {
   if (req.days > access.entitlements.historyDays) throw new ApiError(402, `Seu plano cobre até ${access.entitlements.historyDays} dias de histórico`, "history_locked");
   if (req.mode === "strategy" && req.definition && timeframesOf(req.definition).length > 1 && !access.entitlements.elite) throw new ApiError(402, "Backtest multi-timeframe é recurso do plano ELITE", "elite_required");
+  // abaixo de 4H só no ELITE (mesma regra do scanner, agentes e monitores)
+  if (req.mode === "setup") requireTimeframe(access, req.timeframe ?? "4h", "backtest");
+  else if (req.definition) requireStrategyTimeframes(access, req.definition, "backtest");
 }
 
 export async function runBacktest(req: BacktestRequest): Promise<BacktestResponse> {

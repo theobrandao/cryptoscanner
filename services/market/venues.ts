@@ -125,6 +125,9 @@ async function rawCandles(venue: Venue, inst: Instrument, asset: AssetDefinition
   }
 }
 
+/** Barras buscadas por série de venue (cobre os pedidos de 300 e 400 do contexto e das estratégias). */
+const VENUE_WINDOW = 400;
+
 const candleTtl = (tf: Timeframe) => Math.min(300, Math.max(20, Math.floor(TIMEFRAME_MS[tf] / 1000 / 12)));
 
 /** Série validada de UMA venue (sem trocar de exchange). Binance spot reaproveita o serviço de mercado (WS + cache). */
@@ -135,7 +138,8 @@ export async function getVenueSeries(venue: Venue, inst: Instrument, asset: Asse
     const closed = forming ? s.candles.slice(0, -1) : s.candles;
     return { candles: s.candles, closed, forming, venue, instrument: inst, quality: s.quality as DataQuality };
   }
-  const want = limit;
+  // janela fixa na chave (como getCandles): pedidos de 300 e 400 barras dividem a mesma chamada à exchange
+  const want = Math.max(limit, VENUE_WINDOW);
   const res = await cached<{ candles: Candle[]; fetchedAt: number }>(
     `vcandles:v1:${venue}:${inst}:${asset.symbol}:${tf}:${want}`,
     candleTtl(tf),

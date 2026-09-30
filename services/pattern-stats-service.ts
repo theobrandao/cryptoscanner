@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/database/client";
 import { ASSETS } from "@/lib/assets";
 import { getCache } from "@/lib/cache";
@@ -280,6 +281,7 @@ export async function trackLiveSignals(scans: readonly ScanResult[]): Promise<{ 
     const tf = scan.timeframe;
     if (!(STATS_TIMEFRAMES as readonly string[]).includes(tf)) continue;
     const cooldownMs = COOLDOWN_BARS * TIMEFRAME_MS[tf];
+    const candidates: Prisma.PatternSignalCreateManyInput[] = [];
     for (const row of scan.rows) {
       for (const p of row.patterns) {
         if (p.direction === "neutral" || p.target == null || p.stop == null || p.confidence < MIN_CONFIDENCE) continue;
@@ -287,17 +289,23 @@ export async function trackLiveSignals(scans: readonly ScanResult[]): Promise<{ 
         // entrada = fechamento do último candle fechado (mesma régua do backtest)
         const entry = p.price;
         if (long ? !(p.target > entry && p.stop < entry) : !(p.target < entry && p.stop > entry)) continue;
-        const recent = await prisma.patternSignal.findFirst({
-          where: { symbol: row.symbol, timeframe: tf, patternKey: p.key, detectedAt: { gte: new Date(Date.now() - cooldownMs) } },
-          select: { id: true },
-        });
-        if (recent) continue;
-        await prisma.patternSignal.create({
-          data: { symbol: row.symbol, timeframe: tf, patternKey: p.key, direction: p.direction, confidence: p.confidence, entry, target: p.target, stop: p.stop, candleTime: new Date(row.candleTime) },
-        });
-        created++;
+        candidates.push({ symbol: row.symbol, timeframe: tf, patternKey: p.key, direction: p.direction, confidence: p.confidence, entry, target: p.target, stop: p.stop, candleTime: new Date(row.candleTime) });
       }
     }
+    if (!candidates.length) continue;
+    // uma consulta por timeframe (em vez de um findFirst por padrão): sinais do mesmo ativo×padrão dentro do cooldown
+    const recent = await prisma.patternSignal.findMany({
+      where: { timeframe: tf, detectedAt: { gte: new Date(Date.now() - cooldownMs) }, OR: candidates.map((c) => ({ symbol: c.symbol, patternKey: c.patternKey })) },
+      select: { symbol: true, patternKey: true },
+    });
+    const seen = new Set(recent.map((r) => `${r.symbol}|${r.patternKey}`));
+    const data = candidates.filter((c) => {
+      const k = `${c.symbol}|${c.patternKey}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    if (data.length) created += (await prisma.patternSignal.createMany({ data })).count;
   }
 
   const open = await prisma.patternSignal.findMany({ where: { status: "open" }, orderBy: { detectedAt: "asc" }, take: 500 });

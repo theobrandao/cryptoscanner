@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useSession } from "@/hooks/use-session";
 import { NAV_ITEMS } from "@/components/layout/nav-config";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { apiFetch } from "@/lib/client-api";
 import { cn } from "@/lib/utils";
 
@@ -205,7 +205,7 @@ function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
           <div className="mb-1 mt-1 px-2 text-[11px] uppercase tracking-wide text-muted-foreground">Ativos</div>
           {results.assets.map((a) => (
             <button key={a.symbol} onClick={() => go(`/graficos?symbol=${a.symbol}`)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted cursor-pointer">
-              <span className="w-5 text-center text-muted-foreground">{a.glyph}</span>
+              <span className={`w-5 text-center text-muted-foreground ${GLYPH_FONT_CLASS}`}>{a.glyph}</span>
               <span className="font-semibold">{a.symbol}</span>
               <span className="text-muted-foreground">{a.name}</span>
               <span className="ml-auto text-xs text-muted-foreground">abrir gráfico →</span>

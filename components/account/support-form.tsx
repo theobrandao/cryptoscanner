@@ -52,7 +52,7 @@ const FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: "Quais timeframes cada plano libera no scanner?",
-    a: "FREE e PRO: 4H, 1D e 7D. ELITE: também 1H, 30M e 15M. A verificação é feita no servidor, não só na interface.",
+    a: "Teste grátis e PRO: 4H, 1D e 7D. ELITE: também 1H, 30M e 15M. A verificação é feita no servidor, não só na interface.",
   },
   {
     q: "Com que frequência os agentes verificam o mercado?",
@@ -92,7 +92,7 @@ interface Ticket {
   createdAt: string;
 }
 
-export function SupportForm() {
+export function SupportForm({ initialSubject = "" }: { initialSubject?: string }) {
   const { user, loading } = useSession();
   const plan = PLANS[user?.plan ?? "FREE"];
   return (
@@ -108,6 +108,7 @@ export function SupportForm() {
             <SupportFormBody
               key={user?.email ?? "anon"}
               initialEmail={user?.email ?? ""}
+              initialSubject={initialSubject}
             />
           )}
           {user ? <MyTickets /> : null}
@@ -304,9 +305,9 @@ function MyTickets() {
   );
 }
 
-function SupportFormBody({ initialEmail }: { initialEmail: string }) {
+function SupportFormBody({ initialEmail, initialSubject }: { initialEmail: string; initialSubject: string }) {
   const [email, setEmail] = React.useState(initialEmail);
-  const [subject, setSubject] = React.useState("");
+  const [subject, setSubject] = React.useState(initialSubject);
   const [message, setMessage] = React.useState("");
   const [state, setState] = React.useState<{ ok?: string; error?: string }>({});
   const [loading, setLoading] = React.useState(false);

@@ -345,7 +345,9 @@ export async function runAnalystChat(input: ChatRunInput, emit: (e: ChatEvent) =
     try {
       text = await deterministicAnswer(input.selection);
     } catch (err) {
-      text = `Não consegui montar o contexto de ${input.selection.symbol} ${input.selection.tf.toUpperCase()} agora (${(err as Error).message.slice(0, 120)}).`;
+      // a causa técnica fica só no log; o usuário recebe texto fixo
+      log.warn("contexto indisponível para a resposta automática", { symbol: input.selection.symbol, tf: input.selection.tf, error: (err as Error).message });
+      text = `Não consegui montar o contexto de ${input.selection.symbol} ${input.selection.tf.toUpperCase()} agora. Os dados de mercado não responderam; tente de novo em alguns minutos.`;
     }
     text += "\n\n_O modelo de linguagem não está configurado neste ambiente; esta é a leitura automática do contexto da tela, sem interpretação da pergunta._";
     emit({ type: "text", delta: text });

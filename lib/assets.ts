@@ -56,3 +56,9 @@ export function isKnownSymbol(symbol: string): boolean {
 }
 
 export const ASSET_SYMBOLS: readonly string[] = ASSETS.map((a) => a.symbol);
+
+/**
+ * Classe para exibir `glyph`: fonte do sistema em vez da Inter. Vários símbolos (₿, Ł, Ƀ, Ⱥ, Ξ, τ) ficam fora do
+ * subconjunto latino da Inter e, com ela, obrigavam o navegador a baixar os arquivos latin-ext e grego só por eles.
+ */
+export const GLYPH_FONT_CLASS = "[font-family:system-ui,sans-serif]";

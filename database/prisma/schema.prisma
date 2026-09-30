@@ -65,6 +65,8 @@ model User {
   monitorEvents     MonitorEvent[]
   passwordResets    PasswordReset[]
   analystConversations AnalystConversation[]
+
+  @@index([createdAt])
 }
 
 model UserPreference {
@@ -122,6 +124,7 @@ model MarketSnapshot {
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@index([assetId, collectedAt(sort: Desc)])
+  @@index([collectedAt])
 }
 
 model Candle {
@@ -197,6 +200,7 @@ model ScanHistoryEntry {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt(sort: Desc)])
+  @@index([createdAt])
 }
 
 // ------------------------------------------------------------------
@@ -230,6 +234,7 @@ model WatchlistItem {
   asset     Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@unique([watchlistId, assetId])
+  @@index([assetId])
 }
 
 // ------------------------------------------------------------------
@@ -289,6 +294,8 @@ model AgentExecution {
 
   @@index([symbol, timeframe, startedAt(sort: Desc)])
   @@index([agentId, startedAt(sort: Desc)])
+  @@index([userId])
+  @@index([startedAt])
 }
 
 // Saída de cada agente dentro de uma execução.
@@ -305,6 +312,7 @@ model AgentResult {
   execution AgentExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
 
   @@index([executionId])
+  @@index([createdAt])
 }
 
 model AgentLog {
@@ -319,6 +327,7 @@ model AgentLog {
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@index([agentId, createdAt(sort: Desc)])
+  @@index([createdAt])
 }
 
 // ------------------------------------------------------------------
@@ -342,6 +351,7 @@ model Alert {
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@index([userId, active])
+  @@index([assetId])
 }
 
 // ------------------------------------------------------------------
@@ -402,6 +412,8 @@ model SupportTicket {
   createdAt DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
 }
 
 // ------------------------------------------------------------------
@@ -446,8 +458,8 @@ model PatternSignal {
   exitPrice   Float?
   returnPct   Float?
 
-  @@index([status])
-  @@index([patternKey, timeframe, status])
+  @@index([status, detectedAt])
+  @@index([timeframe, patternKey, status])
   @@index([symbol, timeframe, patternKey, detectedAt(sort: Desc)])
 }
 
@@ -477,6 +489,7 @@ model CronRun {
   startedAt  DateTime @default(now())
 
   @@index([job, startedAt(sort: Desc)])
+  @@index([startedAt])
 }
 
 /// Configuração gerada pelo próprio app (ex.: chaves VAPID quando não definidas no ambiente).
@@ -606,6 +619,7 @@ model Monitor {
 
   @@unique([userId, symbol, timeframe, exchange, instrument, kind, strategyId])
   @@index([active, lastCheckedAt])
+  @@index([strategyId])
 }
 
 /// Evento do alert engine. `fingerprint` único = deduplicação (o mesmo fato nunca notifica duas vezes).
@@ -627,6 +641,8 @@ model MonitorEvent {
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+  @@index([monitorId])
+  @@index([createdAt])
 }
 
 /// Eventos de produto (funil e uso). Sem dado pessoal além do userId; IP não é gravado.
@@ -640,6 +656,7 @@ model AnalyticsEvent {
 
   @@index([name, createdAt])
   @@index([userId, createdAt])
+  @@index([createdAt])
 }
 
 /// Recuperação de senha: guarda só o hash SHA-256 do token (o token vai por e-mail).
@@ -683,6 +700,8 @@ model ExternalGrant {
   status           String
   currentPeriodEnd DateTime?
   lastEvent        String
+  /// data (do corpo do webhook) do último evento aplicado — evento mais antigo reenviado fora de ordem é ignorado
+  lastEventAt      DateTime?
   lastOrderId      String?
   appliedUserId    String?
   appliedAt        DateTime?
@@ -736,4 +755,14 @@ model AdminAuditLog {
 
   @@index([createdAt])
   @@index([targetUserId, createdAt])
+}
+
+/// Cota diária do Analista IA quando o Redis não está disponível (dia em America/Sao_Paulo, AAAA-MM-DD).
+model AiUsage {
+  userId    String
+  day       String
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, day])
 }

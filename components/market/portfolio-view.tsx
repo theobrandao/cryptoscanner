@@ -49,7 +49,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSession } from "@/hooks/use-session";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useToast } from "@/components/providers/toast-provider";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { ApiClientError, apiFetch, postJson } from "@/lib/client-api";
 import { PATTERN_LIST } from "@/lib/patterns/catalog";
 import { formatDateTime, formatPct, formatPrice } from "@/lib/format";
@@ -257,7 +257,7 @@ function WatchlistPanel() {
               <SelectContent>
                 {ASSETS.map((a) => (
                   <SelectItem key={a.symbol} value={a.symbol}>
-                    {a.glyph} {a.symbol} — {a.name}
+                    <span className={GLYPH_FONT_CLASS}>{a.glyph}</span> {a.symbol} — {a.name}
                   </SelectItem>
                 ))}
               </SelectContent>

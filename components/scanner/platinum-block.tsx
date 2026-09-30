@@ -14,9 +14,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PLANS } from "@/lib/plans";
+import { useAccess } from "@/components/account/access-gate";
+import { ELITE_DIFFERENTIALS, formatBRL } from "@/lib/plans-copy";
 
-/** Bloco "Recursos do plano ELITE" (chave interna PLATINUM) + modal de upgrade (comportamento observado na referência). */
+/** Preço do ELITE da conta (PRICE_ELITE_BRL via /api/billing/subscription); espaço reservado enquanto carrega. */
+function ElitePrice({ className }: { className?: string }) {
+  const { access } = useAccess();
+  const price = access?.billing.prices.ELITE;
+  return (
+    <p className={className ?? "min-h-5 text-sm font-semibold tabular"}>
+      {price != null ? `${formatBRL(price)}/mês, sem teste grátis. Cancele quando quiser.` : ""}
+    </p>
+  );
+}
+
+/** Bloco "Recursos do plano ELITE" (chave interna PLATINUM) + modal de upgrade. Benefícios: só o que o ELITE tem a mais que o PRO (lib/plans-copy). */
 export function PlatinumBlock({ currentPlan }: { currentPlan: string }) {
   const router = useRouter();
   if (currentPlan === "PLATINUM") return null;
@@ -33,7 +45,7 @@ export function PlatinumBlock({ currentPlan }: { currentPlan: string }) {
             1H, 30M e 15M são do plano ELITE.
           </p>
           <ul className="mt-3 grid gap-1 text-sm sm:grid-cols-2">
-            {PLANS.PLATINUM.benefits.map((b) => (
+            {ELITE_DIFFERENTIALS.map((b) => (
               <li key={b} className="flex items-center gap-1.5">
                 <Check
                   className="h-3.5 w-3.5 shrink-0 text-success"
@@ -43,6 +55,7 @@ export function PlatinumBlock({ currentPlan }: { currentPlan: string }) {
               </li>
             ))}
           </ul>
+          <ElitePrice className="mt-3 min-h-5 text-sm font-semibold tabular" />
         </div>
         <Button
           size="lg"
@@ -76,8 +89,9 @@ export function UpgradeDialog({
           </DialogTitle>
           <DialogDescription>{feature}</DialogDescription>
         </DialogHeader>
+        <p className="text-sm font-medium">O que o ELITE tem a mais que o PRO:</p>
         <ul className="grid gap-1 text-sm">
-          {PLANS.PLATINUM.benefits.map((b) => (
+          {ELITE_DIFFERENTIALS.map((b) => (
             <li key={b} className="flex items-center gap-1.5">
               <Check
                 className="h-3.5 w-3.5 shrink-0 text-success"
@@ -87,7 +101,8 @@ export function UpgradeDialog({
             </li>
           ))}
         </ul>
-        <DialogFooter>
+        <ElitePrice />
+        <DialogFooter className="flex-wrap">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Continuar com meu plano atual
           </Button>

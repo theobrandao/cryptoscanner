@@ -1,5 +1,6 @@
 import type { Candle, Timeframe } from "@/types/market";
 import { round } from "@/lib/indicators/core";
+import { allowsTimeframe, type Tier } from "@/lib/access-policy";
 
 export interface VolumeAnomaly {
   symbol: string;
@@ -53,4 +54,18 @@ export function detectVolumeAnomaly(
     if (!best || candidate.increasePct > best.increasePct) best = candidate;
   }
   return best;
+}
+
+/** Timeframes padrão do monitor de volume (30M e 1H). */
+export const VOLUME_TIMEFRAMES: readonly Timeframe[] = ["30m", "1h"];
+
+/** Timeframes do monitor de volume liberados para o tier (abaixo de 4H só no ELITE); sem nenhum, o 4H. */
+export function volumeTimeframesFor(tier: Tier): Timeframe[] {
+  const tfs = VOLUME_TIMEFRAMES.filter((tf) => allowsTimeframe(tier, tf, "scanner"));
+  return tfs.length ? tfs : ["4h"];
+}
+
+/** Descarta alertas de volume em timeframe fora do plano (o scan em cache é o mesmo para todos os tiers). */
+export function allowedVolumeAlerts(tier: Tier, alerts: VolumeAnomaly[]): VolumeAnomaly[] {
+  return alerts.filter((a) => allowsTimeframe(tier, a.timeframe, "scanner"));
 }

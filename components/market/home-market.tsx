@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useTickers } from "@/hooks/use-tickers";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { formatCompact, formatPct, formatPrice } from "@/lib/format";
 import { Skeleton } from "@/components/ui/misc";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,7 @@ export function HomeMarket() {
             <li key={a.symbol}>
               <Link href={`/graficos?symbol=${a.symbol}`} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-muted">
                 <span className="flex items-center gap-2 text-sm">
-                  <span className="w-4 text-center text-muted-foreground">{a.glyph}</span>
+                  <span className={`w-4 text-center text-muted-foreground ${GLYPH_FONT_CLASS}`}>{a.glyph}</span>
                   <span className="font-semibold">{a.symbol}</span>
                 </span>
                 {t ? (

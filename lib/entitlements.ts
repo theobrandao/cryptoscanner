@@ -1,15 +1,19 @@
+import { TIER_LIMITS, TIERS, timeframesFor, hasCore, hasElite, type Tier } from "@/lib/access-policy";
+
 /**
  * Entitlements — decididos no BACKEND a partir da assinatura (nunca pelo frontend).
  * Tiers: TRIAL (≈ PRO por TRIAL_DAYS dias), PRO, ELITE, NONE (trial expirado/cancelado sem período ativo), ADMIN (dono).
+ * Timeframes, recursos e limites vêm da regra única em `lib/access-policy.ts`.
  */
-export type Tier = "TRIAL" | "PRO" | "ELITE" | "NONE" | "ADMIN";
+export type { Tier } from "@/lib/access-policy";
+export { legacyPlanFor } from "@/lib/access-policy";
 export type SubscriptionStatus = "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELLED" | "EXPIRED";
 
 export interface Entitlements {
   tier: Tier;
   /** terminal, scanner, monitor, alertas, risco, AI analyst */
   core: boolean;
-  /** backtest avançado/multi-TF, replay, estratégias avançadas, portfolio risk avançado */
+  /** backtest avançado/multi-TF, replay, estratégias avançadas, portfolio risk avançado, timeframes abaixo de 4H */
   elite: boolean;
   timeframes: string[];
   maxAlerts: number;
@@ -19,16 +23,9 @@ export interface Entitlements {
   historyDays: number;
 }
 
-const PRO_TF = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"];
-
-export const ENTITLEMENTS: Record<Tier, Entitlements> = {
-  NONE: { tier: "NONE", core: false, elite: false, timeframes: [], maxAlerts: 0, maxMonitors: 0, maxStrategies: 0, aiQueriesPerDay: 0, historyDays: 0 },
-  // trial com limites anti-abuso (menos alertas/monitores que o PRO)
-  TRIAL: { tier: "TRIAL", core: true, elite: false, timeframes: PRO_TF, maxAlerts: 5, maxMonitors: 1, maxStrategies: 2, aiQueriesPerDay: 10, historyDays: 90 },
-  PRO: { tier: "PRO", core: true, elite: false, timeframes: PRO_TF, maxAlerts: 50, maxMonitors: 5, maxStrategies: 10, aiQueriesPerDay: 100, historyDays: 365 },
-  ELITE: { tier: "ELITE", core: true, elite: true, timeframes: PRO_TF, maxAlerts: 200, maxMonitors: 20, maxStrategies: 50, aiQueriesPerDay: 500, historyDays: 1095 },
-  ADMIN: { tier: "ADMIN", core: true, elite: true, timeframes: PRO_TF, maxAlerts: 1000, maxMonitors: 100, maxStrategies: 500, aiQueriesPerDay: 5000, historyDays: 3650 },
-};
+export const ENTITLEMENTS: Record<Tier, Entitlements> = Object.fromEntries(
+  TIERS.map((tier) => [tier, { tier, core: hasCore(tier), elite: hasElite(tier), timeframes: timeframesFor(tier), ...TIER_LIMITS[tier] }]),
+) as Record<Tier, Entitlements>;
 
 /** Teste grátis: só do plano PRO, sem cartão. */
 export const TRIAL_DAYS = 3;
@@ -60,9 +57,4 @@ export function tierFor(s: SubscriptionLike | null, role: string, now = new Date
   if (st === "ACTIVE" || st === "CANCELLED") return s.plan === "ELITE" ? "ELITE" : "PRO"; // cancelada mantém acesso até o fim do período
   if (st === "PAST_DUE" && s.currentPeriodEnd && now.getTime() <= s.currentPeriodEnd.getTime() + PAST_DUE_GRACE_DAYS * 86_400_000) return s.plan === "ELITE" ? "ELITE" : "PRO";
   return "NONE";
-}
-
-/** Plano legado (User.plan) correspondente ao tier, usado pelos limites já existentes. */
-export function legacyPlanFor(tier: Tier): "FREE" | "PRO" | "PLATINUM" {
-  return tier === "ELITE" || tier === "ADMIN" ? "PLATINUM" : tier === "PRO" || tier === "TRIAL" ? "PRO" : "FREE";
 }

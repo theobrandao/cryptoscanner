@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requirePrisma } from "@/database/client";
 import { ApiError, ok, parseBody, withApi } from "@/lib/api";
 import { PLANS } from "@/lib/plans";
-import { requireCoreUser } from "@/services/subscription-service";
+import { requireCoreUser, requireTimeframe } from "@/services/subscription-service";
 
 const patchSchema = z.object({
   status: z.enum(["ACTIVE", "PAUSED", "STOPPED"]).optional(),
@@ -33,6 +33,8 @@ export const PATCH = withApi(async (req, ctx) => {
   const { id } = await ctx.params;
   const sentinel = await own(user.id, id ?? "");
   const body = await parseBody(req, patchSchema);
+  // o timeframe não muda por aqui; reativar Sentinela abaixo de 4H exige ELITE (regra de `requireTimeframe`)
+  if (body.status === "ACTIVE") requireTimeframe(user.access, sentinel.timeframe, "sentinels");
   if (
     body.notification &&
     body.notification !== "log" &&

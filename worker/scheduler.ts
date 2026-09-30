@@ -1,6 +1,7 @@
 import { getEnv } from "@/lib/env";
 import { createLogger } from "@/lib/logger";
 import { evaluateAlerts } from "@/services/alert-service";
+import { runRetention } from "@/services/retention-service";
 import { runScan } from "@/services/scanner-service";
 import { runAllActiveAgents } from "@/services/user-agent-service";
 import { persistMarketSnapshot } from "@/worker/persist";
@@ -10,10 +11,11 @@ const log = createLogger("scheduler");
 
 /**
  * Ciclo periódico (padrão 5 min, como a verificação server-side citada pela referência):
- *  1. scan de padrões + volume em 4h e 1d (aquece o cache e persiste ScannerResult)
+ *  1. scan de padrões + volume em 4h e 1d (só aquece o cache; ScannerResult não é mais gravado)
  *  2. snapshots de mercado, candles e indicadores no banco (quando há DATABASE_URL)
- *  3. agentes do usuário
- *  4. alertas do usuário
+ *  3. retenção de dados em lotes (no máximo 1×/hora; services/retention-service.ts), inclusive MarketSnapshot
+ *  4. agentes do usuário
+ *  5. alertas do usuário
  */
 export class Scheduler {
   private timer: NodeJS.Timeout | null = null;
@@ -47,6 +49,10 @@ export class Scheduler {
       await this.step("persist-market", async () => {
         const r = await persistMarketSnapshot({ candlesPerAsset: 50 });
         log.info("mercado persistido", { ...r });
+      });
+      await this.step("retention", async () => {
+        const r = await runRetention();
+        log.info("retenção", { ...r });
       });
       await this.step("user-agents", async () => {
         const res = await runAllActiveAgents();

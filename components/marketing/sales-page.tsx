@@ -5,14 +5,13 @@ import Link from "next/link";
 import useSWR from "swr";
 import Image from "next/image";
 import { ArrowRight, BellRing, Bot, Check, CircleSlash, ListChecks, ScrollText, ShieldCheck, Smartphone, Target, UserPlus, X } from "lucide-react";
-import { PlanCards, type LandingData, type Prices } from "@/components/marketing/landing";
+import { FaqList, PlanCards, StickyTrialCta, trackCta, trackCtaInside, type LandingData, type Prices } from "@/components/marketing/landing";
 import { fmtR, ValidatedModels } from "@/components/marketing/validated-models";
 import { Eyebrow, LineChart, SectionHeading, StatTile, TickerMarquee, ToolsGrid } from "@/components/ui/showcase";
 import { billingNote } from "@/lib/plans-copy";
 import { captureAffiliateParams } from "@/lib/affiliate-params";
 import { ENTITLEMENTS } from "@/lib/entitlements";
 import { MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
-import { cn } from "@/lib/utils";
 
 /**
  * Página de vendas (/vendas): destino dos anúncios e URL da página de vendas na Kiwify.
@@ -64,9 +63,9 @@ function faq(trial: number, kiwify: boolean): Array<[string, string]> {
   ];
 }
 
-export function SalesPage({ content }: { content: LandingData }) {
-  const { data } = useSWR<Prices>("/api/billing/prices", { revalidateOnFocus: false });
-  const [open, setOpen] = React.useState<number | null>(0);
+export function SalesPage({ content, initialPrices }: { content: LandingData; initialPrices?: Prices }) {
+  // valor do servidor (canal de venda, preços) já no HTML: a FAQ da Kiwify não depende do carregamento no navegador
+  const { data } = useSWR<Prices>("/api/billing/prices", { revalidateOnFocus: false, fallbackData: initialPrices });
   const trial = data?.trialDays ?? 3;
   const kiwify = data?.provider === "kiwify";
   const main = content.validated[0];
@@ -90,7 +89,7 @@ export function SalesPage({ content }: { content: LandingData }) {
               O CryptoScanner calcula por regras fixas os padrões gráficos, os níveis e os sinais do modelo de rompimento, e avisa no celular quando a condição aparece. Você vê de onde vem cada número e decide.
             </p>
             <div className="mt-7 flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row">
-              <Link href={cta} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
+              <Link href={cta} onClick={trackCta("hero")} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
                 Testar o PRO grátis por {trial} dias <ArrowRight className="h-4 w-4" />
               </Link>
               <a href="#planos" className="inline-flex h-12 items-center justify-center rounded-xl border border-border bg-card px-6 text-sm font-semibold hover:border-primary/50">
@@ -133,9 +132,8 @@ export function SalesPage({ content }: { content: LandingData }) {
         </section>
 
         {/* POR DENTRO */}
-        <section aria-labelledby="pordentro">
+        <section aria-label="Telas do aplicativo">
           <SectionHeading eyebrow="Por dentro" title="Veja o app" accent="funcionando" subtitle="Telas reais do CryptoScanner, capturadas com dados de mercado do momento." />
-          <h2 id="pordentro" className="sr-only">Telas do aplicativo</h2>
           <div className="mt-8 grid gap-4 lg:grid-cols-2">
             {SCREENS.map((sc) => (
               <figure key={sc.src} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card">
@@ -150,9 +148,8 @@ export function SalesPage({ content }: { content: LandingData }) {
         </section>
 
         {/* BENEFÍCIOS */}
-        <section aria-labelledby="beneficios">
+        <section aria-label="Benefícios">
           <SectionHeading eyebrow="Por que usar" title="Menos tempo na tela," accent="mais critério" subtitle="O trabalho repetitivo de olhar gráfico fica com o servidor. Você recebe o aviso e confere os números." />
-          <h2 id="beneficios" className="sr-only">Benefícios</h2>
           <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {BENEFITS.map((b) => (
               <article key={b.title} className="card-glow flex flex-col gap-3 rounded-2xl border border-border p-5">
@@ -167,27 +164,24 @@ export function SalesPage({ content }: { content: LandingData }) {
         </section>
 
         {/* FERRAMENTAS */}
-        <section id="ferramentas" className="scroll-mt-20" aria-labelledby="tools">
+        <section id="ferramentas" className="scroll-mt-20" aria-label="Ferramentas incluídas">
           <SectionHeading eyebrow="Incluído no PRO" title="Tudo o que você" accent="recebe" subtitle="Uma ferramenta para cada tarefa, organizadas pelo que você quer fazer." />
-          <h2 id="tools" className="sr-only">Ferramentas incluídas</h2>
-          <div className="mt-8">
+          <div className="mt-8" onClickCapture={trackCtaInside("cartao_ferramenta")}>
             <ToolsGrid tools={MAIN_TOOLS.filter((t) => t.href !== "/")} categories={TOOL_CATEGORIES} hrefFor={(t) => `/registro?next=${encodeURIComponent(t.href)}`} ctaFor={() => "Testar grátis"} />
           </div>
         </section>
 
         {/* MODELO */}
-        <section id="modelo" className="scroll-mt-20" aria-labelledby="validado">
+        <section id="modelo" className="scroll-mt-20" aria-label="Modelo validado">
           <SectionHeading eyebrow="Transparência" tone="warning" title="Os números do modelo," accent="com as ressalvas" subtitle="Regras escolhidas em um período e medidas em outro, em 30 criptos, descontando taxa e slippage. O setup que não passou nesse teste não é vendido como estratégia." />
-          <h2 id="validado" className="sr-only">Modelo validado</h2>
           <div className="mt-8">
             <ValidatedModels models={content.validated} />
           </div>
         </section>
 
         {/* COMO FUNCIONA */}
-        <section aria-labelledby="como">
+        <section aria-label="Como funciona">
           <SectionHeading eyebrow="Como funciona" title="Três passos para" accent="começar" />
-          <h2 id="como" className="sr-only">Como funciona</h2>
           <ol className="mt-8 grid gap-3 md:grid-cols-3">
             {STEPS.map((s, i) => (
               <li key={s.title} className="flex gap-4 rounded-2xl border border-border bg-card p-5">
@@ -229,9 +223,8 @@ export function SalesPage({ content }: { content: LandingData }) {
         </section>
 
         {/* PLANOS */}
-        <section id="planos" aria-labelledby="pricing" className="scroll-mt-20">
+        <section id="planos" aria-label="Planos e preços" className="scroll-mt-20">
           <SectionHeading eyebrow="Planos" title="Teste o PRO" accent={`${trial} dias grátis`} subtitle="Sem cartão no teste. Assinatura mensal, cancelamento a qualquer momento." />
-          <h2 id="pricing" className="sr-only">Planos e preços</h2>
           <PlanCards data={data} trial={trial} />
           <div className="mx-auto mt-4 flex max-w-4xl flex-col items-start gap-3 rounded-2xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:p-5">
             <ShieldCheck className="h-8 w-8 shrink-0 text-success" aria-hidden />
@@ -246,20 +239,9 @@ export function SalesPage({ content }: { content: LandingData }) {
         </section>
 
         {/* FAQ */}
-        <section id="faq" aria-labelledby="faqh" className="mx-auto w-full max-w-3xl scroll-mt-20">
+        <section id="faq" aria-label="Perguntas frequentes" className="mx-auto w-full max-w-3xl scroll-mt-20">
           <SectionHeading eyebrow="Dúvidas" title="Perguntas" accent="frequentes" />
-          <h2 id="faqh" className="sr-only">Perguntas frequentes</h2>
-          <div className="mt-6 divide-y divide-border rounded-2xl border border-border bg-card">
-            {FAQ.map(([q, a], i) => (
-              <div key={q}>
-                <button onClick={() => setOpen(open === i ? null : i)} className="flex min-h-[52px] w-full items-center justify-between gap-3 px-4 py-3 text-left text-[14px] font-semibold sm:px-5" aria-expanded={open === i}>
-                  <span className="min-w-0">{q}</span>
-                  <span className="shrink-0 text-muted-foreground">{open === i ? "−" : "+"}</span>
-                </button>
-                {open === i ? <p className="px-4 pb-4 text-[13.5px] leading-relaxed text-muted-foreground sm:px-5">{a}</p> : null}
-              </div>
-            ))}
-          </div>
+          <FaqList items={FAQ} compact />
         </section>
 
         {/* CTA FINAL */}
@@ -268,7 +250,7 @@ export function SalesPage({ content }: { content: LandingData }) {
             Comece hoje com <span className="text-gradient">{trial} dias de PRO grátis</span>
           </h2>
           <p className="mt-2 text-[14px] text-muted-foreground">Sem cartão, sem chaves de API. Se gostar, escolha o plano.</p>
-          <Link href={cta} className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110 sm:w-auto">
+          <Link href={cta} onClick={trackCta("final")} className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110 sm:w-auto">
             Criar conta grátis <ArrowRight className="h-4 w-4" />
           </Link>
           <p className="mt-3 text-[12px] text-muted-foreground">
@@ -286,11 +268,7 @@ export function SalesPage({ content }: { content: LandingData }) {
       </div>
 
       {/* CTA fixo no celular */}
-      <div className={cn("fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur lg:hidden")} style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
-        <Link href={cta} data-testid="sales-sticky-cta" className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground">
-          Testar o PRO grátis por {trial} dias <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
+      <StickyTrialCta trial={trial} href={cta} testId="sales-sticky-cta" />
     </div>
   );
 }

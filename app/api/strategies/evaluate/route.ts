@@ -3,7 +3,7 @@ import { z } from "zod";
 import { enforceRateLimit, ok, parseBody, requireUser, withApi } from "@/lib/api";
 import { definitionSchema } from "@/lib/strategies/definition";
 import { INSTRUMENTS, VENUES } from "@/lib/venues";
-import { requireEntitlement } from "@/services/subscription-service";
+import { requireEntitlement, requireStrategyTimeframes } from "@/services/subscription-service";
 import { evaluateLive, getStrategy } from "@/services/strategy-service";
 
 export const maxDuration = 60;
@@ -23,8 +23,9 @@ export const POST = withApi(async (req) => {
   await connection();
   await enforceRateLimit(req, "public");
   const user = await requireUser(req);
-  await requireEntitlement(user);
+  const access = await requireEntitlement(user);
   const b = await parseBody(req, bodySchema);
   const def = b.definition ?? (await getStrategy(user.id, b.id as string)).definition;
+  requireStrategyTimeframes(access, def, "strategies");
   return ok(await evaluateLive(def, b.symbol.replace(/USDT$/, ""), b.exchange, b.instrument));
 });

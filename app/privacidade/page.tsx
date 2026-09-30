@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { publicPageMetadata } from "@/lib/seo/metadata";
 import { connection } from "next/server";
 import { EntityBlock, LegalDoc, legalEntity } from "@/components/legal/legal-doc";
 
-export const metadata: Metadata = { title: "Política de Privacidade" };
+export const metadata: Metadata = publicPageMetadata({ path: "/privacidade", title: "Política de Privacidade", description: "Política de Privacidade do CryptoScanner: dados tratados, finalidades e bases legais, compartilhamento, retenção e seus direitos pela LGPD." });
 
 export default async function PrivacyPage() {
   await connection();

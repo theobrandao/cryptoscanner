@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { requirePrisma } from "@/database/client";
-import { ok, withApi } from "@/lib/api";
+import { okPrivate, withApi } from "@/lib/api";
 import { requireCoreUser } from "@/services/subscription-service";
 
 /** Análises de imagem salvas do usuário. */
@@ -14,5 +14,5 @@ export const GET = withApi(async (req) => {
     take: 50,
     select: { id: true, symbol: true, timeframe: true, provider: true, model: true, result: true, createdAt: true },
   });
-  return ok({ items });
+  return okPrivate({ items });
 });

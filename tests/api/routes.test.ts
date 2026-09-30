@@ -58,15 +58,30 @@ describe("rotas da API", () => {
   });
   afterEach(() => setProvidersForTests(null));
 
-  it("GET /api/health informa provedores, banco e IA", async () => {
+  it("GET /api/health: público mínimo; detalhe só com x-health-secret", async () => {
     const { GET } = await import("@/app/api/health/route");
-    const body = await json(await GET(new Request("http://localhost/api/health"), { params: Promise.resolve({}) }));
-    expect(body.ok).toBe(true);
-    const data = body.data as { database: { configured: boolean }; providers: Array<{ provider: string; ok: boolean }>; llm: { configured: boolean } };
-    expect(data.database.configured).toBe(false);
-    expect(data.providers.find((p) => p.provider === "binance")?.ok).toBe(false);
-    expect(data.providers.find((p) => p.provider === "kraken")?.ok).toBe(true);
-    expect(data.llm.configured).toBe(false);
+    const pub = await GET(new Request("http://localhost/api/health"), { params: Promise.resolve({}) });
+    expect(pub.headers.get("cache-control")).toBe("no-store");
+    const p = (await json(pub)).data as Record<string, unknown>;
+    expect(Object.keys(p).sort()).toEqual(["commit", "database", "llm", "status"]);
+    expect(p.database).toEqual({ ok: false });
+    expect(p.providers).toBeUndefined();
+    process.env.CRON_SECRET = "segredo-do-monitoramento-123";
+    resetEnvCache();
+    try {
+      const wrong = (await json(await GET(new Request("http://localhost/api/health", { headers: { "x-health-secret": "errado" } }), { params: Promise.resolve({}) }))).data as Record<string, unknown>;
+      expect(wrong.providers).toBeUndefined();
+      const body = await json(await GET(new Request("http://localhost/api/health", { headers: { "x-health-secret": "segredo-do-monitoramento-123" } }), { params: Promise.resolve({}) }));
+      expect(body.ok).toBe(true);
+      const data = body.data as { database: { configured: boolean }; providers: Array<{ provider: string; ok: boolean }>; llm: { configured: boolean } };
+      expect(data.database.configured).toBe(false);
+      expect(data.providers.find((p) => p.provider === "binance")?.ok).toBe(false);
+      expect(data.providers.find((p) => p.provider === "kraken")?.ok).toBe(true);
+      expect(data.llm.configured).toBe(false);
+    } finally {
+      delete process.env.CRON_SECRET;
+      resetEnvCache();
+    }
   });
 
   it("GET /api/market/assets devolve universo e catálogo", async () => {
@@ -168,6 +183,20 @@ describe("rotas da API", () => {
     }
   });
 
+  it("POST /api/auth/register e /login validam com os schemas em português (lib/validation/auth.ts)", async () => {
+    const { AUTH_MESSAGES } = await import("@/lib/validation/auth-messages");
+    const register = await import("@/app/api/auth/register/route");
+    const r = await register.POST(new Request("http://localhost/api/auth/register", { method: "POST", body: JSON.stringify({ name: "A", email: "x@example.com", password: "abcdefgh", acceptTerms: false }) }), { params: Promise.resolve({}) });
+    expect(r.status).toBe(400);
+    const rb = JSON.stringify(await r.json());
+    for (const m of [AUTH_MESSAGES.nameShort, AUTH_MESSAGES.passwordLettersNumbers, AUTH_MESSAGES.termsRequired]) expect(rb).toContain(m);
+    const login = await import("@/app/api/auth/login/route");
+    const l = await login.POST(new Request("http://localhost/api/auth/login", { method: "POST", headers: { "x-forwarded-for": "10.9.8.7" }, body: JSON.stringify({ email: "nao-e-email", password: "" }) }), { params: Promise.resolve({}) });
+    expect(l.status).toBe(400);
+    const lb = JSON.stringify(await l.json());
+    for (const m of [AUTH_MESSAGES.emailInvalid, AUTH_MESSAGES.passwordRequired]) expect(lb).toContain(m);
+  });
+
   it("rotas autenticadas respondem 401 sem sessão", async () => {
     const { GET } = await import("@/app/api/watchlist/route");
     const res = await GET(new Request("http://localhost/api/watchlist"), { params: Promise.resolve({}) });
@@ -235,5 +264,189 @@ describe("sessão JWT", () => {
     expect(await verifySessionToken(token)).toMatchObject(user);
     expect(typeof (await verifySessionToken(token))?.iat).toBe("number");
     expect(await verifySessionToken(token.slice(0, -2) + "xx")).toBeNull();
+  });
+});
+
+// ------------------------------------------------------------------ acesso por plano com banco simulado (Frente 5)
+describe("acesso: requireCoreUser/requireEntitlement com assinatura real", () => {
+  const DAY = 86_400_000;
+  type SubRow = { id: string; plan: string; status: string; trialEndsAt: Date | null; currentPeriodEnd: Date | null; cancelAtPeriodEnd: boolean; provider: string | null };
+  const sub = (s: Partial<SubRow>): SubRow => ({ id: "s1", plan: "PRO", status: "ACTIVE", trialEndsAt: null, currentPeriodEnd: new Date(Date.now() + 10 * DAY), cancelAtPeriodEnd: false, provider: "kiwify", ...s });
+  const writes: string[] = [];
+
+  function fakeDb(row: { role?: "USER" | "ADMIN"; plan?: "FREE" | "PRO" | "PLATINUM"; blockedAt?: Date | null; subscription: SubRow | null; agent?: Record<string, unknown> }) {
+    const user = { id: "u-acesso", email: "acesso@example.com", name: "Acesso", role: row.role ?? "USER", plan: row.plan ?? "PRO", passwordChangedAt: null, blockedAt: row.blockedAt ?? null, subscription: row.subscription };
+    process.env.DATABASE_URL = "postgresql://teste/nao-conecta";
+    resetEnvCache();
+    globalThis.__cryptoscannerPrisma = {
+      user: {
+        findUnique: async () => user,
+        update: async ({ data }: { data: Record<string, unknown> }) => {
+          writes.push(`user:${JSON.stringify(data)}`);
+          return { ...user, ...data };
+        },
+      },
+      subscription: {
+        update: async ({ data }: { data: Record<string, unknown> }) => {
+          writes.push(`subscription:${JSON.stringify(data)}`);
+          return { ...row.subscription, ...data };
+        },
+        upsert: async () => row.subscription,
+      },
+      monitor: { findFirst: async () => null },
+      agent: {
+        findFirst: async () => row.agent ?? null,
+        update: async ({ data }: { data: Record<string, unknown> }) => {
+          writes.push(`agent:${JSON.stringify(data)}`);
+          return { ...row.agent, ...data };
+        },
+      },
+    } as unknown as NonNullable<typeof globalThis.__cryptoscannerPrisma>;
+    return user;
+  }
+
+  async function reqFor(url = "http://localhost/api/x", init: RequestInit = {}) {
+    const token = await createSessionToken({ id: "u-acesso", email: "acesso@example.com", name: "Acesso", plan: "PRO", role: "USER" });
+    return new Request(url, { ...init, headers: { ...(init.headers as Record<string, string> | undefined), cookie: `${SESSION_COOKIE}=${token}` } });
+  }
+
+  async function errOf(p: Promise<unknown>): Promise<{ status: number; code: string }> {
+    try {
+      await p;
+    } catch (err) {
+      return err as { status: number; code: string };
+    }
+    throw new Error("esperava erro");
+  }
+
+  beforeEach(() => writes.splice(0));
+  afterEach(() => {
+    globalThis.__cryptoscannerPrisma = undefined;
+    process.env.DATABASE_URL = "";
+    resetEnvCache();
+  });
+
+  it("teste de 3 dias expirado → 402 subscription_required (e o status é gravado na transição)", async () => {
+    fakeDb({ subscription: sub({ status: "TRIALING", trialEndsAt: new Date(Date.now() - DAY), currentPeriodEnd: null }) });
+    const { requireCoreUser } = await import("@/services/subscription-service");
+    expect(await errOf(requireCoreUser(await reqFor()))).toMatchObject({ status: 402, code: "subscription_required" });
+    expect(writes).toContain('subscription:{"status":"EXPIRED"}');
+  });
+
+  it("teste ativo → acesso TRIAL com 4H/1D/1W, sem 1H", async () => {
+    fakeDb({ subscription: sub({ status: "TRIALING", trialEndsAt: new Date(Date.now() + DAY), currentPeriodEnd: null }) });
+    const { requireCoreUser } = await import("@/services/subscription-service");
+    const u = await requireCoreUser(await reqFor());
+    expect(u.access.tier).toBe("TRIAL");
+    expect(u.access.entitlements.timeframes).toEqual(["4h", "1d", "1w"]);
+    expect(u.plan).toBe("PRO");
+  });
+
+  it("PAST_DUE dentro da carência mantém o PRO; fora da carência → 402", async () => {
+    fakeDb({ subscription: sub({ status: "PAST_DUE", currentPeriodEnd: new Date(Date.now() - DAY) }) });
+    const { requireCoreUser, requireEntitlement } = await import("@/services/subscription-service");
+    const u = await requireCoreUser(await reqFor());
+    expect(u.access.tier).toBe("PRO");
+    expect(await errOf(requireEntitlement(u, "elite"))).toMatchObject({ status: 402, code: "elite_required" });
+    fakeDb({ subscription: sub({ status: "PAST_DUE", currentPeriodEnd: new Date(Date.now() - 10 * DAY) }) });
+    expect(await errOf(requireCoreUser(await reqFor()))).toMatchObject({ status: 402, code: "subscription_required" });
+  });
+
+  it("conta bloqueada → 403 account_blocked, mesmo com assinatura ativa", async () => {
+    fakeDb({ blockedAt: new Date(), subscription: sub({ plan: "ELITE" }) });
+    const { requireCoreUser } = await import("@/services/subscription-service");
+    expect(await errOf(requireCoreUser(await reqFor()))).toMatchObject({ status: 403, code: "account_blocked" });
+  });
+
+  it("ELITE ativo recebe 1H; plano legado é sincronizado para a chave interna", async () => {
+    fakeDb({ plan: "PRO", subscription: sub({ plan: "ELITE" }) });
+    const { requireCoreUser } = await import("@/services/subscription-service");
+    const u = await requireCoreUser(await reqFor());
+    expect(u.access.tier).toBe("ELITE");
+    expect(u.access.entitlements.timeframes).toContain("1h");
+    expect(u.plan).toBe("PLATINUM");
+    expect(writes).toContain('user:{"plan":"PLATINUM"}');
+  });
+
+  it("PRO pede 1H: scanner, monitor e analista respondem 403 plan_required (mesma regra)", async () => {
+    fakeDb({ subscription: sub({ plan: "PRO" }) });
+    const table = await import("@/app/api/scanner/table/route");
+    const t = await table.GET(await reqFor("http://localhost/api/scanner/table?timeframe=1h"), { params: Promise.resolve({}) });
+    expect(t.status).toBe(403);
+    expect((await json(t)).error?.code).toBe("plan_required");
+    const monitors = await import("@/app/api/monitors/route");
+    const m = await monitors.POST(await reqFor("http://localhost/api/monitors", { method: "POST", body: JSON.stringify({ symbol: "BTC", timeframe: "1h" }) }), { params: Promise.resolve({}) });
+    expect(m.status).toBe(403);
+    expect((await json(m)).error?.code).toBe("plan_required");
+    const analyst = await import("@/app/api/markets/[symbol]/analyst/route");
+    const a = await analyst.POST(await reqFor("http://localhost/api/markets/BTC/analyst", { method: "POST", body: JSON.stringify({ tf: "30m", llm: false }) }), { params: Promise.resolve({ symbol: "BTC" }) });
+    expect(a.status).toBe(403);
+    expect((await json(a)).error?.message).toBe("Timeframe 30M disponível apenas no plano ELITE.");
+  });
+
+  it("PRO muda agente para 1H ou reativa agente/Sentinela em 1H → 403 plan_required, sem gravar", async () => {
+    const patch = (body: unknown) => ({ method: "PATCH", body: JSON.stringify(body) });
+    fakeDb({ subscription: sub({ plan: "PRO" }), agent: { id: "ag1", userId: "u-acesso", kind: "agent", timeframe: "4h", status: "PAUSED" } });
+    const agents = await import("@/app/api/agents/[id]/route");
+    const a = await agents.PATCH(await reqFor("http://localhost/api/agents/ag1", patch({ timeframe: "1h" })), { params: Promise.resolve({ id: "ag1" }) });
+    expect(a.status).toBe(403);
+    expect((await json(a)).error?.code).toBe("plan_required");
+    const ok4h = await agents.PATCH(await reqFor("http://localhost/api/agents/ag1", patch({ timeframe: "1d" })), { params: Promise.resolve({ id: "ag1" }) });
+    expect(ok4h.status).toBe(200);
+    fakeDb({ subscription: sub({ plan: "PRO" }), agent: { id: "ag2", userId: "u-acesso", kind: "agent", timeframe: "1h", status: "PAUSED" } });
+    const re = await agents.PATCH(await reqFor("http://localhost/api/agents/ag2", patch({ status: "ACTIVE" })), { params: Promise.resolve({ id: "ag2" }) });
+    expect(re.status).toBe(403);
+    const pause = await agents.PATCH(await reqFor("http://localhost/api/agents/ag2", patch({ status: "PAUSED" })), { params: Promise.resolve({ id: "ag2" }) });
+    expect(pause.status).toBe(200);
+    fakeDb({ subscription: sub({ plan: "PRO" }), agent: { id: "se1", userId: "u-acesso", kind: "sentinel", timeframe: "15m", status: "PAUSED" } });
+    const sentinels = await import("@/app/api/sentinels/[id]/route");
+    const s = await sentinels.PATCH(await reqFor("http://localhost/api/sentinels/se1", patch({ status: "ACTIVE" })), { params: Promise.resolve({ id: "se1" }) });
+    expect(s.status).toBe(403);
+    expect((await json(s)).error?.message).toBe("Timeframe 15M disponível apenas no plano ELITE.");
+    expect(writes.filter((w) => w.startsWith("agent:"))).toEqual(['agent:{"timeframe":"1d"}', 'agent:{"status":"PAUSED"}']);
+  });
+
+  it("ELITE muda agente para 1H", async () => {
+    fakeDb({ subscription: sub({ plan: "ELITE" }), agent: { id: "ag1", userId: "u-acesso", kind: "agent", timeframe: "4h", status: "ACTIVE" } });
+    const agents = await import("@/app/api/agents/[id]/route");
+    const a = await agents.PATCH(await reqFor("http://localhost/api/agents/ag1", { method: "PATCH", body: JSON.stringify({ timeframe: "1h" }) }), { params: Promise.resolve({ id: "ag1" }) });
+    expect(a.status).toBe(200);
+  });
+
+  it("GET /api/admin/overview usa requireAdmin (usuário comum → 403)", async () => {
+    fakeDb({ subscription: sub({}) });
+    const { GET } = await import("@/app/api/admin/overview/route");
+    const res = await GET(await reqFor("http://localhost/api/admin/overview"), { params: Promise.resolve({}) });
+    expect(res.status).toBe(403);
+    expect((await json(res)).error?.code).toBe("forbidden");
+  });
+});
+
+describe("login: limite por fluxo e Redis indisponível", () => {
+  afterEach(async () => {
+    const { _setControlStoreForTests } = await import("@/lib/rate-limit");
+    _setControlStoreForTests(undefined);
+  });
+
+  it("sem armazenamento compartilhado (produção sem Redis) responde 503 com texto fixo", async () => {
+    const { _setControlStoreForTests } = await import("@/lib/rate-limit");
+    _setControlStoreForTests(null);
+    const { POST } = await import("@/app/api/auth/login/route");
+    const res = await POST(new Request("http://localhost/api/auth/login", { method: "POST", body: JSON.stringify({ email: "a@example.com", password: "x" }) }), { params: Promise.resolve({}) });
+    expect(res.status).toBe(503);
+    expect((await json(res)).error).toMatchObject({ code: "service_unavailable", message: "Serviço temporariamente indisponível. Tente em instantes." });
+  });
+
+  it("acima do limite por IP: 429 com Retry-After e X-RateLimit-Remaining", async () => {
+    const { _setControlStoreForTests, createMemoryControlStore, flowConfig } = await import("@/lib/rate-limit");
+    _setControlStoreForTests(createMemoryControlStore());
+    const { POST } = await import("@/app/api/auth/login/route");
+    const call = () => POST(new Request("http://localhost/api/auth/login", { method: "POST", headers: { "x-real-ip": "192.0.2.44" }, body: JSON.stringify({ email: "a@example.com", password: "x" }) }), { params: Promise.resolve({}) });
+    for (let i = 0; i < flowConfig("login_ip").limit; i++) expect((await call()).status).not.toBe(429);
+    const res = await call();
+    expect(res.status).toBe(429);
+    expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(res.headers.get("x-ratelimit-remaining")).toBe("0");
+    expect((await json(res)).error?.code).toBe("rate_limited");
   });
 });

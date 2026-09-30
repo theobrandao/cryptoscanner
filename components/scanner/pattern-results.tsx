@@ -16,7 +16,7 @@ import { Badge, DirectionBadge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, Progress } from "@/components/ui/misc";
 import { Hint } from "@/components/ui/tooltip";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import {
   formatCompact,
   formatDateTime,
@@ -165,7 +165,7 @@ export function PatternResults({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">
+                    <span className={`text-muted-foreground ${GLYPH_FONT_CLASS}`}>
                       {asset?.glyph}
                     </span>
                     <span className="text-lg font-bold">{row.symbol}</span>
@@ -320,12 +320,16 @@ export function VolumeAlerts({
   assets,
   checkedAt,
   loading,
+  timeframes,
 }: {
   alerts: VolumeAnomaly[] | null;
   assets: number;
   checkedAt?: number;
   loading?: boolean;
+  /** timeframes monitorados (os do plano); vazio enquanto a sessão carrega */
+  timeframes: readonly Timeframe[];
 }) {
+  const tfText = timeframes.length ? timeframes.map((tf) => TIMEFRAME_LABEL[tf]).join(" e ") : "4H";
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -335,7 +339,7 @@ export function VolumeAlerts({
             loading ? "bg-warning live-dot" : "bg-success live-dot",
           )}
         />
-        Monitorando volume em tempo real — candles de 30M e 1H em {assets}{" "}
+        Monitorando volume em tempo real — candles de {tfText} em {assets}{" "}
         ativos; gatilho: aumento de volume ≥ 100% sobre a média das 20 barras
         anteriores.
         {checkedAt ? (
@@ -355,7 +359,7 @@ export function VolumeAlerts({
             />
           }
           title="Nenhum volume de candle anômalo detectado"
-          description={`Nenhum dos ${assets} ativos apresentou aumento ≥ 100% sobre a média nos últimos candles de 30M e 1H.`}
+          description={`Nenhum dos ${assets} ativos apresentou aumento ≥ 100% sobre a média nos últimos candles de ${tfText}.`}
         />
       ) : (
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -366,7 +370,7 @@ export function VolumeAlerts({
                 <CardContent className="flex items-center justify-between gap-3 p-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">
+                      <span className={`text-muted-foreground ${GLYPH_FONT_CLASS}`}>
                         {asset?.glyph}
                       </span>
                       <span className="font-bold">{a.symbol}</span>

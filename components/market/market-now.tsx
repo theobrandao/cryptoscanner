@@ -6,7 +6,7 @@ import useSWR from "swr";
 import { ExternalLink } from "lucide-react";
 import { StatTile } from "@/components/ui/showcase";
 import { useTickers } from "@/hooks/use-tickers";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { formatCompact, formatPct, formatPrice, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -91,7 +91,7 @@ export function MoversCard({ limit = 8 }: { limit?: number }) {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={m.image} alt="" width={22} height={22} className="h-[22px] w-[22px] shrink-0 rounded-full" loading="lazy" />
                   ) : (
-                    <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full bg-muted text-[11px]">{a?.glyph}</span>
+                    <span className={`grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full bg-muted text-[11px] ${GLYPH_FONT_CLASS}`}>{a?.glyph}</span>
                   )}
                   <span className="min-w-0">
                     <span className="block font-semibold leading-tight">{t.symbol}</span>

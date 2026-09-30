@@ -27,8 +27,9 @@ import { cn } from "@/lib/utils";
 const MAX = 5 * 1024 * 1024;
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+/** Formato público de /api/health: `llm` pode faltar (ex.: resposta de erro ou versão anterior). */
 interface HealthInfo {
-  llm: { configured: boolean; provider: string };
+  llm?: { configured: boolean; provider?: string } | null;
 }
 
 /**
@@ -40,6 +41,8 @@ export function ChartAnalysis() {
   const { user, plan } = useSession();
   const router = useRouter();
   const { data: health } = useSWR<HealthInfo>("/api/health");
+  /** IA sabidamente desligada; sem a informação, trata como ligada (o servidor responde se não estiver) */
+  const llmOff = health?.llm ? !health.llm.configured : false;
   const { toast } = useToast();
   const [file, setFile] = React.useState<File | null>(null);
   const [preview, setPreview] = React.useState<string | null>(null);
@@ -148,7 +151,7 @@ export function ChartAnalysis() {
             Crie uma conta gratuita para analisar até {3} gráficos por dia.
           </Alert>
         ) : null}
-        {user && health && !health.llm.configured ? (
+        {user && llmOff ? (
           <Alert variant="info" title="Leitura técnica com dados reais">
             A leitura é feita sobre os dados reais do ativo e do timeframe
             informados (preço, padrões, tendência e níveis). A imagem enviada
@@ -220,7 +223,7 @@ export function ChartAnalysis() {
               <div className="flex flex-col gap-1">
                 <Label>
                   Ativo{" "}
-                  {health && !health.llm.configured
+                  {llmOff
                     ? "(obrigatório)"
                     : "(opcional)"}
                 </Label>
@@ -262,12 +265,12 @@ export function ChartAnalysis() {
                 disabled={
                   !file ||
                   !user ||
-                  (health ? !health.llm.configured && !symbol : false)
+                  (llmOff && !symbol)
                 }
                 loading={loading}
               >
                 <Upload className="h-4 w-4" />{" "}
-                {health && !health.llm.configured
+                {llmOff
                   ? "Analisar (dados reais)"
                   : "Analisar com IA"}
               </Button>

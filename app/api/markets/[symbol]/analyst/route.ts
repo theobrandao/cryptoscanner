@@ -1,11 +1,12 @@
 import { connection } from "next/server";
 import { z } from "zod";
 import { symbolSchema } from "@/agents/schemas";
-import { ApiError, enforceRateLimit, ok, parseBody, requireUser, withApi } from "@/lib/api";
+import { enforceRateLimit, okPrivate, parseBody, requireUser, withApi } from "@/lib/api";
+import { isLlmConfigured } from "@/lib/env";
 import { parseTimeframe } from "@/lib/timeframes";
-import { getCache } from "@/lib/cache";
 import { INSTRUMENTS, VENUES } from "@/lib/venues";
-import { requireEntitlement } from "@/services/subscription-service";
+import { consumeAiQuota } from "@/services/ai-quota-service";
+import { requireEntitlement, requireTimeframe } from "@/services/subscription-service";
 import { getMarketContext } from "@/services/market-context-service";
 import { analyzeContext } from "@/services/ai-analyst-service";
 
@@ -31,12 +32,19 @@ export const POST = withApi(async (req, ctx) => {
   const sym = symbolSchema.parse((symbol ?? "").toUpperCase().replace(/USDT$/, ""));
   const body = await parseBody(req, bodySchema);
   const tf = parseTimeframe(body.tf);
-  if (!access.entitlements.timeframes.includes(tf)) throw new ApiError(402, `Timeframe ${tf} não incluído no seu plano`, "timeframe_locked");
-  if (body.llm) await enforceRateLimit(req, "llm", `u:${user.id}`);
-  // cota diária do plano (TRIAL 20, PRO 100, ELITE 500)
-  const day = new Date().toISOString().slice(0, 10);
-  const used = await getCache().incr(`ai:quota:${user.id}:${day}`, 26 * 3600);
-  if (used > access.entitlements.aiQueriesPerDay) throw new ApiError(429, `Limite diário de ${access.entitlements.aiQueriesPerDay} consultas ao AI Analyst atingido no seu plano`, "ai_quota");
+  requireTimeframe(access, tf, "analyst");
+  const useLlm = body.llm && isLlmConfigured();
+  if (useLlm) await enforceRateLimit(req, "llm", `u:${user.id}`);
   const c = await getMarketContext(sym, tf, { exchange: body.exchange, instrument: body.instrument });
-  return ok(await analyzeContext(c, { question: body.question, useLlm: body.llm }));
+  // cota diária do plano: debitada só quando o modelo é chamado; estornada se ele falhar ou não responder
+  const ticket = useLlm ? await consumeAiQuota(user.id, access.tier) : null;
+  let reply: Awaited<ReturnType<typeof analyzeContext>>;
+  try {
+    reply = await analyzeContext(c, { question: body.question, useLlm });
+  } catch (err) {
+    await ticket?.refund();
+    throw err;
+  }
+  if (ticket && reply.guardrail.llm !== "ok" && reply.guardrail.llm !== "rejected") await ticket.refund();
+  return okPrivate(reply);
 });

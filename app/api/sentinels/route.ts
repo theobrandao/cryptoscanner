@@ -2,12 +2,15 @@ import { connection } from "next/server";
 import { requirePrisma } from "@/database/client";
 import { ApiError, ok, parseBody, withApi } from "@/lib/api";
 import { ASSETS } from "@/lib/assets";
-import { PLANS, planAllowsTimeframe } from "@/lib/plans";
+import { PLANS } from "@/lib/plans";
 import {
   SENTINEL_STRATEGIES,
   sentinelBodySchema,
 } from "@/lib/validation/sentinel";
-import { requireCoreUser } from "@/services/subscription-service";
+import { requireCoreUser, requireTimeframe } from "@/services/subscription-service";
+
+/** Janela da contagem de registros exibida na lista. */
+const LOG_COUNT_WINDOW_MS = 7 * 86_400_000;
 
 /** Sentinelas do usuário (agentes do tipo sentinel) com o último relatório de cada um. */
 export const GET = withApi(async (req) => {
@@ -18,7 +21,8 @@ export const GET = withApi(async (req) => {
     where: { userId: user.id, kind: "sentinel" },
     orderBy: { createdAt: "desc" },
     include: {
-      _count: { select: { logs: true } },
+      // só os últimos 7 dias (usa o índice agentId+createdAt; o histórico inteiro não é varrido a cada abertura)
+      _count: { select: { logs: { where: { createdAt: { gte: new Date(Date.now() - LOG_COUNT_WINDOW_MS) } } } } },
       logs: {
         where: { level: "signal" },
         orderBy: { createdAt: "desc" },
@@ -35,12 +39,7 @@ export const POST = withApi(async (req) => {
   const user = await requireCoreUser(req);
   const body = await parseBody(req, sentinelBodySchema);
   const plan = PLANS[user.plan];
-  if (!planAllowsTimeframe(user.plan, body.timeframe))
-    throw new ApiError(
-      403,
-      `Timeframe ${body.timeframe.toUpperCase()} disponível apenas no plano ELITE`,
-      "plan_required",
-    );
+  requireTimeframe(user.access, body.timeframe, "sentinels");
   if (body.notification !== "log" && !plan.telegramAlerts)
     throw new ApiError(
       403,

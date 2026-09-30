@@ -9,7 +9,7 @@ import { logAccess } from "@/services/access-log-service";
 /** Define a nova senha com um token válido (60 min, uso único). Invalida os demais tokens do usuário. */
 export const POST = withApi(async (req) => {
   await connection();
-  await enforceRateLimit(req, "auth");
+  await enforceRateLimit(req, "password_reset");
   const body = await parseBody(req, z.object({ token: z.string().min(20).max(200), password: passwordPolicy }));
   const prisma = requirePrisma();
   const tokenHash = createHash("sha256").update(body.token).digest("hex");

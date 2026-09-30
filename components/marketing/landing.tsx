@@ -9,6 +9,8 @@ import { Chip, Eyebrow, LineChart, PillGroup, SectionHeading, StatTile, TickerMa
 import { fmtR, ValidatedModels } from "@/components/marketing/validated-models";
 import { billingNote, PLAN_FEATURES, type BillingProvider } from "@/lib/plans-copy";
 import { postJson } from "@/lib/client-api";
+import { trackClient } from "@/lib/analytics-client";
+import { useSession } from "@/hooks/use-session";
 import { MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 import { captureAffiliateParams, withAffiliateParams } from "@/lib/affiliate-params";
@@ -52,6 +54,51 @@ const faq = (trial: number) => [
   ["Como cancelo?", "A qualquer momento, sem multa. O acesso segue até o fim do período pago. Na primeira contratação, o pedido em até 7 dias garante reembolso integral."],
   ["Funciona no celular?", "Sim. O site é responsivo e os avisos chegam por push no navegador e pelo Telegram."],
 ] as const;
+
+/** Perguntas frequentes com todas as respostas no HTML (details/summary); a primeira começa aberta. */
+export function FaqList({ items, compact }: { items: ReadonlyArray<readonly [string, string]>; compact?: boolean }) {
+  return (
+    <div className="mt-6 divide-y divide-border rounded-2xl border border-border bg-card">
+      {items.map(([q, a], i) => (
+        <details key={q} open={i === 0} className="group">
+          <summary className={cn("flex w-full cursor-pointer list-none items-center justify-between gap-3 text-left text-[14px] font-semibold [&::-webkit-details-marker]:hidden", compact ? "min-h-[52px] px-4 py-3 sm:px-5" : "px-5 py-4")}>
+            <span className="min-w-0">{q}</span>
+            <span className="shrink-0 text-muted-foreground" aria-hidden>
+              <span className="group-open:hidden">+</span>
+              <span className="hidden group-open:inline">−</span>
+            </span>
+          </summary>
+          <p className={cn("pb-4 text-[13.5px] leading-relaxed text-muted-foreground", compact ? "px-4 sm:px-5" : "px-5")}>{a}</p>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+export type CtaOrigin = "hero" | "cartao_ferramenta" | "rodape" | "fixo_celular" | "final";
+
+/** Registra o clique em chamada para o teste, com a origem (best-effort). */
+export const trackCta = (origin: CtaOrigin) => () => trackClient("cta_click", { origin });
+
+/** Registra o clique em qualquer link dentro do bloco (cartões de ferramenta). */
+export const trackCtaInside = (origin: CtaOrigin) => (e: React.MouseEvent) => {
+  if ((e.target as Element | null)?.closest?.("a")) trackClient("cta_click", { origin });
+};
+
+/** CTA fixo no rodapé do celular. `above` sobe o botão acima da barra de navegação do app (h-14). */
+export function StickyTrialCta({ trial, href, visible = true, above, testId }: { trial: number; href: string; visible?: boolean; above?: boolean; testId: string }) {
+  return (
+    <div
+      className={cn("fixed inset-x-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur transition-transform lg:hidden", above ? "bottom-14" : "bottom-0", !visible && "pointer-events-none translate-y-[200%]")}
+      style={above ? undefined : { paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      aria-hidden={visible ? undefined : true}
+    >
+      <Link href={href} data-testid={testId} tabIndex={visible ? undefined : -1} onClick={trackCta("fixo_celular")} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground">
+        Testar o PRO grátis por {trial} dias <ArrowRight className="h-4 w-4" />
+      </Link>
+    </div>
+  );
+}
 
 interface SimResult {
   result: { totalInvested: number; finalValue: number; profitPct: number; maxDrawdownPct: number; startDate: number; endDate: number; curve: Array<{ time: number; invested: number; value: number }> };
@@ -145,6 +192,7 @@ export function Simulator() {
 
 /** Cartões PRO/ELITE: PRO com teste grátis; compra direta pelo link da Kiwify quando o checkout está liberado. */
 export function PlanCards({ data, trial }: { data: Prices | undefined; trial: number }) {
+  const { user, loading } = useSession();
   return (
     <div className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-2">
       {(["PRO", "ELITE"] as const).map((p) => {
@@ -183,6 +231,7 @@ export function PlanCards({ data, trial }: { data: Prices | undefined; trial: nu
                   Criar conta e assinar o ELITE
                 </Link>
               ) : null}
+              {buy && !user && !loading ? <p className="text-center text-[12px] text-muted-foreground">Use no checkout o mesmo e-mail do cadastro.</p> : null}
             </div>
           </div>
         );
@@ -194,16 +243,27 @@ export function PlanCards({ data, trial }: { data: Prices | undefined; trial: nu
 export function Landing({ content }: { content: LandingData }) {
   React.useEffect(() => captureAffiliateParams(window.location.search), []);
   const { data } = useSWR<Prices>("/api/billing/prices", { revalidateOnFocus: false });
-  const [open, setOpen] = React.useState<number | null>(0);
   const trial = data?.trialDays ?? 3;
   const FAQ = faq(trial);
   const main = content.validated[0];
+  // CTA fixo do celular aparece depois que o botão do topo sai da tela
+  const heroRef = React.useRef<HTMLElement>(null);
+  const [pastHero, setPastHero] = React.useState(false);
+  React.useEffect(() => {
+    const el = heroRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e) setPastHero(!e.isIntersecting);
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   return (
-    <div className="flex w-full flex-col">
+    <div className="flex w-full flex-col pb-20 lg:pb-0">
       <TickerMarquee />
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-20 px-4 py-12 sm:py-16">
         {/* HERO */}
-        <section className="flex flex-col items-center text-center">
+        <section ref={heroRef} className="flex flex-col items-center text-center">
           <Eyebrow tone="warning">Modelo testado fora da amostra</Eyebrow>
           <h1 className="mt-5 max-w-4xl text-balance text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
             Cripto com ferramentas claras e <span className="text-gradient">sinais testados</span>
@@ -212,7 +272,7 @@ export function Landing({ content }: { content: LandingData }) {
             Scanner de padrões gráficos, agentes que avisam no celular, Sentinela 24h, gráficos, Fibonacci, simulador e aulas. Cada ferramenta faz uma coisa, e o modelo de sinais mostra o resultado medido em um período que não foi usado para criá-lo.
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-2.5">
-            <Link href="/registro?next=/" className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
+            <Link href="/registro?next=/" onClick={trackCta("hero")} className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
               Testar o PRO grátis por {trial} dias <ArrowRight className="h-4 w-4" />
             </Link>
             <a href="#modelo" className="inline-flex h-12 items-center gap-2.5 rounded-xl border border-border bg-card px-4 text-left hover:border-primary/50">
@@ -249,18 +309,16 @@ export function Landing({ content }: { content: LandingData }) {
         <MarketStrip />
 
         {/* FERRAMENTAS */}
-        <section id="ferramentas" className="scroll-mt-20" aria-labelledby="tools">
+        <section id="ferramentas" className="scroll-mt-20" aria-label="Ferramentas">
           <SectionHeading eyebrow="Ferramentas" title="Uma ferramenta para" accent="cada tarefa" subtitle="Organizadas pelo que você quer fazer. As análises profundas ficam separadas, no grupo Avançado." />
-          <h2 id="tools" className="sr-only">Ferramentas</h2>
-          <div className="mt-10">
-            <ToolsGrid tools={MAIN_TOOLS.filter((t) => t.href !== "/")} categories={TOOL_CATEGORIES} hrefFor={(t) => `/registro?next=${encodeURIComponent(t.href)}`} ctaFor={(t) => `Abrir ${t.name}`} />
+          <div className="mt-10" onClickCapture={trackCtaInside("cartao_ferramenta")}>
+            <ToolsGrid tools={MAIN_TOOLS.filter((t) => t.href !== "/")} categories={TOOL_CATEGORIES} hrefFor={(t) => `/registro?next=${encodeURIComponent(t.href)}`} ctaFor={() => "Testar grátis"} />
           </div>
         </section>
 
         {/* MERCADO + NOTÍCIAS */}
-        <section aria-labelledby="mercado">
+        <section aria-label="Mercado agora">
           <SectionHeading eyebrow="Ao vivo" title="O mercado" accent="agora" subtitle="Preços em tempo real dos ativos monitorados e as manchetes do dia, com fonte e horário." />
-          <h2 id="mercado" className="sr-only">Mercado agora</h2>
           <div className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
             <MoversCard />
             <NewsCard />
@@ -268,7 +326,7 @@ export function Landing({ content }: { content: LandingData }) {
         </section>
 
         {/* MODELO */}
-        <section id="modelo" className="scroll-mt-20" aria-labelledby="validado">
+        <section id="modelo" className="scroll-mt-20" aria-label="Modelo validado">
           <SectionHeading
             eyebrow="Modelo de sinais"
             tone="warning"
@@ -276,25 +334,22 @@ export function Landing({ content }: { content: LandingData }) {
             accent="fora da amostra"
             subtitle="Regras escolhidas em um período e medidas em outro, já descontando taxa e slippage, em 30 criptos. O setup de pullback que testamos junto não passou e por isso não é oferecido como estratégia."
           />
-          <h2 id="validado" className="sr-only">Modelo validado</h2>
           <div className="mt-8">
             <ValidatedModels models={content.validated} />
           </div>
         </section>
 
         {/* SIMULADOR */}
-        <section id="simulador" className="scroll-mt-20" aria-labelledby="sim">
+        <section id="simulador" className="scroll-mt-20" aria-label="Simulador de aportes">
           <SectionHeading eyebrow="Simulador" title="Quanto teria rendido" accent="aportar em cripto" subtitle="Escolha o ativo, a forma e o período. O cálculo usa os preços diários reais do período." />
-          <h2 id="sim" className="sr-only">Simulador de aportes</h2>
           <div className="mt-8">
             <Simulator />
           </div>
         </section>
 
         {/* JORNADA */}
-        <section aria-labelledby="jornada">
+        <section aria-label="Jornada">
           <SectionHeading eyebrow="Jornada" title="Aprenda antes de" accent="operar" subtitle={`${content.lessons.length} aulas curtas com teste e prática dentro do próprio app. O progresso fica salvo na sua conta.`} />
-          <h2 id="jornada" className="sr-only">Jornada</h2>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {LEVELS.map((lv) => {
               const list = content.lessons.filter((l) => l.level === lv.key);
@@ -317,28 +372,16 @@ export function Landing({ content }: { content: LandingData }) {
         </section>
 
         {/* PLANOS */}
-        <section id="planos" aria-labelledby="pricing" className="scroll-mt-20">
+        <section id="planos" aria-label="Planos" className="scroll-mt-20">
           <SectionHeading eyebrow="Planos" title="Teste o PRO" accent={`${trial} dias grátis`} subtitle="Sem cartão no teste. Depois, escolha o plano." />
-          <h2 id="pricing" className="sr-only">Planos</h2>
           <PlanCards data={data} trial={trial} />
           <p className="mx-auto mt-3 max-w-4xl text-center text-[12px] leading-relaxed text-muted-foreground">{billingNote(data?.provider ?? "mercadopago")}</p>
         </section>
 
         {/* FAQ */}
-        <section aria-labelledby="faq" className="mx-auto w-full max-w-3xl">
+        <section id="faq" aria-label="Perguntas frequentes" className="mx-auto w-full max-w-3xl scroll-mt-20">
           <SectionHeading eyebrow="Dúvidas" title="Perguntas" accent="frequentes" />
-          <h2 id="faq" className="sr-only">Perguntas frequentes</h2>
-          <div className="mt-6 divide-y divide-border rounded-2xl border border-border bg-card">
-            {FAQ.map(([q, a], i) => (
-              <div key={q}>
-                <button onClick={() => setOpen(open === i ? null : i)} className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-[14px] font-semibold" aria-expanded={open === i}>
-                  {q}
-                  <span className="text-muted-foreground">{open === i ? "−" : "+"}</span>
-                </button>
-                {open === i ? <p className="px-5 pb-4 text-[13.5px] leading-relaxed text-muted-foreground">{a}</p> : null}
-              </div>
-            ))}
-          </div>
+          <FaqList items={FAQ} />
         </section>
 
         <section className="card-glow rounded-3xl border border-border p-8 text-center sm:p-12">
@@ -352,8 +395,8 @@ export function Landing({ content }: { content: LandingData }) {
               <Chip key={c}>{c}</Chip>
             ))}
           </div>
-          <Link href="/registro?next=/" className="mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
-            Criar conta <ArrowRight className="h-4 w-4" />
+          <Link href="/registro?next=/" onClick={trackCta("final")} className="mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
+            Testar o PRO grátis por {trial} dias <ArrowRight className="h-4 w-4" />
           </Link>
           <p className="mt-3 text-[12px] text-muted-foreground">
             Já tem conta?{" "}
@@ -363,6 +406,9 @@ export function Landing({ content }: { content: LandingData }) {
           </p>
         </section>
       </div>
+
+      {/* CTA fixo no celular (acima da navegação inferior do app) */}
+      <StickyTrialCta trial={trial} href="/registro?next=/" visible={pastHero} above testId="landing-sticky-cta" />
     </div>
   );
 }

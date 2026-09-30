@@ -719,7 +719,7 @@ function AgentCard({
               iconClassName="h-3 w-3"
             />
           </span>
-          <span>Logs: {agent._count.logs}</span>
+          <span>Registros (últimos 7 dias): {agent._count.logs}</span>
           <span>
             Última verificação:{" "}
             {agent.lastRunAt ? timeAgo(agent.lastRunAt) : "—"}

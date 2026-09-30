@@ -43,6 +43,7 @@ import { ASSETS } from "@/lib/assets";
 import { ApiClientError, postJson } from "@/lib/client-api";
 import { formatDateTime } from "@/lib/format";
 import { PLANS } from "@/lib/plans";
+import { volumeTimeframesFor } from "@/lib/scanner/volume";
 import { TIMEFRAME_LABEL } from "@/lib/timeframes";
 import type { Timeframe } from "@/types/market";
 
@@ -72,7 +73,7 @@ interface FxPayload {
 }
 
 export function ScannerView() {
-  const { user } = useSession();
+  const { user, tier } = useSession();
   const plan = PLANS[user?.plan ?? "FREE"];
   const { toast } = useToast();
   const [filters, setFilters] = useLocalStorage<ScannerFilterState>(
@@ -83,6 +84,7 @@ export function ScannerView() {
     "cs-currency",
     "USD",
   );
+  const volumeTfs = React.useMemo(() => (tier ? volumeTimeframesFor(tier) : []), [tier]);
   const { data: fx } = useSWR<FxPayload>("/api/market/fx", {
     refreshInterval: 300_000,
   });
@@ -90,9 +92,11 @@ export function ScannerView() {
     data: volume,
     isLoading: volumeLoading,
     mutate: refreshVolume,
-  } = useSWR<VolumePayload>("/api/scanner/volume?timeframes=30m,1h", {
-    refreshInterval: 60_000,
-  });
+  } = useSWR<VolumePayload>(
+    // só pede os timeframes do plano (30M/1H no ELITE; 4H no teste e no PRO)
+    tier ? `/api/scanner/volume?timeframes=${volumeTfs.join(",")}` : null,
+    { refreshInterval: 60_000 },
+  );
 
   const [scan, setScan] = React.useState<ScanPayload | null>(null);
   const [scanning, setScanning] = React.useState(false);
@@ -341,6 +345,7 @@ export function ScannerView() {
               assets={volume?.assets ?? ASSETS.length}
               checkedAt={volume?.checkedAt}
               loading={volumeLoading}
+              timeframes={volumeTfs}
             />
           </TabsContent>
           <TabsContent value="historico">

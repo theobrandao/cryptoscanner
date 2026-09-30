@@ -1,10 +1,13 @@
 import { connection } from "next/server";
 import { z } from "zod";
 import { requirePrisma } from "@/database/client";
-import { ApiError, ok, parseBody, parseQuery, withApi } from "@/lib/api";
-import { PLANS, planAllowsTimeframe } from "@/lib/plans";
+import { ApiError, enforceRateLimit, ok, parseBody, parseQuery, withApi } from "@/lib/api";
+import { PLANS } from "@/lib/plans";
 import { agentBodySchema } from "@/lib/validation/agent";
-import { requireCoreUser } from "@/services/subscription-service";
+import { requireCoreUser, requireTimeframe } from "@/services/subscription-service";
+
+/** Janela da contagem de registros exibida na lista. */
+const LOG_COUNT_WINDOW_MS = 7 * 86_400_000;
 
 export const GET = withApi(async (req) => {
   await connection();
@@ -24,7 +27,8 @@ export const GET = withApi(async (req) => {
     },
     orderBy: { createdAt: "desc" },
     include: {
-      _count: { select: { logs: true } },
+      // só os últimos 7 dias (usa o índice agentId+createdAt; o histórico inteiro não é varrido a cada abertura)
+      _count: { select: { logs: { where: { createdAt: { gte: new Date(Date.now() - LOG_COUNT_WINDOW_MS) } } } } },
       logs: { orderBy: { createdAt: "desc" }, take: 1 },
     },
   });
@@ -43,14 +47,10 @@ export const GET = withApi(async (req) => {
 export const POST = withApi(async (req) => {
   await connection();
   const user = await requireCoreUser(req);
+  await enforceRateLimit(req, "agent_create", `u:${user.id}`);
   const body = await parseBody(req, agentBodySchema);
   const plan = PLANS[user.plan];
-  if (!planAllowsTimeframe(user.plan, body.timeframe))
-    throw new ApiError(
-      403,
-      `Timeframe ${body.timeframe.toUpperCase()} disponível apenas no plano ELITE`,
-      "plan_required",
-    );
+  requireTimeframe(user.access, body.timeframe, "agents");
   if (body.notification !== "log" && !plan.telegramAlerts)
     throw new ApiError(
       403,

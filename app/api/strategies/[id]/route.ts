@@ -2,7 +2,7 @@ import { connection } from "next/server";
 import { z } from "zod";
 import { enforceRateLimit, ok, parseBody, requireUser, withApi } from "@/lib/api";
 import { definitionSchema } from "@/lib/strategies/definition";
-import { requireEntitlement } from "@/services/subscription-service";
+import { requireEntitlement, requireStrategyTimeframes } from "@/services/subscription-service";
 import { deleteStrategy, getStrategy, updateStrategy } from "@/services/strategy-service";
 
 export const GET = withApi(async (req, ctx) => {
@@ -19,9 +19,10 @@ export const PATCH = withApi(async (req, ctx) => {
   await connection();
   await enforceRateLimit(req, "public");
   const user = await requireUser(req);
-  await requireEntitlement(user);
+  const access = await requireEntitlement(user);
   const { id } = await ctx.params;
   const body = await parseBody(req, patchSchema);
+  if (body.definition) requireStrategyTimeframes(access, body.definition, "strategies");
   return ok({ strategy: await updateStrategy(user.id, id as string, body) });
 });
 

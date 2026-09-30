@@ -77,8 +77,7 @@ export async function recordCronRun(job: string, startedAt: number, outcome: Cro
     await prisma.cronRun.create({
       data: { job, ok: outcome.ok, durationMs: Date.now() - startedAt, detail: (outcome.detail ?? undefined) as Prisma.InputJsonValue | undefined, startedAt: new Date(startedAt) },
     });
-    // retenção: 14 dias
-    await prisma.cronRun.deleteMany({ where: { startedAt: { lt: new Date(Date.now() - 14 * 24 * 3600_000) } } });
+    // retenção (14 dias) fica em services/retention-service.ts, fora do caminho de cada execução
     if (outcome.ok) return;
     const recent = await prisma.cronRun.findMany({ where: { job }, orderBy: { startedAt: "desc" }, take: FAILURE_ALERT_THRESHOLD + 1, select: { ok: true } });
     const failuresInRow = recent.findIndex((r) => r.ok);
@@ -90,4 +89,64 @@ export async function recordCronRun(job: string, startedAt: number, outcome: Cro
   } catch (err) {
     log.warn("registro de execução falhou", { job, error: (err as Error).message });
   }
+}
+
+/**
+ * Orçamento de tempo compartilhado pelas etapas de um ciclo agendado. Cada etapa pergunta quanto sobra e
+ * reserva a margem que as etapas seguintes (e o registro final) precisam; ao estourar, a etapa para de iniciar trabalho novo.
+ */
+export class Deadline {
+  readonly startedAt: number;
+  readonly endsAt: number;
+
+  constructor(totalMs: number, private readonly clock: () => number = Date.now) {
+    this.startedAt = clock();
+    this.endsAt = this.startedAt + totalMs;
+  }
+
+  /** ms restantes (nunca negativo). */
+  remaining(): number {
+    return Math.max(0, this.endsAt - this.clock());
+  }
+
+  elapsed(): number {
+    return this.clock() - this.startedAt;
+  }
+
+  /** true quando sobram menos de `reserveMs` (tempo guardado para o que vem depois). */
+  expired(reserveMs = 0): boolean {
+    return this.remaining() <= reserveMs;
+  }
+
+  /** Orçamento para uma etapa: o que sobra menos a reserva, limitado a `capMs`. */
+  budget(reserveMs = 0, capMs = Number.POSITIVE_INFINITY): number {
+    return Math.max(0, Math.min(capMs, this.remaining() - reserveMs));
+  }
+}
+
+/**
+ * Processa `items` com no máximo `concurrency` tarefas simultâneas. Antes de iniciar cada item consulta `shouldStop`
+ * (orçamento de tempo); itens não iniciados ficam para o próximo ciclo. Erro de um item não interrompe os demais.
+ */
+export async function runWithConcurrency<T, R>(items: readonly T[], concurrency: number, fn: (item: T) => Promise<R>, shouldStop: () => boolean = () => false): Promise<{ results: R[]; errors: Array<{ item: T; error: Error }>; skipped: number }> {
+  const results: R[] = [];
+  const errors: Array<{ item: T; error: Error }> = [];
+  let next = 0;
+  let stopped = false;
+  const worker = async () => {
+    while (!stopped && next < items.length) {
+      if (shouldStop()) {
+        stopped = true;
+        break;
+      }
+      const item = items[next++] as T;
+      try {
+        results.push(await fn(item));
+      } catch (err) {
+        errors.push({ item, error: err instanceof Error ? err : new Error(String(err)) });
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, items.length)) }, worker));
+  return { results, errors, skipped: items.length - next };
 }

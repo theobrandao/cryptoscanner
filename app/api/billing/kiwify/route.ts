@@ -11,7 +11,7 @@ const log = createLogger("kiwify-webhook");
 
 /**
  * Webhook da Kiwify (Apps › Webhooks). URL: {APP}/api/billing/kiwify — token do webhook em KIWIFY_WEBHOOK_TOKEN.
- * Idempotente pelo hash do corpo. 200 para eventos que não mudam acesso (evita reenvio infinito); 500 em falha transitória.
+ * Idempotente pelo hash do corpo; evento mais antigo que o último aplicado na assinatura é ignorado. 200 para eventos que não mudam acesso (evita reenvio infinito); 500 em falha transitória.
  */
 export const POST = withApi(async (req) => {
   await connection();
@@ -35,7 +35,7 @@ export const POST = withApi(async (req) => {
   const ev = parseKiwifyEvent(body);
   const eventKey = `kiwify:${createHash("sha256").update(raw).digest("hex").slice(0, 32)}`;
   // sem dados pessoais no registro do evento: tipo, ids e as chaves do corpo (para mapear o formato)
-  const summary = { kind: ev.kind, rawType: ev.rawType, orderId: ev.orderId, subscriptionId: ev.subscriptionId, productId: ev.productId, productName: ev.productName, planName: ev.planName, variant: sig.variant, keys: body && typeof body === "object" ? Object.keys(body as object).slice(0, 40) : [] };
+  const summary = { kind: ev.kind, rawType: ev.rawType, eventAt: ev.eventAt?.toISOString() ?? null, orderId: ev.orderId, subscriptionId: ev.subscriptionId, productId: ev.productId, productName: ev.productName, planName: ev.planName, variant: sig.variant, keys: body && typeof body === "object" ? Object.keys(body as object).slice(0, 40) : [] };
   try {
     await prisma.billingEvent.create({ data: { provider: "kiwify", eventKey, type: ev.rawType, resourceId: ev.subscriptionId ?? ev.orderId, payload: summary as Prisma.InputJsonValue } });
   } catch (err) {
@@ -75,7 +75,12 @@ export const POST = withApi(async (req) => {
       await done({ error: "sem e-mail do comprador" });
       return ok({ ignored: "missing_email" });
     }
-    const r = await recordKiwifyGrant({ externalId: ev.subscriptionId ?? ev.orderId!, email, plan, kind: ev.kind, orderId: ev.orderId, nextPayment: ev.nextPayment });
+    const r = await recordKiwifyGrant({ externalId: ev.subscriptionId ?? ev.orderId!, email, plan, kind: ev.kind, orderId: ev.orderId, nextPayment: ev.nextPayment, eventAt: ev.eventAt });
+    if (r.stale) {
+      // reentrega antiga (fora de ordem): registrada, sem mudar o acesso
+      await done({ error: "evento mais antigo que o último aplicado" });
+      return ok({ processed: true, stale: true, status: r.status });
+    }
     await done();
     return ok({ processed: true, applied: Boolean(r.userId), status: r.status });
   } catch (err) {

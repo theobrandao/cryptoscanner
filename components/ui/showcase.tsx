@@ -4,10 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { ToolIconView } from "@/components/layout/tool-icon";
+import { useSession } from "@/hooks/use-session";
 import { useTickers } from "@/hooks/use-tickers";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { formatPct, formatPrice } from "@/lib/format";
 import type { Tool } from "@/lib/tools";
+import { prefetchFor } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 /**
@@ -38,8 +40,10 @@ export function Chip({ children }: { children: React.ReactNode }) {
 
 /** Cartão de ferramenta: ícone em bloco colorido, selo, função em uma frase, marcadores e link. */
 export function ToolCard({ tool, href, cta = "Abrir", compact, showCategory }: { tool: Tool; href?: string; cta?: string; compact?: boolean; showCategory?: boolean }) {
+  const { user } = useSession();
+  const target = href ?? tool.href;
   return (
-    <Link href={href ?? tool.href} className="card-glow group flex h-full flex-col gap-3 rounded-2xl border border-border p-4 transition-colors hover:border-primary/50 sm:p-5">
+    <Link href={target} prefetch={prefetchFor(target, !!user)} className="card-glow group flex h-full flex-col gap-3 rounded-2xl border border-border p-4 transition-colors hover:border-primary/50 sm:p-5">
       <div className="flex items-start justify-between gap-2">
         <span className={cn("icon-tile grid shrink-0 place-items-center rounded-xl", compact ? "h-9 w-9" : "h-11 w-11")}>
           <ToolIconView icon={tool.icon} className={compact ? "h-4.5 w-4.5" : "h-5 w-5"} />
@@ -124,6 +128,7 @@ export function LineChart({ values, compare, height = 120, className, tone, area
 
 /** Faixa de cotações em movimento (pausa ao passar o mouse; parada com "reduzir movimento"). */
 export function TickerMarquee() {
+  const { user } = useSession();
   const { data } = useTickers();
   const list = (data?.tickers ?? []).filter((t) => ASSETS.some((a) => a.symbol === t.symbol)).slice(0, 20);
   // altura reservada desde o primeiro render: a faixa não empurra a página quando as cotações chegam
@@ -133,8 +138,8 @@ export function TickerMarquee() {
       {list.map((t) => {
         const a = ASSETS.find((x) => x.symbol === t.symbol);
         return (
-          <Link key={`${key}${t.symbol}`} href={`/graficos?symbol=${t.symbol}`} className="flex h-9 items-center gap-2 border-r border-border px-5 text-[12.5px]">
-            <span className="text-muted-foreground">{a?.glyph}</span>
+          <Link key={`${key}${t.symbol}`} href={`/graficos?symbol=${t.symbol}`} prefetch={prefetchFor("/graficos", !!user)} className="flex h-9 items-center gap-2 border-r border-border px-5 text-[12.5px]">
+            <span className={cn("text-muted-foreground", GLYPH_FONT_CLASS)}>{a?.glyph}</span>
             <span className="font-semibold">{t.symbol}</span>
             <span className="tabular">{formatPrice(t.price)}</span>
             <span className={cn("tabular", t.changePct24h >= 0 ? "text-success" : "text-danger")}>

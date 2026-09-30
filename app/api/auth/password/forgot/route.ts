@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/database/client";
 import { enforceRateLimit, ok, parseBody, withApi } from "@/lib/api";
+import { emailKey } from "@/lib/rate-limit";
 import { isEmailConfigured } from "@/services/email-service";
 import { sendPasswordResetLink } from "@/services/password-reset-service";
 
@@ -11,8 +12,9 @@ import { sendPasswordResetLink } from "@/services/password-reset-service";
  */
 export const POST = withApi(async (req) => {
   await connection();
-  await enforceRateLimit(req, "auth");
+  await enforceRateLimit(req, "password_forgot");
   const { email } = await parseBody(req, z.object({ email: z.string().trim().toLowerCase().email() }));
+  await enforceRateLimit(req, "password_forgot_email", emailKey(email));
   const prisma = getPrisma();
   const user = prisma ? await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, email: true } }) : null;
   if (prisma && user) await sendPasswordResetLink(user);

@@ -4,7 +4,10 @@ import { sentimentAgent, type SentimentOutput } from "@/agents/sentiment-agent";
 import { createStrategyContext, evaluateStrategies, type StrategySignal } from "@/agents/strategies";
 import { createDefaultTools } from "@/agents/tools";
 import { getPrisma, requirePrisma } from "@/database/client";
+import { allowsTimeframe } from "@/lib/access-policy";
 import { automationsAllowed } from "@/lib/admin-users";
+import { tierFor } from "@/lib/entitlements";
+import { runWithConcurrency } from "@/lib/cron";
 import { getEnv, isTelegramConfigured } from "@/lib/env";
 import { computeSnapshot } from "@/lib/indicators/snapshot";
 import { createLogger } from "@/lib/logger";
@@ -116,20 +119,56 @@ export async function runUserAgent(agent: Agent, options: { force?: boolean; now
   return summary;
 }
 
-/** Ciclo do worker: executa os agentes ativos de contas não bloqueadas e com acesso (assinatura ativa ou admin). */
-export async function runAllActiveAgents(): Promise<AgentRunSummary[]> {
+/** Agentes considerados por ciclo (os que rodaram há mais tempo primeiro). */
+export const MAX_AGENTS_PER_CYCLE = 2000;
+
+export interface RunAllOptions {
+  /** consultado antes de iniciar cada agente (orçamento de tempo do ciclo) */
+  shouldStop?: () => boolean;
+  /** agentes executados em paralelo */
+  concurrency?: number;
+  /** agentes carregados por consulta */
+  batch?: number;
+}
+
+/**
+ * Ciclo do worker: executa os agentes ativos de contas não bloqueadas e com acesso (assinatura ativa ou admin).
+ * Ordem: `lastRunAt` mais antigo primeiro (quem ficou de fora por falta de tempo vem primeiro no próximo ciclo);
+ * lotes com concorrência limitada e parada quando o orçamento do ciclo acaba.
+ */
+export async function runAllActiveAgents(opts: RunAllOptions = {}): Promise<AgentRunSummary[]> {
   const prisma = getPrisma();
   if (!prisma) return [];
-  const agents = await prisma.agent.findMany({ where: { status: "ACTIVE", user: { blockedAt: null } }, include: { user: { select: { blockedAt: true, role: true, subscription: true } } } });
+  const shouldStop = opts.shouldStop ?? (() => false);
+  const candidates = await prisma.agent.findMany({
+    where: { status: "ACTIVE", user: { blockedAt: null } },
+    orderBy: [{ lastRunAt: { sort: "asc", nulls: "first" } }, { id: "asc" }],
+    take: MAX_AGENTS_PER_CYCLE,
+    select: { id: true, timeframe: true, user: { select: { blockedAt: true, role: true, subscription: true } } },
+  });
+  // sem acesso ou com timeframe fora do plano atual (1H no PRO após sair do ELITE): não roda nem avisa;
+  // o agente continua ACTIVE e volta a rodar quando o acesso voltar
+  const ids = candidates.filter((c) => automationsAllowed(c.user) && allowsTimeframe(tierFor(c.user.subscription, c.user.role), c.timeframe, "agents")).map((c) => c.id);
   const out: AgentRunSummary[] = [];
-  for (const { user, ...a } of agents) {
-    // sem acesso: não roda nem avisa (o agente continua ACTIVE e volta a rodar quando a assinatura voltar)
-    if (!automationsAllowed(user)) continue;
-    try {
-      out.push(await runUserAgent(a));
-    } catch (err) {
-      log.error("agente falhou", { agentId: a.id, error: (err as Error).message });
+  const batch = opts.batch ?? 20;
+  let skipped = 0;
+  for (let i = 0; i < ids.length; i += batch) {
+    const part = ids.slice(i, i + batch);
+    if (shouldStop()) {
+      skipped += ids.length - i;
+      break;
     }
+    const rows = await prisma.agent.findMany({ where: { id: { in: part } } });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const agents = part.flatMap((id) => {
+      const a = byId.get(id);
+      return a ? [a] : [];
+    });
+    const r = await runWithConcurrency(agents, opts.concurrency ?? 4, (a) => runUserAgent(a), shouldStop);
+    out.push(...r.results);
+    for (const e of r.errors) log.error("agente falhou", { agentId: e.item.id, error: e.error.message });
+    skipped += r.skipped;
   }
+  if (skipped) log.warn("agentes adiados para o próximo ciclo (tempo esgotado)", { skipped });
   return out;
 }

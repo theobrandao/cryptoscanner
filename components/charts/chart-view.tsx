@@ -33,7 +33,7 @@ import {
 import { Hint } from "@/components/ui/tooltip";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useTickers } from "@/hooks/use-tickers";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { ApiClientError } from "@/lib/client-api";
 import {
   formatDateTime,
@@ -259,7 +259,7 @@ export function ChartView() {
           <SelectContent>
             {ASSETS.map((a) => (
               <SelectItem key={a.symbol} value={a.symbol}>
-                {a.glyph} {a.symbol} — {a.name}
+                <span className={GLYPH_FONT_CLASS}>{a.glyph}</span> {a.symbol} — {a.name}
               </SelectItem>
             ))}
           </SelectContent>

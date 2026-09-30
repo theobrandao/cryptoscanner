@@ -13,7 +13,7 @@ import {
 import { Hint } from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { TIMEFRAME_LABEL } from "@/lib/timeframes";
 import { cn } from "@/lib/utils";
 import type { Timeframe } from "@/types/market";
@@ -147,7 +147,7 @@ export function ScannerFilters({
             </SelectItem>
             {ASSETS.map((a) => (
               <SelectItem key={a.symbol} value={a.symbol}>
-                {a.glyph} {a.symbol} — {a.name}
+                <span className={GLYPH_FONT_CLASS}>{a.glyph}</span> {a.symbol} — {a.name}
               </SelectItem>
             ))}
           </SelectContent>

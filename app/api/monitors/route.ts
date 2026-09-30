@@ -1,9 +1,9 @@
 import { connection } from "next/server";
 import { z } from "zod";
-import { enforceRateLimit, ok, parseBody, requireUser, withApi } from "@/lib/api";
+import { enforceRateLimit, okPrivate, parseBody, requireUser, withApi } from "@/lib/api";
 import { INSTRUMENTS, VENUES } from "@/lib/venues";
 import { TIMEFRAMES } from "@/types/market";
-import { requireEntitlement } from "@/services/subscription-service";
+import { requireEntitlement, requireTimeframe } from "@/services/subscription-service";
 import { createMonitor, listMonitors, MONITOR_STATES } from "@/services/monitor-service";
 import { track } from "@/services/analytics-service";
 
@@ -12,7 +12,7 @@ export const GET = withApi(async (req) => {
   await enforceRateLimit(req, "public");
   const user = await requireUser(req);
   const access = await requireEntitlement(user);
-  return ok({ items: await listMonitors(user.id), limit: access.entitlements.maxMonitors, states: MONITOR_STATES });
+  return okPrivate({ items: await listMonitors(user.id), limit: access.entitlements.maxMonitors, states: MONITOR_STATES });
 });
 
 const bodySchema = z.object({
@@ -34,7 +34,8 @@ export const POST = withApi(async (req) => {
   const user = await requireUser(req);
   const access = await requireEntitlement(user);
   const b = await parseBody(req, bodySchema);
+  requireTimeframe(access, b.timeframe, "monitors");
   const m = await createMonitor(user.id, access, { ...b, symbol: b.symbol.replace(/USDT$/, "") });
   await track("monitor_created", { userId: user.id, props: { kind: b.kind, timeframe: b.timeframe, exchange: b.exchange, instrument: b.instrument } });
-  return ok({ monitor: m }, { status: 201 });
+  return okPrivate({ monitor: m }, { status: 201 });
 });

@@ -1,12 +1,12 @@
 import { connection } from "next/server";
 import { z } from "zod";
 import { symbolSchema } from "@/agents/schemas";
-import { ApiError, enforceRateLimit, ok, parseBody, withApi } from "@/lib/api";
+import { enforceRateLimit, NO_STORE, ok, parseBody, withApi } from "@/lib/api";
 import { getPrisma } from "@/database/client";
-import { planAllowsTimeframe } from "@/lib/plans";
 import { parseTimeframe } from "@/lib/timeframes";
+import { allowedVolumeAlerts } from "@/lib/scanner/volume";
 import { runScan } from "@/services/scanner-service";
-import { requireCoreUser } from "@/services/subscription-service";
+import { requireCoreUser, requireTimeframe } from "@/services/subscription-service";
 
 const bodySchema = z.object({
   timeframe: z.string().default("4h"),
@@ -24,13 +24,10 @@ export const POST = withApi(async (req) => {
   const body = await parseBody(req, bodySchema);
   const tf = parseTimeframe(body.timeframe);
   const user = await requireCoreUser(req);
-  if (!planAllowsTimeframe(user?.plan, tf))
-    throw new ApiError(
-      403,
-      `Timeframe ${tf.toUpperCase()} disponível apenas no plano ELITE`,
-      "plan_required",
-    );
-  const res = await runScan({
+  requireTimeframe(user.access, tf, "scanner");
+  // refresh refaz o scan na origem: balde caro por usuário
+  if (body.refresh) await enforceRateLimit(req, "scanner_refresh", `u:${user.id}`);
+  const scan = await runScan({
     timeframe: tf,
     direction: body.direction,
     symbols: body.symbols,
@@ -38,9 +35,11 @@ export const POST = withApi(async (req) => {
     includeVolume: body.includeVolume,
     refresh: body.refresh,
   });
+  // o scan em cache é o mesmo para todos: volume de 30M/1H só chega ao ELITE
+  const res = { ...scan, volumeAlerts: allowedVolumeAlerts(user.access.tier, scan.volumeAlerts) };
 
   const prisma = getPrisma();
-  if (user && prisma && !res.cached) {
+  if (prisma && !res.cached) {
     const entries = [
       ...res.rows.flatMap((r) =>
         r.patterns.map((p) => ({
@@ -87,5 +86,6 @@ export const POST = withApi(async (req) => {
         typeof v === "number" && !Number.isFinite(v) ? null : v,
       ),
     ),
+    { headers: NO_STORE },
   );
 });

@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Hint } from "@/components/ui/tooltip";
 import { useFavorites } from "@/hooks/use-local-storage";
 import { useTickers } from "@/hooks/use-tickers";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { ApiClientError } from "@/lib/client-api";
 import { DIRECTION_LABEL, MOMENTUM_LABEL, formatCompact, formatPct, formatPrice, timeAgo } from "@/lib/format";
 import { TIMEFRAME_LABEL } from "@/lib/timeframes";
@@ -318,7 +318,7 @@ export function ScannerTable({
                   </TableCell>
                   <TableCell>
                     <Link href={`/graficos?symbol=${r.symbol}&timeframe=${timeframe}`} className="flex items-center gap-2 hover:underline">
-                      <span className="w-5 text-center text-muted-foreground">{asset?.glyph}</span>
+                      <span className={`w-5 text-center text-muted-foreground ${GLYPH_FONT_CLASS}`}>{asset?.glyph}</span>
                       <span className="font-semibold">{r.symbol}</span>
                       <span className="hidden text-xs text-muted-foreground md:inline">{asset?.name}</span>
                     </Link>

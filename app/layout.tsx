@@ -7,8 +7,12 @@ import { themeInitScript } from "@/components/providers/theme-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { SITE_URL } from "@/lib/site";
 
-/** Inter servida pelo próprio site (pré-carregada; "optional" evita troca de fonte depois da pintura, que empurrava o layout). */
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "optional", variable: "--font-inter" });
+/**
+ * Inter variável servida pelo próprio site (um arquivo por subconjunto cobre todos os pesos; pré-carrega só o latino).
+ * "optional" evita troca de fonte depois da pintura, que empurrava o layout. Símbolos de moeda fora do latino
+ * usam a fonte do sistema (GLYPH_FONT_CLASS em lib/assets.ts), para não baixar os arquivos latin-ext e grego.
+ */
+const inter = Inter({ subsets: ["latin"], display: "optional", variable: "--font-inter" });
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

@@ -40,7 +40,7 @@ import {
 import { useSession } from "@/hooks/use-session";
 import { useToast } from "@/components/providers/toast-provider";
 import { ApiClientError, apiFetch, postJson } from "@/lib/client-api";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { formatDateTime, formatPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type {
@@ -246,7 +246,7 @@ export function SimulatorView() {
                   <SelectContent>
                     {ASSETS.map((a) => (
                       <SelectItem key={a.symbol} value={a.symbol}>
-                        {a.glyph} {a.symbol} — {a.name}
+                        <span className={GLYPH_FONT_CLASS}>{a.glyph}</span> {a.symbol} — {a.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

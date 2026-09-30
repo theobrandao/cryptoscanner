@@ -26,7 +26,7 @@ export function getPrisma(): PrismaClient | null {
 
 export class DatabaseUnavailableError extends Error {
   constructor() {
-    super("Banco de dados não configurado (DATABASE_URL). Recurso indisponível.");
+    super("Serviço temporariamente indisponível. Tente em instantes.");
     this.name = "DatabaseUnavailableError";
   }
 }

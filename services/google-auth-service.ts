@@ -10,6 +10,7 @@ import { track } from "@/services/analytics-service";
 import { applyPendingGrants } from "@/services/billing/kiwify";
 import { sendTemplate } from "@/services/email-service";
 import { startTrial } from "@/services/subscription-service";
+import { legacyPlanForSalePlan } from "@/lib/access-policy";
 
 /**
  * Entrar/cadastrar com Google — OAuth 2.0 "authorization code" com PKCE e state (CSRF), sem biblioteca externa.
@@ -124,8 +125,8 @@ export function googleLinkChanges(user: { googleSub: string | null; email: strin
     out.googleSub = identity.sub;
     out.resetPassword = user.googleSub == null;
   }
-  if (shouldPromoteOwner({ email: identity.email, via: "google", emailVerified: identity.emailVerified, createdAt: user.createdAt }) && user.email.toLowerCase() === identity.email.toLowerCase() && (user.plan !== "PLATINUM" || user.role !== "ADMIN")) {
-    out.plan = "PLATINUM";
+  if (shouldPromoteOwner({ email: identity.email, via: "google", emailVerified: identity.emailVerified, createdAt: user.createdAt }) && user.email.toLowerCase() === identity.email.toLowerCase() && (user.plan !== legacyPlanForSalePlan("ELITE") || user.role !== "ADMIN")) {
+    out.plan = legacyPlanForSalePlan("ELITE");
     out.role = "ADMIN";
   }
   return out;
@@ -166,7 +167,7 @@ export async function signInWithGoogle(identity: GoogleIdentity, opts: { acceptT
       googleSub: identity.sub,
       termsVersion: env.LEGAL_TERMS_VERSION,
       termsAcceptedAt: new Date(),
-      ...(owner ? { plan: "PLATINUM" as const, role: "ADMIN" as const } : {}),
+      ...(owner ? { plan: legacyPlanForSalePlan("ELITE"), role: "ADMIN" as const } : {}),
       preference: { create: {} },
       watchlists: { create: { name: "Favoritos", isDefault: true } },
     },

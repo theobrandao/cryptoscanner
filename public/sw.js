@@ -1,6 +1,6 @@
 /* Service worker mínimo: torna o app instalável e oferece uma casca offline para navegação.
    Não intercepta chunks, RSC nem /api — esses vão direto à rede/CDN. */
-const SHELL = "cs-shell-v3";
+const SHELL = "cs-shell-v4";
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(SHELL).then((c) => c.addAll(["/", "/icons/icon-192.png", "/icons/icon-512.png"]).catch(() => undefined)));
   self.skipWaiting();

@@ -1,10 +1,20 @@
 import { requirePrisma } from "@/database/client";
 import { getEnv, isGoogleLoginConfigured, isLlmConfigured, isRegistrationOpen, legalStatus } from "@/lib/env";
 import { effectiveStatus } from "@/lib/entitlements";
-import { isBillingConfigured, priceFor, verifyBillingAccount } from "@/services/billing/mercadopago";
+import { isBillingConfigured, verifyBillingAccount } from "@/services/billing/mercadopago";
 import { isKiwifyApiConfigured, isKiwifyConfigured, kiwifyCheckoutUrl } from "@/services/billing/kiwify";
 import { isEmailConfigured } from "@/services/email-service";
 import { isPushConfigured } from "@/services/push-service";
+
+/** Assinatura paga em vigor: ACTIVE efetivo, cobrada por um provedor (Kiwify hoje; Mercado Pago no código). Manual e teste não entram. */
+export function isPaidActive(s: { eff: string; provider: string | null }): boolean {
+  return s.eff === "ACTIVE" && Boolean(s.provider) && s.provider !== "manual";
+}
+
+/** MRR em R$ pelos preços de venda (PRICE_PRO_BRL / PRICE_ELITE_BRL, os mesmos da Kiwify), independente do provedor. */
+export function mrrBrl(subs: ReadonlyArray<{ eff: string; provider: string | null; plan: string }>, prices: { PRICE_PRO_BRL: number; PRICE_ELITE_BRL: number }): number {
+  return subs.filter(isPaidActive).reduce((sum, s) => sum + (s.plan === "ELITE" ? prices.PRICE_ELITE_BRL : prices.PRICE_PRO_BRL), 0);
+}
 
 /** Visão do dono: base de usuários, trials, assinaturas, MRR, funil e prontidão para vender. */
 export async function getAdminOverview() {
@@ -25,9 +35,9 @@ export async function getAdminOverview() {
     prisma.strategy.count(),
   ]);
   const eff = subs.map((s) => ({ ...s, eff: effectiveStatus(s, now) }));
-  const paid = eff.filter((s) => s.eff === "ACTIVE" && (s.provider === "mercadopago" || s.provider === "kiwify"));
-  const manual = eff.filter((s) => s.eff === "ACTIVE" && s.provider !== "mercadopago" && s.provider !== "kiwify").length;
-  const mrr = paid.reduce((sum, s) => sum + priceFor(s.plan === "ELITE" ? "ELITE" : "PRO"), 0);
+  const paid = eff.filter((s) => isPaidActive(s));
+  const manual = eff.filter((s) => s.eff === "ACTIVE" && !isPaidActive(s)).length;
+  const mrr = mrrBrl(eff, getEnv());
   const trialsStarted30 = eff.filter((s) => s.trialStartedAt && s.trialStartedAt >= d30).length;
   const converted30 = paid.filter((s) => s.trialStartedAt && s.trialStartedAt >= d30).length;
   const env = getEnv();

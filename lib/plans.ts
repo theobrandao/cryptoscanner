@@ -1,6 +1,7 @@
 import type { Timeframe } from "@/types/market";
+import { timeframesForLegacyPlan, type LegacyPlanKey } from "@/lib/access-policy";
 
-export type PlanKey = "FREE" | "PRO" | "PLATINUM";
+export type PlanKey = LegacyPlanKey;
 
 export interface PlanDefinition {
   key: PlanKey;
@@ -20,12 +21,13 @@ export interface PlanDefinition {
  * Regras de plano (camada legada). A chave interna PLATINUM é exibida ao usuário como "Elite" (plano ELITE). Valores da referência pública: PLATINUM = análises ilimitadas, timeframes até 15M,
  * até 15 agentes simultâneos, alertas no Telegram; 1H/30M/15M bloqueados fora do PLATINUM.
  * Limites de FREE/PRO não são públicos — os números abaixo são deste projeto.
+ * Timeframes vêm da regra única (`lib/access-policy.ts`): abaixo de 4H só no ELITE.
  */
 export const PLANS: Record<PlanKey, PlanDefinition> = {
   FREE: {
     key: "FREE",
     name: "Free",
-    timeframes: ["4h", "1d", "1w"],
+    timeframes: timeframesForLegacyPlan("FREE"),
     imageAnalysesPerDay: 3,
     maxAgents: 2,
     maxSentinels: 1,
@@ -40,7 +42,7 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
   PRO: {
     key: "PRO",
     name: "Pro",
-    timeframes: ["4h", "1d", "1w"],
+    timeframes: timeframesForLegacyPlan("PRO"),
     imageAnalysesPerDay: 30,
     maxAgents: 5,
     maxSentinels: 3,
@@ -55,7 +57,7 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
   PLATINUM: {
     key: "PLATINUM",
     name: "Elite",
-    timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"],
+    timeframes: timeframesForLegacyPlan("PLATINUM"),
     imageAnalysesPerDay: Number.POSITIVE_INFINITY,
     maxAgents: 15,
     maxSentinels: 10,
@@ -73,5 +75,5 @@ export function planAllowsTimeframe(
   plan: PlanKey | null | undefined,
   tf: Timeframe,
 ): boolean {
-  return PLANS[plan ?? "FREE"].timeframes.includes(tf);
+  return timeframesForLegacyPlan(plan).includes(tf);
 }

@@ -119,11 +119,15 @@ capturePre = true;
 capturePre = false;
 
 // ------------------------------------------------------------------ públicas
-await test("Saúde", "GET /api/health", async () => {
-  const r = await call("GET", "/api/health", { auth: false });
+await test("Saúde", "GET /api/health (detalhe com x-health-secret quando CRON_SECRET é informado)", async () => {
+  // cache, provedores e Telegram só aparecem para o monitoramento; sem o segredo, só o formato público
+  const r = await call("GET", "/api/health", { auth: false, headers: CRON_SECRET ? { "x-health-secret": CRON_SECRET } : {} });
   expectStatus(r, 200);
   const d = r.json.data;
-  expect(d.database.ok === true, "banco não OK");
+  expect(typeof d.status === "string", "sem status");
+  expect(d.database?.ok === true, "banco não OK");
+  if (!CRON_SECRET) return `público: status ${d.status}, db ok (CRON_SECRET não informado: detalhe não testado)`;
+  expect(Array.isArray(d.providers), "detalhe sem provedores");
   expect(d.cache === "redis", `cache=${d.cache}`);
   const bin = d.providers.find((p) => p.provider === "binance");
   const kr = d.providers.find((p) => p.provider === "kraken");
@@ -554,7 +558,7 @@ await test("On-chain", "GET /api/market/whales (coleta do cron) e POST /api/cron
 
 await test("PWA", "GET /manifest.webmanifest + /sw.js + ícones", async () => {
   const m = await call("GET", "/manifest.webmanifest", { auth: false });
-  expect(m.res.status === 200 && m.json?.icons?.length === 2, `manifest ${m.res.status}`);
+  expect(m.res.status === 200 && (m.json?.icons?.length ?? 0) >= 2, `manifest ${m.res.status}`);
   const sw = await call("GET", "/sw.js", { auth: false, raw: true });
   expect(sw.res.status === 200, `sw ${sw.res.status}`);
   const ic = await call("GET", "/icons/icon-512.png", { auth: false, raw: true });
@@ -686,11 +690,14 @@ await test("Comercial", "GET /api/markets/BTC/context (anônimo → 401; trial �
 });
 
 await test("Comercial", "Contexto global: exchange × instrumento (OKX perpétuo, parâmetro inválido → 400)", async () => {
-  const r = await call("GET", "/api/markets/ETH/context?tf=1h&candles=0&exchange=okx&instrument=perp");
+  // 1H é do ELITE: a conta em teste pede 4H (1H → 403 plan_required)
+  const locked = await call("GET", "/api/markets/ETH/context?tf=1h&candles=0&exchange=okx&instrument=perp");
+  if (state.trialPlan) expectStatus(locked, 403, "plan_required");
+  const r = await call("GET", "/api/markets/ETH/context?tf=4h&candles=0&exchange=okx&instrument=perp");
   expectStatus(r, 200);
   const d = r.json.data;
-  expect(d.exchange === "okx" && d.instrument === "perp" && d.timeframe === "1h" && d.symbol === "ETH", `contexto ${d.contextKey}`);
-  expect(d.contextKey === "okx:perp:ETH:1h", `contextKey ${d.contextKey}`);
+  expect(d.exchange === "okx" && d.instrument === "perp" && d.timeframe === "4h" && d.symbol === "ETH", `contexto ${d.contextKey}`);
+  expect(d.contextKey === "okx:perp:ETH:4h", `contextKey ${d.contextKey}`);
   expect(d.derivatives ? d.derivatives.exchange === "okx" && Number.isFinite(d.derivatives.nextFundingTime) : typeof d.derivativesError === "string", "derivativos de outra venue ou sem motivo");
   expect(d.quality && typeof d.quality.status === "string", "sem status de qualidade");
   const bad = await call("GET", "/api/markets/ETH/context?tf=1h&candles=0&exchange=kraken");
@@ -764,7 +771,11 @@ await test("R2", "Market Monitor: criar, duplicado → 409, listar, eventos, pau
   expectStatus(c, 201);
   const dup = await call("POST", "/api/monitors", { body: { symbol: "BTC", timeframe: "4h", exchange: "binance", instrument: "spot", kind: "SETUP" } });
   expectStatus(dup, 409, "duplicate");
-  const s = await call("POST", "/api/monitors", { body: { symbol: "ETH", timeframe: "1h", kind: "STRATEGY", strategyId: state.strategyId } });
+  // 1H é do ELITE: no teste grátis/PRO a regra de timeframe responde antes do limite de monitores
+  const intraday = await call("POST", "/api/monitors", { body: { symbol: "ETH", timeframe: "1h", kind: "STRATEGY", strategyId: state.strategyId } });
+  if (state.trialPlan) expectStatus(intraday, 403, "plan_required");
+  else if (intraday.res.status === 201) expectStatus(await call("DELETE", `/api/monitors/${intraday.json.data.monitor.id}`), 200);
+  const s = await call("POST", "/api/monitors", { body: { symbol: "ETH", timeframe: "4h", kind: "STRATEGY", strategyId: state.strategyId } });
   const list = await call("GET", "/api/monitors");
   expectStatus(list, 200);
   const limit = list.json.data.limit;
@@ -776,7 +787,7 @@ await test("R2", "Market Monitor: criar, duplicado → 409, listar, eventos, pau
   const p = await call("PATCH", `/api/monitors/${c.json.data.monitor.id}`, { body: { active: false } });
   expectStatus(p, 200);
   for (const m of list.json.data.items) expectStatus(await call("DELETE", `/api/monitors/${m.id}`), 200);
-  return `limite do plano ${list.json.data.limit} · eventos não lidos ${ev.json.data.unread}`;
+  return `limite do plano ${list.json.data.limit} · 1H ${intraday.res.status} · eventos não lidos ${ev.json.data.unread}`;
 });
 
 await test("R2", "Backtest: setup 4H 90 dias com custos; multi-TF no trial → 402; feature ao vivo → 400", async () => {
@@ -1453,6 +1464,58 @@ if (!SKIP_RATE_LIMIT) {
     return `429 na tentativa ${first429}`;
   });
 }
+
+// ------------------------------------------------------------------ monetização (planos no HTML, eventos de conversão)
+await test("Monetização", "/planos traz título, PRO, ELITE e preços no HTML do servidor", async () => {
+  const r = await call("GET", "/planos", { auth: false });
+  expectStatus(r, 200);
+  const p = await call("GET", "/api/billing/prices", { auth: false });
+  const { PRO, ELITE } = p.json?.data?.prices ?? {};
+  for (const needle of ["<h1", ">PRO<", ">ELITE<", `R$ ${PRO}`, `R$ ${ELITE}`]) expect(r.text.includes(needle), `HTML de /planos sem ${needle}`);
+  return `R$ ${PRO} / R$ ${ELITE}`;
+});
+await test("Monetização", "Eventos de conversão aceitos e motivo de cancelamento validado", async () => {
+  for (const [name, props] of [["cta_click", { origin: "smoke" }], ["signup_view", {}], ["gate_view", { feature: "Scanner", state: "visitante" }], ["trial_card_click", { origin: "smoke" }], ["onboarding_step", { step: "smoke" }], ["cancel_reason", { reason: "outro" }]]) {
+    const r = await call("POST", "/api/analytics/event", { auth: false, body: { name, anonId: `smoke-${stamp}`, props } });
+    expectStatus(r, 200);
+  }
+  expectStatus(await call("POST", "/api/analytics/event", { auth: false, body: { name: "cancel_reason", props: { reason: "texto livre" } } }), 400);
+  expectStatus(await call("POST", "/api/analytics/event", { auth: false, body: { name: "subscription_activated" } }), 400);
+  return "6 nomes aceitos; motivo livre e nome de servidor recusados";
+});
+
+// ------------------------------------------------------------------ Frente 5: acesso, erros e saúde
+await test("Frente 5", "GET /api/health público mínimo; detalhe só com x-health-secret", async () => {
+  const r = await call("GET", "/api/health", { auth: false });
+  expectStatus(r, 200);
+  const d = r.json.data;
+  expect(typeof d.status === "string" && typeof d.database?.ok === "boolean", "faltam status/database.ok");
+  expect(d.providers === undefined && d.cache === undefined && d.database.error === undefined, "health público expõe detalhes internos");
+  expect(r.res.headers.get("cache-control") === "no-store", `cache-control=${r.res.headers.get("cache-control")}`);
+  if (!CRON_SECRET) return "público ok (CRON_SECRET não informado: detalhe não testado)";
+  const det = await call("GET", "/api/health", { auth: false, headers: { "x-health-secret": CRON_SECRET } });
+  expectStatus(det, 200);
+  expect(Array.isArray(det.json.data.providers), "detalhe sem provedores");
+  return `público ok; detalhe com ${det.json.data.providers.length} provedores, cache ${det.json.data.cache}`;
+});
+
+await test("Frente 5", "Teste grátis pede 1H no scanner → 403 plan_required (1H/30M/15M só no ELITE)", async () => {
+  if (!preCookie) return "sem conta de apoio";
+  const r = await call("GET", "/api/scanner/table?timeframe=1h", { auth: "pre" });
+  expectStatus(r, 403, "plan_required");
+  const m = await call("POST", "/api/scanner/run", { auth: "pre", body: { timeframe: "30m", symbols: ["BTC"] } });
+  expectStatus(m, 403, "plan_required");
+  return r.json.error.message;
+});
+
+await test("Frente 5", "Validação devolve campo e mensagem em português", async () => {
+  const r = await callAuth("POST", "/api/auth/password/forgot", { auth: false, body: { email: "nao-e-email" } });
+  expectStatus(r, 400, "validation");
+  const d = r.json.error.details?.[0];
+  expect(d?.path === "email" && d?.field === "E-mail", `detalhe ${JSON.stringify(d)}`);
+  expect(!/^(Invalid|Too|Expected)/.test(d.message), `mensagem em inglês: ${d.message}`);
+  return `${d.field}: ${d.message}`;
+});
 
 if (preCookie) {
   await test("Limpeza", "Conta de apoio (teste grátis) excluída", async () => {

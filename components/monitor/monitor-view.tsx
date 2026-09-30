@@ -6,10 +6,11 @@ import useSWR from "swr";
 import { useSearchParams } from "next/navigation";
 import { BellRing, Pause, Play, Trash2 } from "lucide-react";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
-import { AccessGate } from "@/components/account/access-gate";
+import { AccessGate, useAccess } from "@/components/account/access-gate";
+import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/misc";
 import { useToast } from "@/components/providers/toast-provider";
-import { ApiClientError, postJson } from "@/lib/client-api";
+import { errorMessage, postJson } from "@/lib/client-api";
 import { ASSETS } from "@/lib/assets";
 import { formatDateTime, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -50,8 +51,11 @@ const sel = "h-9 rounded-md border border-input bg-background px-2 text-[13px] o
 function MonitorInner() {
   const params = useSearchParams();
   const { toast } = useToast();
-  const { data, mutate } = useSWR<{ items: MonitorRow[]; limit: number; states: string[] }>("/api/monitors");
-  const { data: events, mutate: mutateEvents } = useSWR<{ items: EventRow[]; unread: number }>("/api/monitors/events?limit=50", { refreshInterval: 60_000 });
+  const { data, error, mutate } = useSWR<{ items: MonitorRow[]; limit: number; states: string[] }>("/api/monitors");
+  const { data: events, error: eventsError, mutate: mutateEvents } = useSWR<{ items: EventRow[]; unread: number }>("/api/monitors/events?limit=50", { refreshInterval: 60_000 });
+  const { access } = useAccess();
+  // tempos gráficos do plano (abaixo de 4H só no ELITE); sem a resposta ainda, não bloqueia a lista
+  const allowedTfs = access?.entitlements.timeframes ?? null;
   const { data: strategies } = useSWR<{ items: Array<{ id: string; name: string }> }>("/api/strategies", { revalidateOnFocus: false });
   const presetStrategy = params.get("strategy");
   const [kind, setKind] = React.useState<"SETUP" | "STRATEGY">(presetStrategy ? "STRATEGY" : "SETUP");
@@ -66,7 +70,7 @@ function MonitorInner() {
   const [telegram, setTelegram] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
 
-  const fail = (t: string, err: unknown) => toast({ title: t, description: err instanceof ApiClientError ? err.message : String(err), variant: "danger" });
+  const fail = (t: string, err: unknown) => toast({ title: t, description: errorMessage(err), variant: "danger" });
   const create = async () => {
     setBusy(true);
     try {
@@ -127,11 +131,15 @@ function MonitorInner() {
               </select>
               {kind === "SETUP" ? (
                 <select aria-label="Timeframe" className={sel} value={tf} onChange={(e) => setTf(e.target.value as Timeframe)}>
-                  {TFS.map((t) => (
-                    <option key={t} value={t}>
-                      {t.toUpperCase()}
-                    </option>
-                  ))}
+                  {TFS.map((t) => {
+                    const locked = allowedTfs !== null && !allowedTfs.includes(t);
+                    return (
+                      <option key={t} value={t} disabled={locked}>
+                        {t.toUpperCase()}
+                        {locked ? " (ELITE)" : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               ) : (
                 <select aria-label="Estratégia" className={sel} value={strategyId} onChange={(e) => setStrategyId(e.target.value)}>
@@ -241,7 +249,24 @@ function MonitorInner() {
           </ul>
         </section>
       </div>
-      {!data ? <Alert variant="info" className="mt-3">Carregando…</Alert> : null}
+      {error || eventsError ? (
+        <Alert
+          variant="danger"
+          className="mt-3"
+          title="Não foi possível carregar os monitores"
+          action={
+            <Button size="sm" variant="outline" onClick={() => void Promise.all([mutate(), mutateEvents()])}>
+              Tentar novamente
+            </Button>
+          }
+        >
+          {errorMessage(error ?? eventsError)}
+        </Alert>
+      ) : !data ? (
+        <Alert variant="info" className="mt-3">
+          Carregando…
+        </Alert>
+      ) : null}
     </PageShell>
   );
 }

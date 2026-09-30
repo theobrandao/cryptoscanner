@@ -1,8 +1,8 @@
 import { connection } from "next/server";
 import { z } from "zod";
 import { symbolSchema } from "@/agents/schemas";
-import { ApiError, enforceRateLimit, ok, parseQuery, requireUser, withApi } from "@/lib/api";
-import { requireEntitlement } from "@/services/subscription-service";
+import { enforceRateLimit, ok, parseQuery, requireUser, withApi } from "@/lib/api";
+import { requireEntitlement, requireTimeframe } from "@/services/subscription-service";
 import { parseTimeframe } from "@/lib/timeframes";
 import { getMarketContext } from "@/services/market-context-service";
 import { INSTRUMENTS, VENUES } from "@/services/market/venues";
@@ -31,7 +31,7 @@ export const GET = withApi(async (req, ctx) => {
   const sym = symbolSchema.parse(raw);
   const q = parseQuery(req, querySchema);
   const tf = parseTimeframe(q.tf);
-  if (!access.entitlements.timeframes.includes(tf)) throw new ApiError(402, `Timeframe ${tf} não incluído no seu plano`, "timeframe_locked");
+  requireTimeframe(access, tf, "terminal");
   const c = await getMarketContext(sym, tf, { exchange: q.exchange, instrument: q.instrument });
   return ok(q.candles === "1" ? c : { ...c, candles: [] });
 });

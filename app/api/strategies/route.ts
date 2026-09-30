@@ -2,7 +2,7 @@ import { connection } from "next/server";
 import { z } from "zod";
 import { enforceRateLimit, ok, parseBody, requireUser, withApi } from "@/lib/api";
 import { definitionSchema, FEATURES, OPS, STRATEGY_TEMPLATES, STRATEGY_TFS } from "@/lib/strategies/definition";
-import { requireEntitlement } from "@/services/subscription-service";
+import { requireEntitlement, requireStrategyTimeframes } from "@/services/subscription-service";
 import { createStrategy, listStrategies } from "@/services/strategy-service";
 import { track } from "@/services/analytics-service";
 
@@ -23,6 +23,7 @@ export const POST = withApi(async (req) => {
   const user = await requireUser(req);
   const access = await requireEntitlement(user);
   const body = await parseBody(req, bodySchema);
+  requireStrategyTimeframes(access, body.definition, "strategies");
   const s = await createStrategy(user.id, access, body);
   await track("strategy_created", { userId: user.id, props: { conditions: body.definition.groups.reduce((a, g) => a + g.conditions.length, 0) } });
   return ok({ strategy: s }, { status: 201 });

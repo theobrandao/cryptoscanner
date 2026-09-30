@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { requirePrisma } from "@/database/client";
 import { ApiError } from "@/lib/api";
+import { runWithConcurrency } from "@/lib/cron";
 import { getAsset } from "@/lib/assets";
 import { createLogger } from "@/lib/logger";
 import { INSTRUMENT_LABEL, VENUE_LABEL, type Instrument, type Venue } from "@/lib/venues";
@@ -12,7 +13,7 @@ import { evaluateLive } from "@/services/strategy-service";
 import { sendPushToUser } from "@/services/push-service";
 import { escapeHtml, sendTelegramMessage } from "@/services/telegram";
 import { track } from "@/services/analytics-service";
-import type { AccessView } from "@/services/subscription-service";
+import { requireStrategyTimeframes, type AccessView } from "@/services/subscription-service";
 import { ENTITLEMENTS, tierFor } from "@/lib/entitlements";
 import type { Timeframe } from "@/types/market";
 
@@ -57,6 +58,7 @@ export async function createMonitor(userId: string, access: AccessView, input: M
     if (!input.strategyId) throw new ApiError(400, "Escolha a estratégia", "validation");
     const s = await prisma.strategy.findFirst({ where: { id: input.strategyId, userId } });
     if (!s) throw new ApiError(404, "Estratégia não encontrada", "not_found");
+    requireStrategyTimeframes(access, definitionSchema.parse(s.definition), "monitors");
   }
   const dup = await prisma.monitor.findFirst({
     where: { userId, symbol: asset.symbol, timeframe: input.timeframe, exchange: input.exchange, instrument: input.instrument, kind: input.kind, strategyId: input.kind === "STRATEGY" ? input.strategyId : null },
@@ -172,7 +174,7 @@ async function emit(userId: string, monitorId: string, fingerprint: string, kind
  * Avalia monitores ativos (mais antigos primeiro) dentro do orçamento de tempo do ciclo.
  * Contextos iguais (ativo × TF × venue × instrumento) são calculados uma vez.
  */
-export async function evaluateMonitors(opts: { budgetMs?: number; batch?: number } = {}) {
+export async function evaluateMonitors(opts: { budgetMs?: number; batch?: number; concurrency?: number } = {}) {
   const prisma = requirePrisma();
   const t0 = Date.now();
   const budget = opts.budgetMs ?? 20_000;
@@ -186,13 +188,13 @@ export async function evaluateMonitors(opts: { budgetMs?: number; batch?: number
   let checked = 0;
   let events = 0;
   let errors = 0;
-  for (const m of monitors) {
-    if (Date.now() - t0 > budget) break;
+  // concorrência limitada: contextos iguais são compartilhados (ctxCache guarda a Promise); para ao estourar o orçamento
+  await runWithConcurrency(monitors, opts.concurrency ?? 4, async (m) => {
     checked++;
     // sem assinatura ativa o monitor pausa (dados preservados); reativado pelo usuário depois de assinar
     if (!ENTITLEMENTS[tierFor(m.user.subscription, m.user.role)].core) {
       await prisma.monitor.update({ where: { id: m.id }, data: { active: false, lastCheckedAt: new Date(), lastError: "pausado: assinatura inativa" } });
-      continue;
+      return;
     }
     try {
       if (m.kind === "STRATEGY" && m.strategy) {
@@ -211,7 +213,7 @@ export async function evaluateMonitors(opts: { budgetMs?: number; batch?: number
           }
         }
         await prisma.monitor.update({ where: { id: m.id }, data: { lastState: state, lastScore: null, lastCheckedAt: new Date(), lastError: ev.missing.length ? `sem dado: ${ev.missing.join(", ")}`.slice(0, 300) : null } });
-        continue;
+        return;
       }
       const key = `${m.exchange}:${m.instrument}:${m.symbol}:${m.timeframe}`;
       let p = ctxCache.get(key);
@@ -238,6 +240,6 @@ export async function evaluateMonitors(opts: { budgetMs?: number; batch?: number
       log.warn("monitor falhou", { id: m.id, error: (err as Error).message });
       await prisma.monitor.update({ where: { id: m.id }, data: { lastCheckedAt: new Date(), lastError: (err as Error).message.slice(0, 300) } }).catch(() => undefined);
     }
-  }
+  }, () => Date.now() - t0 > budget);
   return { monitors: monitors.length, checked, events, errors, ms: Date.now() - t0 };
 }

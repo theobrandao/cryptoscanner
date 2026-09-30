@@ -189,7 +189,7 @@ await step("Jornada Trader: abrir aula, responder teste e concluir", async () =>
   await goto("/jornada");
   await page.waitForFunction(() => /12 aulas/i.test(document.body.innerText), null, { timeout: 20_000 });
   await page.getByRole("link", { name: /O que é Bitcoin/ }).first().click();
-  await page.waitForURL(/\/jornada\?aula=/, { timeout: 10_000 });
+  await page.waitForURL(/\/jornada\/o-que-e-bitcoin/, { timeout: 10_000 });
   await page.waitForFunction(() => /Teste rápido/i.test(document.body.innerText), null, { timeout: 10_000 });
   await page.getByRole("button", { name: /Teste rápido/ }).first().click();
   await page.getByRole("radio", { name: /A recompensa por bloco cai pela metade/ }).click();

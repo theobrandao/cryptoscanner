@@ -49,7 +49,7 @@ describe("Automações só rodam para conta ativa e com acesso", () => {
   });
 
   it("agentes: consulta ignora contas bloqueadas e pula dono sem acesso", async () => {
-    const agent = (id: string, subscription: unknown) => ({ id, userId: `u-${id}`, symbols: [], strategies: [], timeframe: "1h", minConfidence: 70, lastAlertAt: null, user: { blockedAt: null, role: "USER", subscription } });
+    const agent = (id: string, subscription: unknown) => ({ id, userId: `u-${id}`, symbols: [], strategies: [], timeframe: "4h", minConfidence: 70, lastAlertAt: null, user: { blockedAt: null, role: "USER", subscription } });
     db.prisma.agent.findMany.mockResolvedValue([agent("ok", activeSub), agent("sem-acesso", expiredSub)]);
     const out = await runAllActiveAgents();
     const where = db.prisma.agent.findMany.mock.calls[0]![0].where;
@@ -57,6 +57,16 @@ describe("Automações só rodam para conta ativa e com acesso", () => {
     expect(out.map((s) => s.agentId)).toEqual(["ok"]);
     expect(db.prisma.agent.update).toHaveBeenCalledTimes(1);
     expect(db.prisma.agent.update.mock.calls[0]![0].where).toEqual({ id: "ok" });
+  });
+
+  it("agentes: timeframe fora do plano atual (1H no PRO) é pulado, não apagado; ELITE roda 1H", async () => {
+    const agent = (id: string, timeframe: string, subscription: unknown) => ({ id, userId: `u-${id}`, symbols: [], strategies: [], timeframe, minConfidence: 70, lastAlertAt: null, user: { blockedAt: null, role: "USER", subscription } });
+    db.prisma.agent.findMany.mockResolvedValue([agent("pro-4h", "4h", activeSub), agent("pro-1h", "1h", activeSub), agent("elite-1h", "1h", { ...activeSub, plan: "ELITE" })]);
+    const out = await runAllActiveAgents();
+    expect(db.prisma.agent.findMany.mock.calls[0]![0].select).toMatchObject({ timeframe: true });
+    expect(out.map((s) => s.agentId)).toEqual(["pro-4h", "elite-1h"]);
+    expect(db.prisma.agent.update.mock.calls.map((c) => c[0].where.id)).toEqual(["pro-4h", "elite-1h"]);
+    expect(db.prisma.agent.update.mock.calls.every((c) => c[0].data.status === undefined)).toBe(true);
   });
 
   it("alertas: consulta ignora contas bloqueadas e não dispara para dono sem acesso", async () => {

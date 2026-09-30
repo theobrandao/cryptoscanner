@@ -45,7 +45,7 @@ export const LESSONS: Lesson[] = [
       },
       {
         heading: "De onde vem o preço",
-        body: "Não existe preço oficial. Cada corretora forma seu preço pela oferta e demanda do próprio livro de ordens; índices agregam várias corretoras. Diferenças entre corretoras (spread regional) existem e costumam ser pequenas em mercados líquidos. Neste app, os preços vêm da Binance Spot com fallback para a Kraken.",
+        body: "Não existe preço oficial. Cada corretora forma seu preço pela oferta e demanda do próprio livro de ordens; índices agregam várias corretoras. Diferenças entre corretoras (spread regional) existem e costumam ser pequenas em mercados líquidos. Neste app, os preços vêm da Binance Spot; se ela estiver fora do ar, o app usa a Kraken.",
       },
     ],
     keyPoints: [
@@ -599,3 +599,10 @@ export const LEVEL_LABEL: Record<LessonLevel, string> = {
   intermediario: "Intermediário",
   avancado: "Avançado",
 };
+
+/** Endereço público de cada aula (página estática em /jornada/[slug]). */
+export const lessonPath = (slug: string) => `/jornada/${slug}`;
+
+export function getLesson(slug: string): Lesson | undefined {
+  return LESSONS.find((l) => l.slug === slug);
+}

@@ -6,6 +6,7 @@ import { createLogger } from "@/lib/logger";
 import { checkWebhookSignature, getPreapproval, mapPreapprovalStatus } from "@/services/billing/mercadopago";
 import { track } from "@/services/analytics-service";
 import { sendTemplate } from "@/services/email-service";
+import { legacyPlanForSalePlan } from "@/lib/access-policy";
 
 const log = createLogger("billing-webhook");
 
@@ -58,7 +59,7 @@ export const POST = withApi(async (req) => {
         create: { userId, plan, status, provider: "mercadopago", providerSubscriptionId: pre.id, currentPeriodEnd: next, lastPaymentStatus: pre.status },
         update: { plan, status, provider: "mercadopago", providerSubscriptionId: pre.id, currentPeriodEnd: next, lastPaymentStatus: pre.status, cancelAtPeriodEnd: status === "CANCELLED" },
       });
-      const u = await prisma.user.update({ where: { id: userId }, data: { plan: status === "ACTIVE" ? (plan === "ELITE" ? "PLATINUM" : "PRO") : undefined }, select: { email: true, name: true } });
+      const u = await prisma.user.update({ where: { id: userId }, data: { plan: status === "ACTIVE" ? legacyPlanForSalePlan(plan) : undefined }, select: { email: true, name: true } });
       // avisos só na transição de estado (reentrega do mesmo evento não repete e-mail)
       if (before?.status !== status || before?.plan !== plan) {
         if (status === "ACTIVE") {

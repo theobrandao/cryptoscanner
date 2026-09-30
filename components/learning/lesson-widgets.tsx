@@ -3,38 +3,18 @@
 import * as React from "react";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { LAB_META } from "./lesson-lab-meta";
 
-/** Exercícios interativos embutidos em algumas aulas. Tudo calculado no navegador, sem dados de mercado. */
-export const WIDGETS: Record<
-  string,
-  { title: string; hint: string; Component: () => React.ReactElement }
-> = {
-  "candles-e-timeframes": {
-    title: "Monte um candle",
-    hint: "Arraste abertura e fechamento e veja como corpo e pavios mudam a leitura.",
-    Component: CandleBuilder,
-  },
-  "rsi-stochrsi-macd": {
-    title: "Leia o RSI",
-    hint: "Mova o RSI e veja em que zona o indicador está.",
-    Component: RsiZones,
-  },
-  fibonacci: {
-    title: "Calcule as retrações",
-    hint: "Informe fundo e topo do movimento; os níveis são calculados na hora.",
-    Component: FibCalc,
-  },
-  "gestao-de-risco": {
-    title: "Calcule o tamanho da posição",
-    hint: "Defina capital, risco por operação, entrada, stop e alvo.",
-    Component: RiskCalc,
-  },
-  "simulacao-e-dca": {
-    title: "Preço médio no DCA",
-    hint: "Compare o preço médio de aportes fixos com preços que sobem e caem.",
-    Component: DcaDemo,
-  },
+/** Exercícios interativos embutidos em algumas aulas. Tudo calculado no navegador, sem dados de mercado. Título e instrução em lesson-lab-meta.ts. */
+export const WIDGET_COMPONENTS: Record<string, () => React.ReactElement> = {
+  "candles-e-timeframes": CandleBuilder,
+  "rsi-stochrsi-macd": RsiZones,
+  fibonacci: FibCalc,
+  "gestao-de-risco": RiskCalc,
+  "simulacao-e-dca": DcaDemo,
 };
+
+export const WIDGETS: Record<string, { title: string; hint: string; Component: () => React.ReactElement }> = Object.fromEntries(Object.entries(WIDGET_COMPONENTS).map(([slug, Component]) => [slug, { ...LAB_META[slug]!, Component }]));
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", {

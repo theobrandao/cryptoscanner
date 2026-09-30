@@ -31,7 +31,7 @@ import {
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Alert } from "@/components/ui/misc";
 import { Slider } from "@/components/ui/slider";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { ApiClientError, postJson } from "@/lib/client-api";
 import { TIMEFRAME_LABEL } from "@/lib/timeframes";
 import type { PlanDefinition } from "@/lib/plans";
@@ -315,7 +315,7 @@ function WizardBody({
                         })
                       }
                     />
-                    <span className="text-muted-foreground">{a.glyph}</span>{" "}
+                    <span className={`text-muted-foreground ${GLYPH_FONT_CLASS}`}>{a.glyph}</span>{" "}
                     {a.symbol}
                   </label>
                 );

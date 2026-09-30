@@ -1,7 +1,12 @@
 "use client";
 
-/** Evento de produto (best-effort; nunca bloqueia a interface). */
-export function trackClient(name: "dashboard_view" | "context_change" | "analyst_open" | "analyst_message" | "analyst_action_alert" | "plans_view" | "onboarding_step" | "strategy_scan", props?: Record<string, string | number | boolean | null>) {
+import type { ClientAnalyticsName } from "@/services/analytics-service";
+
+/**
+ * Evento de produto (best-effort; nunca bloqueia a interface). Nomes e propriedades aceitas: services/analytics-service.ts
+ * (cta_click {origin}, signup_view, gate_view {feature}, trial_card_click, onboarding_step {step}, cancel_reason {reason}).
+ */
+export function trackClient(name: ClientAnalyticsName, props?: Record<string, string | number | boolean | null>) {
   try {
     let anonId: string | undefined;
     try {

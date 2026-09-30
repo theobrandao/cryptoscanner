@@ -3,9 +3,8 @@ import { runAgent } from "@/agents/runtime";
 import { scannerAgent, type ScannerOutput, type ScannerRow } from "@/agents/scanner-agent";
 import { createDefaultTools } from "@/agents/tools";
 import type { AgentRunResult } from "@/agents/types";
-import { getPrisma } from "@/database/client";
 import { ASSET_SYMBOLS } from "@/lib/assets";
-import { getCache } from "@/lib/cache";
+import { cached, primeCached } from "@/lib/cache";
 import { createLogger } from "@/lib/logger";
 import type { Timeframe } from "@/types/market";
 
@@ -29,23 +28,33 @@ export interface ScanResult extends ScannerOutput {
 
 const TABLE_TTL_SECONDS = 30;
 const PATTERN_TTL_SECONDS = 60;
+/** Janela em que o scan vencido é servido na hora enquanto é refeito em segundo plano: cobre o intervalo de 5 min do cron. */
+const SCAN_SWR_SECONDS = 6 * 60;
+const SCAN_STALE_TTL_SECONDS = 3600;
 
 function cacheKey(o: ScanOptions): string {
   const syms = (o.symbols ?? [...ASSET_SYMBOLS]).slice().sort().join(",");
   return `scan:${o.timeframe}:${o.direction ?? "all"}:${o.minConfidence ?? 60}:${o.includeVolume ? "v" : "nv"}:${syms}`;
 }
 
+type StoredScan = Omit<ScanResult, "cached">;
+
 /**
- * Executa o scanner-agent com cache curto (o mesmo scan não é recalculado a cada usuário)
- * e persiste os padrões detectados quando há banco de dados.
+ * Executa o scanner-agent com cache curto (o mesmo scan não é recalculado a cada usuário): single-flight, trava
+ * distribuída e valor recém-vencido servido enquanto o próximo é calculado. As linhas não dependem de `includeVolume`,
+ * então um scan com volume também aquece a chave sem volume (a que a tabela lê) — é o que o cron faz a cada 5 min.
  */
 export async function runScan(options: ScanOptions): Promise<ScanResult> {
-  const cache = getCache();
   const key = cacheKey(options);
-  if (!options.refresh) {
-    const hit = await cache.get<ScanResult>(key);
-    if (hit) return { ...hit, cached: true };
+  const ttl = options.includeVolume ? TABLE_TTL_SECONDS : PATTERN_TTL_SECONDS;
+  const res = await cached<StoredScan>(key, ttl, () => computeScan(options), { force: options.refresh, lock: true, swrSeconds: SCAN_SWR_SECONDS, staleTtlSeconds: SCAN_STALE_TTL_SECONDS });
+  if (options.includeVolume && !res.fromCache) {
+    await primeCached(cacheKey({ ...options, includeVolume: false }), { ...res.value, volumeAlerts: [] }, PATTERN_TTL_SECONDS, { staleTtlSeconds: SCAN_STALE_TTL_SECONDS }).catch((err) => log.warn("aquecimento da tabela falhou", { error: (err as Error).message }));
   }
+  return { ...res.value, cached: res.fromCache };
+}
+
+async function computeScan(options: ScanOptions): Promise<StoredScan> {
   const runId = randomUUID();
   const result = await runAgent(
     scannerAgent,
@@ -62,45 +71,8 @@ export async function runScan(options: ScanOptions): Promise<ScanResult> {
   if (!result.output) {
     throw new Error(result.error ?? "scanner falhou");
   }
-  const out: ScanResult = {
-    ...result.output,
-    runId,
-    cached: false,
-    agent: { status: result.status, durationMs: result.durationMs, error: result.error },
-  };
-  await cache.set(key, out, options.includeVolume ? TABLE_TTL_SECONDS : PATTERN_TTL_SECONDS);
-  void persistPatterns(runId, out).catch((err) => log.warn("persistência do scan falhou", { error: (err as Error).message }));
-  return out;
-}
-
-async function persistPatterns(runId: string, out: ScanResult): Promise<void> {
-  const prisma = getPrisma();
-  if (!prisma) return;
-  const rowsWithPatterns = out.rows.filter((r) => r.patterns.length > 0);
-  if (rowsWithPatterns.length === 0) return;
-  const assets = await prisma.asset.findMany({ where: { symbol: { in: rowsWithPatterns.map((r) => r.symbol) } }, select: { id: true, symbol: true } });
-  const byS = new Map(assets.map((a) => [a.symbol, a.id]));
-  const data = rowsWithPatterns.flatMap((r) =>
-    r.patterns.flatMap((p) => {
-      const assetId = byS.get(r.symbol);
-      if (!assetId) return [];
-      return [
-        {
-          runId,
-          assetId,
-          timeframe: out.timeframe,
-          pattern: p.key,
-          direction: p.direction,
-          confidence: p.confidence,
-          price: p.price,
-          target: p.target,
-          stop: p.stop,
-          details: { summary: p.summary, points: p.points, levels: p.levels, source: r.source },
-        },
-      ];
-    }),
-  );
-  if (data.length) await prisma.scannerResult.createMany({ data });
+  // ScannerResult deixou de ser gravado (nada o lia); padrões ao vivo ficam em PatternSignal (trackLiveSignals)
+  return { ...result.output, runId, agent: { status: result.status, durationMs: result.durationMs, error: result.error } };
 }
 
 /** Linhas para a tabela em tempo real (colunas do scanner) — usa o scan completo com cache curto. */

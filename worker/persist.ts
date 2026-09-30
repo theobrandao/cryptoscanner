@@ -173,7 +173,6 @@ export async function persistMarketSnapshot(options: PersistOptions = {}): Promi
       log.warn("persistência em lote falhou", { tf, error: (err as Error).message });
     }
   }
-  // Retenção: snapshots com mais de 7 dias
-  await prisma.marketSnapshot.deleteMany({ where: { collectedAt: { lt: new Date(Date.now() - 7 * 24 * 3600 * 1000) } } });
+  // retenção dos snapshots (7 dias) em lotes: services/retention-service.ts (etapa do ciclo, 1×/hora)
   return result;
 }

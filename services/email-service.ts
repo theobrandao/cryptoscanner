@@ -2,6 +2,7 @@ import { getEnv, legalDocKind } from "@/lib/env";
 import { fetchJson } from "@/lib/http";
 import { createLogger } from "@/lib/logger";
 import { TRIAL_DAYS } from "@/lib/entitlements";
+import { SUPPORT_PATHS } from "@/lib/plans-copy";
 
 const log = createLogger("email");
 
@@ -57,7 +58,14 @@ ${cta ? `<p style="margin:18px 0"><a href="${esc(cta.url)}" style="display:inlin
 
 export type TemplateKind = "welcome" | "trial_ending" | "trial_last_day" | "trial_ended" | "payment_failed" | "subscription_active" | "password_reset";
 
-export async function sendTemplate(kind: TemplateKind, d: { to: string; name?: string; url?: string; plan?: string; daysLeft?: number }) {
+/** Data e hora de um aviso no fuso de Brasília, ex.: "02/10 às 14:30". */
+export function formatNoticeTime(d: Date): string {
+  const parts = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d);
+  const get = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("day")}/${get("month")} às ${get("hour")}:${get("minute")}`;
+}
+
+export async function sendTemplate(kind: TemplateKind, d: { to: string; name?: string; url?: string; plan?: string; endsAt?: Date }) {
   const app = getEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
   const hi = d.name ? `Olá, ${d.name.split(" ")[0]}.` : "Olá.";
   const plans = { label: "Ver planos", url: `${app}/planos` };
@@ -66,13 +74,23 @@ export async function sendTemplate(kind: TemplateKind, d: { to: string; name?: s
       subject: `Seu teste grátis de ${TRIAL_DAYS} dias do CryptoScanner começou`,
       title: `Teste de ${TRIAL_DAYS} dias ativo (PRO)`,
       p: [hi, `Seu acesso ao PRO vale por ${TRIAL_DAYS} dias: Scanner de padrões, Agentes IA, Sentinela, Gráficos, sinais do modelo de rompimento, Construtor de estratégias, Backtest com custos e Derivativos.`, "Sugestão para o primeiro dia: veja os sinais ativos no Início, crie um agente para o seu ativo principal e ative as notificações."],
-      cta: { label: "Abrir o Dashboard", url: `${app}/` },
+      cta: { label: "Abrir o Início", url: `${app}/` },
     },
-    trial_ending: { subject: `Seu teste termina em ${d.daysLeft ?? 2} dias`, title: `Faltam ${d.daysLeft ?? 2} dias do teste`, p: [hi, "Para manter monitores, estratégias e watchlists ativos depois do teste, escolha o plano PRO ou ELITE. Sem assinatura, os dados continuam salvos, mas o acesso ao workspace é pausado."], cta: plans },
-    trial_last_day: { subject: "Último dia do seu teste", title: "Hoje é o último dia do teste", p: [hi, "Amanhã o acesso ao workspace é pausado. Seus dados continuam salvos e voltam a funcionar ao assinar."], cta: plans },
-    trial_ended: { subject: "Seu teste terminou", title: "Teste encerrado", p: [hi, "Seu período de teste terminou. Monitores foram pausados; estratégias, watchlists e preferências continuam salvos."], cta: plans },
-    payment_failed: { subject: "Pagamento não aprovado", title: "Não conseguimos processar o pagamento", p: [hi, "A última cobrança da sua assinatura não foi aprovada. Atualize o meio de pagamento para evitar a pausa do acesso após o período de tolerância."], cta: { label: "Revisar assinatura", url: `${app}/planos` } },
-    subscription_active: { subject: `Assinatura ${d.plan ?? ""} ativa`, title: `Assinatura ${d.plan ?? ""} ativa`, p: [hi, "Pagamento confirmado. Seu acesso está ativo. Você pode cancelar a renovação a qualquer momento em Plans & Billing; o acesso segue até o fim do período pago."], cta: { label: "Abrir o Dashboard", url: `${app}/` } },
+    trial_ending: {
+      subject: `Seu teste do PRO termina em ${d.endsAt ? formatNoticeTime(d.endsAt) : "breve"}`,
+      title: `Seu teste termina em ${d.endsAt ? formatNoticeTime(d.endsAt) : "breve"}`,
+      p: [hi, "Até lá, tudo do PRO continua liberado. Depois, o acesso às ferramentas fica pausado até você escolher um plano; agentes, monitores, favoritos e estratégias continuam salvos na sua conta.", "Se ainda não viu, confira os sinais do modelo no Início e crie um agente para o ativo que você acompanha."],
+      cta: plans,
+    },
+    trial_last_day: {
+      subject: "Últimas horas do seu teste do PRO",
+      title: d.endsAt ? `Seu teste termina em ${formatNoticeTime(d.endsAt)}` : "Seu teste termina em poucas horas",
+      p: [hi, "Para continuar com agentes, alertas e scanner sem interrupção, escolha o PRO ou o ELITE em Planos.", "Na primeira contratação, você pode desistir em até 7 dias e recebe o valor integral de volta.", "Se algo ficou faltando no teste, conte para nós pela página Suporte."],
+      cta: plans,
+    },
+    trial_ended: { subject: "Seu teste terminou", title: "Teste encerrado", p: [hi, "O acesso às ferramentas foi pausado e os monitores foram desligados. Agentes, estratégias, favoritos e preferências continuam salvos e voltam a funcionar quando você assinar."], cta: plans },
+    payment_failed: { subject: "Pagamento não aprovado", title: "Não conseguimos processar o pagamento", p: [hi, "A última cobrança da sua assinatura não foi aprovada. Atualize o meio de pagamento para evitar a pausa do acesso após o período de tolerância."], cta: { label: "Resolver pagamento", url: `${app}${SUPPORT_PATHS.payment}` } },
+    subscription_active: { subject: `Assinatura ${d.plan ?? ""} ativa`, title: `Assinatura ${d.plan ?? ""} ativa`, p: [hi, "Pagamento confirmado. Seu acesso está ativo. Você pode cancelar a renovação a qualquer momento em Planos; o acesso segue até o fim do período pago."], cta: { label: "Abrir o Início", url: `${app}/` } },
     password_reset: { subject: "Redefinição de senha", title: "Redefinir sua senha", p: [hi, "Recebemos um pedido para redefinir a senha da sua conta. O link vale por 60 minutos e pode ser usado uma vez. Se você não fez o pedido, ignore este e-mail."], cta: d.url ? { label: "Criar nova senha", url: d.url } : undefined },
   };
   const x = t[kind];

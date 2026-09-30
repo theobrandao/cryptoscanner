@@ -3,9 +3,13 @@ import { z } from "zod";
 import { requirePrisma } from "@/database/client";
 import { ApiError, ok, parseBody, withApi } from "@/lib/api";
 import { agentBodySchema } from "@/lib/validation/agent";
-import { requireCoreUser } from "@/services/subscription-service";
+import { requireCoreUser, requireTimeframe } from "@/services/subscription-service";
 
-const patchSchema = agentBodySchema.partial().extend({ status: z.enum(["ACTIVE", "PAUSED", "STOPPED"]).optional() });
+// sem os valores padrão da criação: um PATCH só de `status` não pode zerar ícone, confiança mínima e notificação
+const patchSchema = agentBodySchema
+  .extend({ icon: agentBodySchema.shape.icon.unwrap(), minConfidence: agentBodySchema.shape.minConfidence.unwrap(), notification: agentBodySchema.shape.notification.unwrap() })
+  .partial()
+  .extend({ status: z.enum(["ACTIVE", "PAUSED", "STOPPED"]).optional() });
 
 async function own(userId: string, id: string) {
   const agent = await requirePrisma().agent.findFirst({ where: { id, userId } });
@@ -28,6 +32,8 @@ export const PATCH = withApi(async (req, ctx) => {
   const { id } = await ctx.params;
   const agent = await own(user.id, id ?? "");
   const body = await parseBody(req, patchSchema);
+  // abaixo de 4H só no ELITE: ao trocar o timeframe e ao reativar um agente criado em plano anterior
+  if ((body.timeframe && body.timeframe !== agent.timeframe) || body.status === "ACTIVE") requireTimeframe(user.access, body.timeframe ?? agent.timeframe, "agents");
   const updated = await requirePrisma().agent.update({ where: { id: agent.id }, data: { ...body, description: body.description === undefined ? undefined : body.description } });
   return ok({ agent: updated });
 });

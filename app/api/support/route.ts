@@ -8,7 +8,8 @@ const bodySchema = z.object({ email: z.string().trim().toLowerCase().email(), su
 
 export const POST = withApi(async (req) => {
   await connection();
-  await enforceRateLimit(req, "auth");
+  // balde próprio (5 chamados em 10 min por IP): não divide a cota com login e cadastro
+  await enforceRateLimit(req, "support");
   const body = await parseBody(req, bodySchema);
   const user = await getSessionFromRequest(req);
   const ticket = await requirePrisma().supportTicket.create({ data: { ...body, userId: user?.id ?? null } });

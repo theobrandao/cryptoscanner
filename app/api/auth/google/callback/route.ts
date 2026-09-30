@@ -1,5 +1,5 @@
 import { connection, NextResponse } from "next/server";
-import { ApiError, withApi } from "@/lib/api";
+import { ApiError, enforceRateLimit, withApi } from "@/lib/api";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth";
 import { createLogger } from "@/lib/logger";
 import { logAccess } from "@/services/access-log-service";
@@ -33,6 +33,12 @@ export const GET = withApi(async (req) => {
     return res;
   };
   const fail = (code: string, page: "login" | "registro" = "login") => clear(NextResponse.redirect(new URL(`/${page}?erro=${code}${saved?.next ? `&next=${encodeURIComponent(saved.next)}` : ""}`, url.origin)));
+  try {
+    await enforceRateLimit(req, "google_callback");
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 429) return fail("google_falhou");
+    throw err;
+  }
   if (url.searchParams.get("error")) return fail("google_cancelado");
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");

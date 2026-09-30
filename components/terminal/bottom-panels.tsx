@@ -8,7 +8,7 @@ import { Panel, Unavailable } from "@/components/terminal/panels";
 import { useTickers } from "@/hooks/use-tickers";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useSession } from "@/hooks/use-session";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { ASSET_CATEGORIES } from "@/lib/asset-categories";
 import { liquidationPrice, positionSize } from "@/lib/engines/risk";
 import { formatCompact, formatPct, formatPrice } from "@/lib/format";
@@ -79,7 +79,7 @@ export function WatchlistPanel({ selected, trendBySymbol, onSelect }: { selected
                   <td className="px-3 py-1.5">
                     <span className="flex items-center gap-2">
                       <Star className="h-3 w-3 text-muted-foreground" />
-                      <span className="w-4 text-center text-muted-foreground">{a?.glyph}</span>
+                      <span className={`w-4 text-center text-muted-foreground ${GLYPH_FONT_CLASS}`}>{a?.glyph}</span>
                       <span className="font-medium">{s}/USDT</span>
                     </span>
                   </td>

@@ -39,7 +39,7 @@ import { Slider } from "@/components/ui/slider";
 import { useSession } from "@/hooks/use-session";
 import { useToast } from "@/components/providers/toast-provider";
 import { ApiClientError, apiFetch, postJson } from "@/lib/client-api";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { formatDateTime, formatPrice, timeAgo } from "@/lib/format";
 import { PLANS } from "@/lib/plans";
 import { TIMEFRAME_LABEL } from "@/lib/timeframes";
@@ -240,7 +240,7 @@ export function SentinelView() {
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     Última varredura: {s.lastRunAt ? timeAgo(s.lastRunAt) : "—"}{" "}
-                    · {s._count.logs} registro(s)
+                    · {s._count.logs} registro(s) (últimos 7 dias)
                   </div>
                   <div className="mt-2 flex gap-2">
                     {s.status === "ACTIVE" ? (
@@ -411,7 +411,7 @@ function NewSentinelCard({
               <SelectContent>
                 {ASSETS.map((a) => (
                   <SelectItem key={a.symbol} value={a.symbol}>
-                    {a.glyph} {a.symbol} — {a.name}
+                    <span className={GLYPH_FONT_CLASS}>{a.glyph}</span> {a.symbol} — {a.name}
                   </SelectItem>
                 ))}
               </SelectContent>

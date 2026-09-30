@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/database/client";
 import { automationsAllowed } from "@/lib/admin-users";
+import { runWithConcurrency } from "@/lib/cron";
 import { isTelegramConfigured } from "@/lib/env";
 import { computeSnapshot } from "@/lib/indicators/snapshot";
 import { createLogger } from "@/lib/logger";
@@ -18,18 +19,22 @@ const log = createLogger("alerts");
  * Avaliados no ciclo do worker; quando disparam ficam inativos (one-shot) e registram
  * uma entrada no histórico do usuário (ScanHistoryEntry) e, opcionalmente, Telegram.
  */
-export async function evaluateAlerts(): Promise<{ evaluated: number; triggered: number }> {
+/** Alertas considerados por ciclo (mais antigos primeiro); os demais entram quando os primeiros disparam. */
+export const MAX_ALERTS_PER_CYCLE = 1000;
+
+export async function evaluateAlerts(opts: { shouldStop?: () => boolean; concurrency?: number } = {}): Promise<{ evaluated: number; triggered: number }> {
   const prisma = getPrisma();
   if (!prisma) return { evaluated: 0, triggered: 0 };
   // conta bloqueada fica fora da consulta; dono sem acesso (assinatura inativa) é pulado sem desativar o alerta
-  const found = await prisma.alert.findMany({ where: { active: true, user: { blockedAt: null } }, include: { asset: true, user: { select: { id: true, telegramChatId: true, blockedAt: true, role: true, subscription: true } } } });
+  const found = await prisma.alert.findMany({ where: { active: true, user: { blockedAt: null } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: MAX_ALERTS_PER_CYCLE, include: { asset: true, user: { select: { id: true, telegramChatId: true, blockedAt: true, role: true, subscription: true } } } });
   const alerts = found.filter((a) => automationsAllowed(a.user));
   if (alerts.length === 0) return { evaluated: 0, triggered: 0 };
   const { tickers } = await getTickers();
   const byS = new Map(tickers.map((t) => [t.symbol, t]));
   let triggered = 0;
 
-  for (const a of alerts) {
+  // concorrência limitada (candles repetidos saem do cache com single-flight); para quando o orçamento do ciclo acaba
+  const run = await runWithConcurrency(alerts, opts.concurrency ?? 5, async (a) => {
     try {
       const symbol = a.asset.symbol;
       const t = byS.get(symbol);
@@ -86,7 +91,7 @@ export async function evaluateAlerts(): Promise<{ evaluated: number; triggered: 
         default:
           break;
       }
-      if (!fired) continue;
+      if (!fired) return;
       triggered++;
       await prisma.$transaction([
         prisma.alert.update({ where: { id: a.id }, data: { active: false, triggeredAt: new Date() } }),
@@ -110,6 +115,7 @@ export async function evaluateAlerts(): Promise<{ evaluated: number; triggered: 
     } catch (err) {
       log.warn("alerta falhou", { alertId: a.id, error: (err as Error).message });
     }
-  }
-  return { evaluated: alerts.length, triggered };
+  }, opts.shouldStop);
+  if (run.skipped) log.warn("alertas adiados para o próximo ciclo (tempo esgotado)", { skipped: run.skipped });
+  return { evaluated: alerts.length - run.skipped, triggered };
 }

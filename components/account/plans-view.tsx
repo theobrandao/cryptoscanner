@@ -3,118 +3,164 @@
 import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { useSearchParams } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, CreditCard, LifeBuoy, RotateCcw, ShieldCheck, Sparkles } from "lucide-react";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
 import { Alert } from "@/components/ui/misc";
 import { useSession } from "@/hooks/use-session";
 import { useToast } from "@/components/providers/toast-provider";
-import { ApiClientError, postJson } from "@/lib/client-api";
+import { postJson } from "@/lib/client-api";
 import { cn } from "@/lib/utils";
 import { trackClient } from "@/lib/analytics-client";
-import { billingNote, PLAN_FEATURES, PROVIDER_LABEL, type BillingProvider } from "@/lib/plans-copy";
+import { PAST_DUE_GRACE_DAYS } from "@/lib/entitlements";
+import { billingNote, formatBRL, PLAN_FEATURES, PROVIDER_LABEL, SUPPORT_PATHS, type BillingProvider } from "@/lib/plans-copy";
 import type { AccessView } from "@/services/subscription-service";
 import { withAffiliateParams } from "@/lib/affiliate-params";
+import type { PublicPrices } from "@/lib/billing/public-prices";
+import { CheckoutReturnNotice } from "@/components/account/plans/checkout-return-notice";
+import { CancelDialog } from "@/components/account/plans/cancel-dialog";
+import { SavedSummary, type SavedCounts } from "@/components/account/plans/saved-summary";
 
 interface SubPayload extends AccessView {
   billing: { provider: BillingProvider; configured: boolean; prices: { PRO: number; ELITE: number }; currency: string };
+  saved?: SavedCounts | null;
 }
 
-export interface PublicPrices {
-  prices: { PRO: number; ELITE: number };
-  checkoutEnabled: boolean;
-  trialDays: number;
-  provider: BillingProvider;
-  checkoutUrls: { PRO: string | null; ELITE: string | null } | null;
-}
+export type { PublicPrices };
 
 const STATUS_PT: Record<string, string> = { TRIALING: "Em teste", ACTIVE: "Ativa", PAST_DUE: "Pagamento pendente", CANCELLED: "Cancelada (acesso até o fim do período)", EXPIRED: "Sem acesso ativo", NONE: "Sem assinatura" };
+const dateBR = (d: string | Date) => new Date(d).toLocaleDateString("pt-BR");
+const providerPlace = (p: string | null | undefined) => (p === "kiwify" ? "na Kiwify" : p === "mercadopago" ? "no Mercado Pago" : null);
 
-export function PlansView() {
-  const { user } = useSession();
-  const params = useSearchParams();
+/** Estado da conta que muda a página: teste/assinatura encerrados, pagamento pendente, cancelada com período restante. */
+function pageState(data: SubPayload | undefined) {
+  if (!data || data.tier === "ADMIN") return { ended: false, endedPaid: false, trialUsed: false, pastDue: false, cancelledWithPeriod: false };
+  const trialUsed = data.status !== "TRIALING" && (data.trialEndsAt != null || data.provider != null);
+  const ended = data.status === "EXPIRED" || (data.status === "NONE" && data.trialEndsAt != null);
+  const cancelledWithPeriod = data.status === "CANCELLED" && data.currentPeriodEnd != null && new Date(data.currentPeriodEnd).getTime() > Date.now();
+  return { ended, endedPaid: ended && data.provider != null, trialUsed, pastDue: data.status === "PAST_DUE", cancelledWithPeriod };
+}
+
+/**
+ * Página de planos. Título, cartões e preços chegam prontos do servidor (`initial`, de PRICE_*_BRL);
+ * o que depende da conta (assinatura, avisos) entra depois num espaço já reservado.
+ */
+export function PlansView({ initial }: { initial: PublicPrices }) {
+  const { user, loading: sessionLoading } = useSession();
   const { toast } = useToast();
-  const { data, mutate } = useSWR<SubPayload>(user ? "/api/billing/subscription" : null);
-  const { data: pub } = useSWR<PublicPrices>("/api/billing/prices", { revalidateOnFocus: false });
+  const { data, mutate } = useSWR<SubPayload>(user ? "/api/billing/subscription?saved=1" : null);
+  const { data: pubData } = useSWR<PublicPrices>("/api/billing/prices", { revalidateOnFocus: false, fallbackData: initial });
+  const pub = pubData ?? initial;
   const [busy, setBusy] = React.useState<string | null>(null);
   React.useEffect(() => {
     trackClient("plans_view");
   }, []);
-  const prices = pub?.prices ?? data?.billing.prices ?? null;
-  const provider: BillingProvider = pub?.provider ?? data?.billing.provider ?? "mercadopago";
+  const prices = pub.prices;
+  const provider: BillingProvider = pub.provider;
   const via = PROVIDER_LABEL[provider];
-  const trial = pub?.trialDays ?? data?.trialDays ?? 3;
+  const trial = pub.trialDays;
+  const st = pageState(data);
 
   const checkout = async (plan: "PRO" | "ELITE") => {
+    trackClient("cta_click", { origin: "planos", plan });
     setBusy(plan);
     try {
       const r = await postJson<{ url: string }>("/api/billing/checkout", { plan });
       window.location.href = withAffiliateParams(r.url);
-    } catch (err) {
-      toast({ title: "Não foi possível iniciar o pagamento", description: err instanceof ApiClientError ? err.message : String(err), variant: "danger" });
-      setBusy(null);
-    }
-  };
-  const cancel = async () => {
-    setBusy("cancel");
-    try {
-      await postJson("/api/billing/cancel", {});
-      await mutate();
-      toast({ title: "Renovação cancelada. O acesso continua até o fim do período pago.", variant: "success" });
-    } catch (err) {
-      toast({ title: "Falha ao cancelar", description: err instanceof ApiClientError ? err.message : String(err), variant: "danger" });
-    } finally {
+    } catch {
+      toast({ title: "Não foi possível iniciar o pagamento. Tente novamente.", variant: "danger" });
       setBusy(null);
     }
   };
 
+  const title = st.ended ? "Escolha o plano para voltar de onde parou" : "Planos";
+  const description = st.ended ? "Sua conta continua aqui. Escolha PRO ou ELITE para voltar a usar as ferramentas." : st.trialUsed ? "PRO ou ELITE, pagamento mensal. Sua conta e configurações ficam salvas." : `${trial} dias grátis no PRO, sem cartão. Depois, PRO ou ELITE. Sua conta e configurações ficam salvas.`;
+
   return (
     <PageShell>
-      <PageTitle title="Planos" description={`${trial} dias grátis no PRO, sem cartão. Depois, PRO ou ELITE. Sua conta e configurações ficam salvas.`} />
-      {params.get("checkout") === "return" ? (
-        <Alert variant="info" className="mb-4" title="Pagamento em processamento">
-          A confirmação da {via} pode levar alguns minutos. Esta página atualiza sozinha.
+      {st.ended ? (
+        <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-0.5 text-xs font-semibold text-warning">
+          <RotateCcw className="h-3.5 w-3.5" aria-hidden /> {st.endedPaid ? "Sua assinatura terminou" : "Seu teste terminou"}
+        </span>
+      ) : null}
+      <PageTitle title={title} description={description} />
+      {st.pastDue && data ? (
+        <Alert
+          variant="warning"
+          className="mb-4"
+          title={`Pagamento pendente — atualize o pagamento${providerPlace(data.provider) ? ` ${providerPlace(data.provider)}` : ""}`}
+          action={
+            <Link href={SUPPORT_PATHS.payment} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold hover:bg-muted">
+              <LifeBuoy className="h-4 w-4" aria-hidden /> Falar com o suporte
+            </Link>
+          }
+        >
+          A última cobrança do {data.plan} não foi aprovada.
+          {data.currentPeriodEnd ? ` Seu acesso continua até ${dateBR(new Date(new Date(data.currentPeriodEnd).getTime() + PAST_DUE_GRACE_DAYS * 86_400_000))} enquanto o pagamento é regularizado.` : ""} Se precisar de ajuda, fale com o suporte.
         </Alert>
       ) : null}
-      {data ? (
-        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border bg-card p-4 text-sm">
-          <span className="font-semibold">Sua assinatura:</span>
-          <span>{data.tier === "ADMIN" ? "Administrador (acesso ELITE)" : `${data.plan} · ${STATUS_PT[data.status] ?? data.status}`}</span>
-          {data.daysLeft != null ? <span className="text-warning">{data.daysLeft} dia(s) de teste restante(s)</span> : null}
-          {data.currentPeriodEnd ? <span className="text-muted-foreground">período até {new Date(data.currentPeriodEnd).toLocaleDateString("pt-BR")}</span> : null}
-          {data.status === "ACTIVE" && !data.cancelAtPeriodEnd ? (
-            data.provider === "kiwify" ? (
-              <span className="text-xs text-muted-foreground sm:ml-auto">Compra pela Kiwify: cancelamento pelo e-mail da compra ou pelo suporte.</span>
-            ) : (
-              <button onClick={() => void cancel()} disabled={busy === "cancel"} className="h-9 rounded-md border border-border px-3 text-xs hover:bg-muted sm:ml-auto">
-                Cancelar renovação
-              </button>
-            )
-          ) : null}
-        </div>
-      ) : null}
-      {pub && !pub.checkoutEnabled ? (
+      <React.Suspense fallback={null}>
+        <CheckoutReturnNotice via={via} />
+      </React.Suspense>
+      {/* espaço reservado: a mesma caixa para visitante, carregamento e assinante (sem salto de layout) */}
+      <div className="mb-4 flex min-h-[4.25rem] flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border bg-card p-4 text-sm">
+        {data ? (
+          <>
+            <span className="font-semibold">Sua assinatura:</span>
+            <span>{data.tier === "ADMIN" ? "Administrador (acesso ELITE)" : `${data.plan} · ${STATUS_PT[data.status] ?? data.status}`}</span>
+            {data.daysLeft != null ? <span className="text-warning">{data.daysLeft} dia(s) de teste restante(s)</span> : null}
+            {data.currentPeriodEnd && !st.ended ? <span className="text-muted-foreground">período até {dateBR(data.currentPeriodEnd)}</span> : null}
+            {data.status === "ACTIVE" && !data.cancelAtPeriodEnd && data.tier !== "ADMIN" && data.provider ? <CancelDialog plan={data.plan} provider={data.provider} currentPeriodEnd={data.currentPeriodEnd} onCancelled={() => mutate()} /> : null}
+            {st.cancelledWithPeriod ? (
+              <Link href={SUPPORT_PATHS.reactivate} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold hover:bg-muted sm:ml-auto">
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reativar renovação
+              </Link>
+            ) : null}
+            {st.ended ? <SavedSummary saved={data.saved} /> : null}
+          </>
+        ) : user || sessionLoading ? (
+          <span className="skeleton h-5 w-64 max-w-full rounded" aria-busy="true" aria-label="Carregando sua assinatura" />
+        ) : (
+          <ul className="flex flex-wrap gap-x-5 gap-y-1.5 text-muted-foreground">
+            <li className="inline-flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-success" aria-hidden /> {trial} dias grátis no PRO, sem cartão
+            </li>
+            <li className="inline-flex items-center gap-1.5">
+              <CreditCard className="h-4 w-4 text-primary" aria-hidden /> Cancele quando quiser
+            </li>
+            <li className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-primary" aria-hidden /> Arrependimento em até 7 dias com reembolso integral
+            </li>
+          </ul>
+        )}
+      </div>
+      {!pub.checkoutEnabled ? (
         <Alert variant="info" className="mb-4" title="Assinaturas em liberação">
-          O teste grátis de {trial} dias do PRO está disponível. A contratação paga é liberada após a ativação da {via} e a publicação dos termos definitivos.
-        </Alert>
-      ) : null}
-      {user && provider === "kiwify" && pub?.checkoutEnabled ? (
-        <Alert variant="info" className="mb-4" title="Use o mesmo e-mail na compra">
-          O acesso é liberado automaticamente para a conta com o e-mail usado no checkout da Kiwify: <strong>{user.email}</strong>.
+          O teste grátis de {trial} dias do PRO está disponível. A contratação paga é liberada após a ativação do pagamento e a publicação dos termos definitivos.
         </Alert>
       ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         {(["PRO", "ELITE"] as const).map((p) => {
-          const current = data && data.plan === p && (data.status === "ACTIVE" || data.status === "CANCELLED");
-          const directUrl = pub?.checkoutUrls?.[p] ?? null;
+          const current = data && data.plan === p && (data.status === "ACTIVE" || data.status === "CANCELLED" || data.status === "PAST_DUE");
+          const directUrl = pub.checkoutUrls?.[p] ?? null;
+          const highlight = p === "PRO" && st.ended;
+          const badge =
+            p === "ELITE" ? (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">Mais recursos</span>
+            ) : st.ended && !st.endedPaid ? (
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">Plano do seu teste</span>
+            ) : data?.status === "TRIALING" ? (
+              <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">Em teste agora</span>
+            ) : st.trialUsed ? null : (
+              <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">{trial} dias grátis</span>
+            );
           return (
-            <section key={p} className={cn("flex flex-col rounded-xl border bg-card p-5", p === "ELITE" ? "border-primary/40" : "border-border")}>
-              <div className="flex items-center justify-between gap-2">
+            <section key={p} className={cn("flex flex-col rounded-xl border bg-card p-5", highlight ? "border-primary ring-2 ring-primary/40" : p === "ELITE" ? "border-primary/40" : "border-border")}>
+              <div className="flex min-h-6 items-center justify-between gap-2">
                 <h2 className="text-lg font-bold">{p}</h2>
-                {p === "PRO" ? <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">{trial} dias grátis</span> : <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">Mais recursos</span>}
+                {badge}
               </div>
               <div className="mt-2">
-                <span className="tabular text-3xl font-bold">{prices ? `R$ ${prices[p]}` : "—"}</span>
+                <span className="tabular text-3xl font-bold">{formatBRL(prices[p])}</span>
                 <span className="text-sm text-muted-foreground"> /mês</span>
               </div>
               <ul className="mt-4 flex flex-1 flex-col gap-2 text-sm">
@@ -126,11 +172,19 @@ export function PlansView() {
               </ul>
               {!user ? (
                 p === "PRO" ? (
-                  <Link href="/registro?next=/planos" className="mt-5 flex h-11 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+                  <Link href="/registro?next=/planos" onClick={() => trackClient("cta_click", { origin: "planos", plan: "PRO" })} className="mt-5 flex h-11 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
                     Começar {trial} dias grátis
                   </Link>
                 ) : directUrl ? (
-                  <a href={directUrl} rel="noopener" onClick={(e) => (e.currentTarget.href = withAffiliateParams(directUrl))} className="mt-5 flex h-11 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+                  <a
+                    href={directUrl}
+                    rel="noopener"
+                    onClick={(e) => {
+                      trackClient("cta_click", { origin: "planos", plan: "ELITE" });
+                      e.currentTarget.href = withAffiliateParams(directUrl);
+                    }}
+                    className="mt-5 flex h-11 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground"
+                  >
                     Assinar ELITE
                   </a>
                 ) : (
@@ -138,21 +192,30 @@ export function PlansView() {
                     Criar conta
                   </Link>
                 )
+              ) : current && data?.status === "PAST_DUE" ? (
+                <Link href={SUPPORT_PATHS.payment} className="mt-5 flex h-11 items-center justify-center gap-2 rounded-md border border-warning/60 text-sm font-semibold text-foreground hover:bg-warning/10">
+                  <LifeBuoy className="h-4 w-4" aria-hidden /> Resolver pagamento
+                </Link>
               ) : current ? (
                 <span className="mt-5 flex h-11 items-center justify-center rounded-md border border-border text-sm text-muted-foreground">Plano atual</span>
               ) : (
                 <button
                   onClick={() => void checkout(p)}
-                  disabled={!pub?.checkoutEnabled || busy !== null || data?.tier === "ADMIN"}
-                  className="mt-5 h-11 rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50"
+                  disabled={!pub.checkoutEnabled || busy !== null || data?.tier === "ADMIN"}
+                  className={cn("mt-5 h-11 rounded-md text-sm font-semibold disabled:opacity-50", st.ended && p === "ELITE" ? "border border-border hover:bg-muted" : "bg-primary text-primary-foreground hover:brightness-110")}
                 >
-                  {busy === p ? `Abrindo ${via}…` : `Assinar ${p}`}
+                  {busy === p ? "Abrindo o pagamento…" : `Assinar ${p}`}
                 </button>
               )}
             </section>
           );
         })}
       </div>
+      {user && provider === "kiwify" && pub.checkoutEnabled ? (
+        <Alert variant="info" className="mt-4" title="Use o mesmo e-mail na compra">
+          O acesso é liberado automaticamente para a conta com o e-mail usado no checkout da Kiwify: <strong>{user.email}</strong>.
+        </Alert>
+      ) : null}
       <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
         {billingNote(provider)} (
         <Link href="/reembolso" className="underline">

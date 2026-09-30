@@ -6,6 +6,10 @@
    Tokens de tema (próprios). Escuro é o padrão; claro via .light no <html>.
    ------------------------------------------------------------------ */
 :root {
+  /* cores da logo (degradê ciano → azul → violeta); versão mais escura no tema claro */
+  --brand-1: #0891b2;
+  --brand-2: #2f5bea;
+  --brand-3: #7c3aed;
   --background: #f6f5fb;
   --foreground: #16122b;
   --card: #ffffff;
@@ -35,6 +39,9 @@
 }
 
 .dark {
+  --brand-1: #22d3ee;
+  --brand-2: #3b7bff;
+  --brand-3: #a855f7;
   /* Terminal V2 — referência visual aprovada: navy/grafite, bordas muito leves, azul elétrico controlado */
   --background: #07101a;
   --foreground: #e6edf5;
@@ -187,13 +194,13 @@ body {
 
 /* ---------------------------------------------------------------- Apresentação (v4) */
 .text-gradient {
-  background: linear-gradient(90deg, var(--primary), var(--accent));
+  background: linear-gradient(90deg, var(--brand-1), var(--brand-2) 55%, var(--brand-3));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 .icon-tile {
-  background: linear-gradient(135deg, var(--primary), var(--accent));
+  background: linear-gradient(135deg, var(--brand-1), var(--brand-2) 55%, var(--brand-3));
   color: #fff;
 }
 .card-glow {
