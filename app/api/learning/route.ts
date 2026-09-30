@@ -2,16 +2,15 @@ import { connection } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { requirePrisma } from "@/database/client";
-import { ok, parseBody, withApi } from "@/lib/api";
+import { ok, parseBody, requireUser, withApi } from "@/lib/api";
 import { LESSONS } from "@/lib/content/lessons";
-import { requireCoreUser } from "@/services/subscription-service";
 
 const progressSchema = z.record(z.string(), z.object({ done: z.boolean(), score: z.number().int().min(0).max(10), at: z.string() }));
 
-/** Progresso da Jornada Trader do usuário. */
+/** Progresso da Jornada Trader do usuário. A Jornada é aberta; qualquer conta logada sincroniza. */
 export const GET = withApi(async (req) => {
   await connection();
-  const user = await requireCoreUser(req);
+  const user = await requireUser(req);
   const pref = await requirePrisma().userPreference.findUnique({ where: { userId: user.id }, select: { learning: true } });
   return ok({ progress: (pref?.learning as Record<string, unknown> | null) ?? {}, total: LESSONS.length });
 });
@@ -19,7 +18,7 @@ export const GET = withApi(async (req) => {
 /** Substitui o progresso (mesclado com o existente). */
 export const PATCH = withApi(async (req) => {
   await connection();
-  const user = await requireCoreUser(req);
+  const user = await requireUser(req);
   const body = await parseBody(req, z.object({ progress: progressSchema }));
   const known = new Set(LESSONS.map((l) => l.slug));
   const filtered = Object.fromEntries(Object.entries(body.progress).filter(([k]) => known.has(k)));

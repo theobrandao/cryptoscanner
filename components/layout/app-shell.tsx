@@ -486,7 +486,7 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
 const SALES_ROUTES = ["/vendas"];
 
 /** Páginas abertas sem plano: venda, conta, documentos e estado do sistema. Todo o resto exige teste ativo ou plano pago. */
-const OPEN_ROUTES = ["/vendas", "/planos", "/login", "/registro", "/esqueci-senha", "/redefinir-senha", "/termos", "/privacidade", "/reembolso", "/status", "/suporte", "/preferencias", "/admin"];
+const OPEN_ROUTES = ["/jornada", "/vendas", "/planos", "/login", "/registro", "/esqueci-senha", "/redefinir-senha", "/termos", "/privacidade", "/reembolso", "/status", "/suporte", "/preferencias", "/admin"];
 const isOpenRoute = (p: string) => p === "/" || OPEN_ROUTES.some((r) => p === r || p.startsWith(r + "/"));
 function featureName(p: string) {
   const t = [...MAIN_TOOLS, ...ADVANCED_TOOLS].find((x) => p === x.href || p.startsWith(x.href + "/"));
