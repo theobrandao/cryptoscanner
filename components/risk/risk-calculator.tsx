@@ -234,7 +234,7 @@ export function RiskCalculator({ prefill }: { prefill?: RiskPrefill }) {
       {stress.length ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Stress test</CardTitle>
+            <CardTitle className="text-base">Teste de estresse</CardTitle>
             <CardDescription>P&L, razão de margem e distância da liquidação para variações do preço a partir da entrada.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0 sm:p-0">

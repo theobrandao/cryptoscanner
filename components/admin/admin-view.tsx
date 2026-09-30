@@ -106,7 +106,7 @@ export function AdminView() {
             </section>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Operação: <Link href="/status" className="underline">System Status</Link> · chamados em Help &amp; Support.
+            Operação: <Link href="/status" className="underline">Estado do sistema</Link> · chamados em Help &amp; Support.
           </p>
         </div>
       ) : null}

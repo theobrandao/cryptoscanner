@@ -61,6 +61,7 @@ model User {
   monitors          Monitor[]
   monitorEvents     MonitorEvent[]
   passwordResets    PasswordReset[]
+  analystConversations AnalystConversation[]
 }
 
 model UserPreference {
@@ -687,4 +688,33 @@ model ExternalGrant {
 
   @@unique([provider, externalId])
   @@index([email])
+}
+
+/// Conversa do Analista IA (histórico por usuário; as respostas são geradas só com dados das ferramentas do app)
+model AnalystConversation {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AnalystMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model AnalystMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  /// user | assistant
+  role           String
+  content        String
+  /// assistant: ferramentas consultadas, números não conferidos, ações propostas, modelo
+  meta           Json?
+  createdAt      DateTime @default(now())
+
+  conversation AnalystConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }

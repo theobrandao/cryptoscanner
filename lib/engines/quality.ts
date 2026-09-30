@@ -146,7 +146,7 @@ export function classifyStatus(i: StatusInput): { status: DataStatus; issues: st
   }
   if (delayed) return { status: "DELAYED", issues };
   const degraded = (i.gaps ?? 0) > 0 || (i.invalid ?? 0) > 0 || (i.divergencePct != null && Math.abs(i.divergencePct) > DIVERGENCE_THRESHOLD_PCT);
-  if (i.divergencePct != null && Math.abs(i.divergencePct) > DIVERGENCE_THRESHOLD_PCT) issues.push(`DATA DISCREPANCY: ${i.divergencePct.toFixed(2)}% entre fontes`);
+  if (i.divergencePct != null && Math.abs(i.divergencePct) > DIVERGENCE_THRESHOLD_PCT) issues.push(`divergência de ${i.divergencePct.toFixed(2).replace(".", ",")}% entre fontes`);
   if (degraded) return { status: "DEGRADED", issues };
   if (i.source !== i.primarySource) return { status: "FALLBACK", issues: [`fonte secundária (${i.source})`] };
   return { status: "LIVE", issues };

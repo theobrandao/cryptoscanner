@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { EntityBlock, LegalDoc, legalEntity } from "@/components/legal/legal-doc";
 
-export const metadata: Metadata = { title: "Política de Privacidade — CryptoScanner" };
+export const metadata: Metadata = { title: "Política de Privacidade" };
 
 export default async function PrivacyPage() {
   await connection();

@@ -5,6 +5,7 @@ import type { MtfResult } from "@/lib/engines/mtf";
 import type { Technicals } from "@/lib/engines/technicals";
 import type { SetupGeometry } from "@/lib/engines/setup";
 import type { DataStatus } from "@/lib/engines/quality";
+import { candlesAgo, dec, POOL_KIND_PT, pt } from "@/lib/display-labels";
 
 /**
  * Confluence Score (R2) — nota 0–100 de QUALIDADE/CONFLUÊNCIA. Não é probabilidade.
@@ -32,14 +33,14 @@ export const DEFAULT_WEIGHTS: Record<ComponentKey, number> = {
 };
 
 export const COMPONENT_LABEL: Record<ComponentKey, string> = {
-  structure: "Market Structure",
-  liquidity: "Liquidity",
-  htf: "HTF Alignment",
+  structure: "Estrutura",
+  liquidity: "Liquidez",
+  htf: "Tendência maior (HTF)",
   volume: "Volume",
-  momentum: "Momentum",
-  derivatives: "Derivatives",
-  historical: "Historical Perf.",
-  risk: "Risk Quality",
+  momentum: "Momento",
+  derivatives: "Derivativos",
+  historical: "Histórico",
+  risk: "Qualidade do risco",
 };
 
 export interface ConfluenceComponent {
@@ -167,12 +168,12 @@ export function computeConfluence(i: ConfluenceInput): ConfluenceResult {
     const sweep = i.liquidity.recentSweeps.find((s) => s.direction === d);
     if (sweep) {
       v += 8;
-      r.push(`varredura de ${sweep.kind} há ${sweep.barsAgo} candles`);
+      r.push(`varredura de ${pt(POOL_KIND_PT, sweep.kind)} ${candlesAgo(sweep.barsAgo)}`);
     }
     const ahead = d === "bullish" ? i.liquidity.nearestAbove : i.liquidity.nearestBelow;
     if (ahead && Number.isFinite(ahead.distanceAtr) && Math.abs(ahead.distanceAtr) <= 3) {
       v += 4;
-      r.push(`liquidez-alvo a ${Math.abs(ahead.distanceAtr).toFixed(1)} ATR`);
+      r.push(`liquidez-alvo a ${dec(Math.abs(ahead.distanceAtr), 1)} ATR`);
     }
     if (i.setup && /liquidez|fundo|topo/.test(i.setup.keyLevel.source)) {
       v += 3;
@@ -181,7 +182,7 @@ export function computeConfluence(i: ConfluenceInput): ConfluenceResult {
     add("liquidity", (v / 15) * W.liquidity, r.length ? r : ["sem evento de liquidez relevante"]);
     if (ahead && Number.isFinite(ahead.distanceAtr) && Math.abs(ahead.distanceAtr) < 0.5) pen(d === "bullish" ? "Resistance nearby" : "Support nearby", -3);
     const against = i.liquidity.recentSweeps.find((s) => s.direction !== d && s.barsAgo <= 3);
-    if (against) pen(`Varredura contrária recente (${against.kind})`, -3);
+    if (against) pen(`Varredura contrária recente (${pt(POOL_KIND_PT, against.kind)})`, -3);
   }
 
   // HTF Alignment (15): proporcional ao score ponderado na direção
@@ -190,7 +191,7 @@ export function computeConfluence(i: ConfluenceInput): ConfluenceResult {
     const a = (i.mtf.alignmentScore * sg) / 100;
     add("htf", a * W.htf, [`alinhamento ${i.mtf.alignmentScore > 0 ? "+" : ""}${i.mtf.alignmentScore}${i.mtf.summary ? ` (${i.mtf.summary})` : ""}`], available);
     if (available && a <= -0.6) {
-      pen("Conflicting timeframes", -5);
+      pen("Timeframes em conflito", -5);
       noTrade.push("Timeframes superiores fortemente contra a direção");
     }
   }
@@ -202,12 +203,12 @@ export function computeConfluence(i: ConfluenceInput): ConfluenceResult {
     let v = 0;
     if (t.rvol != null) {
       v += t.rvol >= 2 ? 7 : t.rvol >= 1.5 ? 5 : t.rvol >= 1 ? 3 : 0;
-      r.push(`RVOL ${t.rvol.toFixed(2)}×`);
+      r.push(`RVOL ${dec(t.rvol, 2)}×`);
       if (t.rvol < 0.6) pen("Volume baixo (RVOL < 0,6)", -2);
     }
     if (t.volumeZ != null && t.volumeZ >= 2) {
       v += 3;
-      r.push(`z-score ${t.volumeZ.toFixed(1)}`);
+      r.push(`z-score ${dec(t.volumeZ, 1)}`);
     }
     add("volume", (v / 10) * W.volume, r, t.rvol != null);
   }
@@ -221,11 +222,11 @@ export function computeConfluence(i: ConfluenceInput): ConfluenceResult {
       const rsiD = sg > 0 ? t.rsi : 100 - t.rsi;
       if (rsiD >= 50 && rsiD <= 70) {
         v += 4;
-        r.push(`RSI ${t.rsi.toFixed(1)} em zona de força`);
+        r.push(`RSI ${dec(t.rsi, 1)} em zona de força`);
       } else if (rsiD > 75) {
-        r.push(`RSI ${t.rsi.toFixed(1)} esticado`);
+        r.push(`RSI ${dec(t.rsi, 1)} esticado`);
         pen(sg > 0 ? "RSI sobrecomprado" : "RSI sobrevendido", -2);
-      } else r.push(`RSI ${t.rsi.toFixed(1)}`);
+      } else r.push(`RSI ${dec(t.rsi, 1)}`);
     }
     if (t.macd.histogram != null && sg * t.macd.histogram > 0) {
       v += 3;
@@ -254,12 +255,12 @@ export function computeConfluence(i: ConfluenceInput): ConfluenceResult {
     if (dv?.fundingRate != null) {
       const f = dv.fundingRate * sg;
       if (f > 0.0005) {
-        pen("Elevated funding (lado lotado)", -2);
-        r.push(`funding ${(dv.fundingRate * 100).toFixed(4)}% lotado`);
+        pen("Funding elevado (lado lotado)", -2);
+        r.push(`funding ${dec(dv.fundingRate * 100, 4)}% lotado`);
       } else if (f < 0) {
         v += 2;
-        r.push(`funding ${(dv.fundingRate * 100).toFixed(4)}%: o outro lado paga`);
-      } else r.push(`funding ${(dv.fundingRate * 100).toFixed(4)}% neutro`);
+        r.push(`funding ${dec(dv.fundingRate * 100, 4)}%: o outro lado paga`);
+      } else r.push(`funding ${dec(dv.fundingRate * 100, 4)}% neutro`);
     }
     if (dv?.openInterestChange24hPct != null && dv.priceChange24hPct != null) {
       const oiUp = dv.openInterestChange24hPct > 0;
@@ -270,7 +271,7 @@ export function computeConfluence(i: ConfluenceInput): ConfluenceResult {
       } else if (oiUp && !priceFav) {
         pen("OI ↑ com preço contra", -2);
         r.push("OI ↑ com preço contra");
-      } else r.push(`OI ${dv.openInterestChange24hPct.toFixed(1)}% em 24h`);
+      } else r.push(`OI ${dec(dv.openInterestChange24hPct, 1)}% em 24h`);
     }
     add("derivatives", (v / 10) * W.derivatives, avail ? r : ["indisponível para este instrumento/fonte"], avail);
   }
@@ -280,7 +281,7 @@ export function computeConfluence(i: ConfluenceInput): ConfluenceResult {
     const h = i.historical;
     const avail = h != null && h.expectancyR != null && h.samples >= h.minSample;
     const e = h?.expectancyR ?? 0;
-    add("historical", avail ? clamp(e * 25, 0, 10) * (W.historical / 10) : 0, h ? [`expectativa ${h.expectancyR != null ? `${e >= 0 ? "+" : ""}${e.toFixed(2)}R` : "—"} · n=${h.samples}${h.samples < h.minSample ? " (amostra pequena)" : ""}`] : ["sem backtest para este recorte"], avail);
+    add("historical", avail ? clamp(e * 25, 0, 10) * (W.historical / 10) : 0, h ? [`expectativa ${h.expectancyR != null ? `${e >= 0 ? "+" : ""}${dec(e, 2)}R` : "—"} · n=${h.samples}${h.samples < h.minSample ? " (amostra pequena)" : ""}`] : ["sem backtest para este recorte"], avail);
     if (avail && e < -0.1) pen("Expectativa histórica negativa", -3);
   }
 
@@ -292,8 +293,8 @@ export function computeConfluence(i: ConfluenceInput): ConfluenceResult {
     if (rr == null) noTrade.push("Sem geometria de setup (entrada/invalidação/alvo)");
     else {
       v = rr >= 3 ? 10 : rr >= 2 ? 8 : rr >= 1.5 ? 6 : rr >= 1 ? 3 : 0;
-      if (rr < 1) noTrade.push(`R:R até o TP1 abaixo de 1 (${rr.toFixed(2)})`);
-      r.push(`R:R ${rr.toFixed(2)} até o TP1`);
+      if (rr < 1) noTrade.push(`R:R até o TP1 abaixo de 1 (${dec(rr, 2)})`);
+      r.push(`R:R ${dec(rr, 2)} até o TP1`);
     }
     add("risk", (v / 10) * W.risk, r, rr != null);
   }
@@ -306,10 +307,11 @@ export function computeConfluence(i: ConfluenceInput): ConfluenceResult {
   }
   if (i.technicals.volatility === "EXTREME") pen("Volatilidade extrema", -3);
   let dataIssue = false;
+  const dsTxt = ({ DEGRADED: "degradados", DELAYED: "atrasados", OFFLINE: "offline" } as Record<string, string>)[i.dataStatus ?? ""] ?? i.dataStatus;
   if (i.dataStatus && i.dataStatus !== "LIVE" && i.dataStatus !== "FALLBACK") {
-    pen(`Dados ${i.dataStatus}`, -5);
+    pen(`Dados ${dsTxt}`, -5);
     if (i.dataStatus === "OFFLINE" || i.dataStatus === "DELAYED") {
-      noTrade.push(`Dados ${i.dataStatus}: sem base atual para operar`);
+      noTrade.push(`Dados ${dsTxt}: sem base atual para operar`);
       dataIssue = true;
     }
   }
@@ -317,7 +319,7 @@ export function computeConfluence(i: ConfluenceInput): ConfluenceResult {
   const raw = r1(comps.reduce((s, c) => s + c.score, 0));
   const penaltyTotal = penalties.reduce((s, p) => s + p.points, 0);
   const score = Math.round(clamp(raw + penaltyTotal, 0, 100));
-  if (score < 40) noTrade.push(`Confluência ${score}/100 (Low)`);
+  if (score < 40) noTrade.push(`Confluência ${score}/100 (baixa)`);
   const verdict: Verdict = noTrade.length ? "NO_TRADE" : score >= 60 ? "TRADE_CANDIDATE" : "WATCH";
   const conflicting = noTrade.some((n) => n.startsWith("Timeframes superiores"));
   const condition: ConfluenceResult["condition"] = dataIssue ? "DATA_UNAVAILABLE" : conflicting ? "CONFLICTING_TIMEFRAMES" : !i.setup ? "NO_SETUP" : score < 40 ? "LOW_CONFLUENCE" : "OK";

@@ -88,7 +88,7 @@ export function PortfolioView() {
   if (!user) {
     return (
       <PageShell>
-        <PageTitle icon="💼" title="Carteira" description="Watchlist com posições simuladas, alertas personalizados e análises salvas." />
+        <PageTitle icon="💼" title="Carteira" description="Favoritos com posições simuladas, alertas personalizados e análises salvas." />
         <Alert
           variant="info"
           title="Faça login para usar a Carteira"
@@ -105,10 +105,10 @@ export function PortfolioView() {
   }
   return (
     <PageShell>
-      <PageTitle icon="💼" title="Carteira" description="Watchlist com posições simuladas (quantidade e preço médio), alertas personalizados e análises de gráfico salvas." />
+      <PageTitle icon="💼" title="Carteira" description="Favoritos com posições simuladas (quantidade e preço médio), alertas personalizados e análises de gráfico salvas." />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="carteira">💼 Watchlist & posições</TabsTrigger>
+          <TabsTrigger value="carteira">💼 Favoritos e posições</TabsTrigger>
           <TabsTrigger value="alertas">🔔 Alertas</TabsTrigger>
           <TabsTrigger value="analises">🧠 Análises salvas</TabsTrigger>
         </TabsList>

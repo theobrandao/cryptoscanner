@@ -14,3 +14,23 @@ describe("AI Analyst — guardrail numérico", () => {
     expect(unknownNumbers("3 timeframes e 2 penalidades", {})).toEqual([]);
   });
 });
+
+describe("AI Analyst — guardrail por precisão escrita", () => {
+  it("número com 1 casa só casa com valores que arredondam para ele", () => {
+    const ctx = { hitRatePct: [74.1, 62.5, 55.0], samples: 599 };
+    expect(unknownNumbers("Probabilidade estimada de 73.9%.", ctx)).toEqual([73.9]);
+    expect(unknownNumbers("Acerto de 74.1% em 599 amostras.", ctx)).toEqual([]);
+    expect(unknownNumbers("Acerto de 62,5% e 55%.", ctx)).toEqual([]);
+  });
+  it("preço grande escrito arredondado segue aceito; bilhões e mil também", () => {
+    const ctx = { price: 67012.4, cap: 2_345_000_000_000 };
+    expect(unknownNumbers("BTC em 67,012 (67.012) e capitalização de 2.345 bi… ou 2,35 tri", ctx).includes(67012)).toBe(false);
+    expect(unknownNumbers("BTC perto de 67 mil", { price: 67012.4 })).toEqual([]);
+  });
+  it("padrão brasileiro e separador ambíguo (milhar ou decimal) aceitam a leitura que existe nos dados", () => {
+    const ctx = { price: 119.26, zoneHigh: 117360.5, atr: 1.234 };
+    expect(unknownNumbers("SOL em 119,26; zona até US$ 117.360,50; 1,234 ATR", ctx)).toEqual([]);
+    expect(unknownNumbers("SOL em 119,260 e ATR 1.234", ctx)).toEqual([]);
+    expect(unknownNumbers("SOL em 119,960", ctx)).toEqual([119960]);
+  });
+});

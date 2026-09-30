@@ -121,7 +121,7 @@ describe("confluence", () => {
     expect(c.components.find((x) => x.key === "derivatives")?.available).toBe(false);
     expect(c.verdict).toBe("NO_TRADE");
     expect(c.noTradeReasons.join()).toMatch(/R:R/);
-    expect(c.penalties.some((p) => /DELAYED/.test(p.label))).toBe(true);
+    expect(c.penalties.some((p) => /Dados atrasados/.test(p.label))).toBe(true);
   });
   it("pesos padrão somam 100", () => {
     expect(Object.values(DEFAULT_WEIGHTS).reduce((a, b) => a + b, 0)).toBe(100);

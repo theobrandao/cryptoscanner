@@ -17,6 +17,7 @@ import {
   Ruler,
   ShieldCheck,
   Signal,
+  Sparkles,
   Target,
   Workflow,
 } from "lucide-react";
@@ -42,6 +43,7 @@ const MAP: Record<ToolIcon, React.ComponentType<{ className?: string }>> = {
   target: Target,
   chart: ChartNoAxesCombined,
   percent: Percent,
+  sparkles: Sparkles,
 };
 
 export function ToolIconView({ icon, className }: { icon: ToolIcon; className?: string }) {

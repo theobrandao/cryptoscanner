@@ -14,6 +14,8 @@ export const ANALYTICS_EVENTS = [
   "dashboard_view",
   "context_change",
   "analyst_open",
+  "analyst_message",
+  "analyst_action_alert",
   "strategy_created",
   "strategy_scan",
   "monitor_created",

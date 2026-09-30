@@ -43,7 +43,7 @@ describe("classifyStatus", () => {
     expect(classifyStatus(base).status).toBe("LIVE");
     expect(classifyStatus({ ...base, source: "kraken" }).status).toBe("FALLBACK");
     expect(classifyStatus({ ...base, gaps: 1 }).status).toBe("DEGRADED");
-    expect(classifyStatus({ ...base, divergencePct: 0.9 }).issues.join()).toMatch(/DATA DISCREPANCY/);
+    expect(classifyStatus({ ...base, divergencePct: 0.9 }).issues.join()).toMatch(/divergência de 0,90% entre fontes/);
     expect(classifyStatus({ ...base, stale: true }).status).toBe("DELAYED");
     expect(classifyStatus({ ...base, lastClosedOpenTime: now - 10 * 4 * H }).status).toBe("DELAYED");
     expect(classifyStatus({ ...base, fetchedAt: 0 }).status).toBe("OFFLINE");

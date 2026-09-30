@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { BubblesView } from "@/components/market/bubbles-view";
 
-export const metadata: Metadata = { title: "Bubbles" };
+export const metadata: Metadata = { title: "Bolhas de mercado" };
 export default function Page() {
   return <BubblesView />;
 }

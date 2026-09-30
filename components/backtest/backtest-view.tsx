@@ -210,7 +210,7 @@ function BacktestInner() {
           <div className="text-[12.5px] text-muted-foreground">
             {res.params.strategyName} · {res.params.symbol}/USDT {res.params.timeframe.toUpperCase()} · {VENUE_LABEL[res.params.exchange]} {INSTRUMENT_LABEL[res.params.instrument]} · {new Date(res.fromTime).toLocaleDateString("pt-BR")}–{new Date(res.toTime).toLocaleDateString("pt-BR")} · {res.bars} candles · {res.signals} sinais
           </div>
-          {m.samples < 30 ? <Alert variant="warning">LOW SAMPLE SIZE: {m.samples} operações. Não use o resultado isoladamente.</Alert> : null}
+          {m.samples < 30 ? <Alert variant="warning">Amostra pequena: {m.samples} operações. Não use o resultado isoladamente.</Alert> : null}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
             <Metric k="Operações" v={String(m.samples)} />
             <Metric k="Expectativa líquida" v={r2(m.expectancyR)} tone={(m.expectancyR ?? 0) > 0 ? "up" : "down"} hint={`bruta ${r2(res.grossExpectancyR)}`} />

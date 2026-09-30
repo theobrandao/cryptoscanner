@@ -1,6 +1,7 @@
 import type { Candle, Direction } from "@/types/market";
 import type { StructureResult } from "@/lib/engines/structure";
 import type { LiquidityMap } from "@/lib/engines/liquidity";
+import { dec, POOL_KIND_PT, pt } from "@/lib/display-labels";
 
 /**
  * Setup Engine — geometria determinística de um setup a partir de estrutura e liquidez, e máquina de
@@ -81,11 +82,11 @@ export function buildSetupGeometry(
   if (long) {
     push(external.lastLow?.price, "fundo externo");
     push(internal.lastLow?.price, "fundo interno");
-    push(liquidity.nearestBelow?.price, `liquidez ${liquidity.nearestBelow?.kind ?? ""}`.trim());
+    push(liquidity.nearestBelow?.price, liquidity.nearestBelow ? `liquidez: ${pt(POOL_KIND_PT, liquidity.nearestBelow.kind)}` : "liquidez");
   } else {
     push(external.lastHigh?.price, "topo externo");
     push(internal.lastHigh?.price, "topo interno");
-    push(liquidity.nearestAbove?.price, `liquidez ${liquidity.nearestAbove?.kind ?? ""}`.trim());
+    push(liquidity.nearestAbove?.price, liquidity.nearestAbove ? `liquidez: ${pt(POOL_KIND_PT, liquidity.nearestAbove.kind)}` : "liquidez");
   }
   if (external.range) push(external.range.equilibrium, "equilíbrio da faixa");
   if (!cands.length) return null;
@@ -111,7 +112,7 @@ export function buildSetupGeometry(
   const levels: Lv[] = [];
   for (const p of liquidity.pools) {
     if (p.state !== "available") continue;
-    if (long ? p.price > ideal && p.side === "BSL" : p.price < ideal && p.side === "SSL") levels.push({ price: p.price, source: `liquidez ${p.kind}` });
+    if (long ? p.price > ideal && p.side === "BSL" : p.price < ideal && p.side === "SSL") levels.push({ price: p.price, source: `liquidez: ${pt(POOL_KIND_PT, p.kind)}` });
   }
   const extTarget = long ? external.lastHigh?.price : external.lastLow?.price;
   if (extTarget != null && (long ? extTarget > ideal : extTarget < ideal)) levels.push({ price: extTarget, source: long ? "topo externo" : "fundo externo" });
@@ -211,7 +212,7 @@ export function evaluateSetup(candles: readonly Candle[], g: SetupGeometry, inte
   }
   if (long ? last.close < g.invalidation.price : last.close > g.invalidation.price) return { ...base, state: "INVALIDATED", stateReason: "fechamento além da invalidação estrutural", checks };
   if (confluenceScore >= SETUP_THRESHOLDS.ready && dist <= SETUP_THRESHOLDS.readyDistanceAtr)
-    return { ...base, state: "READY", stateReason: dist === 0 ? "preço na zona; aguardando quebra da estrutura interna" : `a ${dist.toFixed(2)} ATR da zona; aguardando chegada e gatilho`, checks: { ...checks, awaitingTrigger: true } };
-  if (confluenceScore >= SETUP_THRESHOLDS.forming) return { ...base, state: "FORMING", stateReason: `confluência ${Math.round(confluenceScore)}; preço a ${dist.toFixed(2)} ATR da zona`, checks };
+    return { ...base, state: "READY", stateReason: dist === 0 ? "preço na zona; aguardando quebra da estrutura interna" : `a ${dec(dist)} ATR da zona; aguardando chegada e gatilho`, checks: { ...checks, awaitingTrigger: true } };
+  if (confluenceScore >= SETUP_THRESHOLDS.forming) return { ...base, state: "FORMING", stateReason: `confluência ${Math.round(confluenceScore)}; preço a ${dec(dist)} ATR da zona`, checks };
   return { ...base, state: "DETECTED", stateReason: `geometria válida, confluência ${Math.round(confluenceScore)} abaixo de ${SETUP_THRESHOLDS.forming}`, checks };
 }

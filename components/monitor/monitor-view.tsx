@@ -181,7 +181,7 @@ function MonitorInner() {
               <label className="flex items-center gap-1.5">
                 <input type="checkbox" checked={telegram} onChange={(e) => setTelegram(e.target.checked)} /> Telegram
               </label>
-              <span className="text-[11px] text-muted-foreground">In-app sempre. Push e Telegram configurados em Settings.</span>
+              <span className="text-[11px] text-muted-foreground">No app sempre. Push e Telegram configurados em Preferências.</span>
               <button onClick={() => void create()} disabled={busy || (kind === "STRATEGY" && !strategyId)} className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-[13px] font-semibold text-primary-foreground disabled:opacity-50">
                 <BellRing className="h-4 w-4" /> Criar monitor
               </button>
@@ -192,7 +192,7 @@ function MonitorInner() {
               <span className="font-semibold">Monitores</span>
               <span className="text-muted-foreground">{data ? `${data.items.length}/${data.limit}` : "…"}</span>
             </div>
-            {data && data.items.length === 0 ? <p className="p-3 text-[12.5px] text-muted-foreground">Nenhum monitor. Crie um acima ou pelo botão “Monitor” no Dashboard.</p> : null}
+            {data && data.items.length === 0 ? <p className="p-3 text-[12.5px] text-muted-foreground">Nenhum monitor. Crie um acima ou pelo botão “Monitorar” na Análise completa.</p> : null}
             <ul className="divide-y divide-border">
               {(data?.items ?? []).map((m) => (
                 <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-[12.5px]">

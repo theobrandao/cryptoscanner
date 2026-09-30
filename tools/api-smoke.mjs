@@ -1316,18 +1316,18 @@ await test("Push", "GET/POST/DELETE /api/push/subscribe e POST /api/push/test", 
 });
 
 await test("LGPD", "DELETE /api/auth/account senha errada → 401; confirmação errada → 400", async () => {
-  const a = await call("DELETE", "/api/auth/account", { body: { confirm: "EXCLUIR", password: "Errada12345" } });
+  const a = await callAuth("DELETE", "/api/auth/account", { body: { confirm: "EXCLUIR", password: "Errada12345" } });
   expectStatus(a, 401, "invalid_credentials");
-  const b = await call("DELETE", "/api/auth/account", { body: { confirm: "excluir", password: PASSWORD } });
+  const b = await callAuth("DELETE", "/api/auth/account", { body: { confirm: "excluir", password: PASSWORD } });
   expectStatus(b, 400, "validation");
   return "401 + 400";
 });
 
 await test("LGPD", "DELETE /api/auth/account (exclusão definitiva da conta de teste)", async () => {
-  const r = await call("DELETE", "/api/auth/account", { body: { confirm: "EXCLUIR", password: PASSWORD } });
+  const r = await callAuth("DELETE", "/api/auth/account", { body: { confirm: "EXCLUIR", password: PASSWORD } });
   expectStatus(r, 200);
   cookie = "";
-  const login = await call("POST", "/api/auth/login", { auth: false, body: { email: EMAIL, password: PASSWORD } });
+  const login = await callAuth("POST", "/api/auth/login", { auth: false, body: { email: EMAIL, password: PASSWORD } });
   expectStatus(login, 401, "invalid_credentials");
   cookie = "";
   return "conta apagada; login passa a falhar";

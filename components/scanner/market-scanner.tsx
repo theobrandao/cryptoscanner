@@ -16,6 +16,7 @@ import { postJson } from "@/lib/client-api";
 import type { SetupRow } from "@/services/market-overview-service";
 import type { ScanRow, StrategyRecord } from "@/services/strategy-service";
 import type { Timeframe } from "@/types/market";
+import { CONDITION_PT, directionPt, NO_TRADE_CODE_PT, pt, REGIME_PT, SCORE_LABEL_PT, SETUP_STATE_PT } from "@/lib/display-labels";
 
 const TFS: Timeframe[] = ["15m", "30m", "1h", "4h", "1d", "1w"];
 const STATES = ["DETECTED", "FORMING", "READY", "TRIGGERED", "ACTIVE", "TARGET_HIT", "INVALIDATED", "EXPIRED"] as const;
@@ -131,14 +132,14 @@ function ScannerInner() {
         </div>
         <select aria-label="Direção" className={sel} value={direction} onChange={(e) => setDirection(e.target.value as typeof direction)}>
           <option value="all">Direção: todas</option>
-          <option value="bullish">Bullish</option>
-          <option value="bearish">Bearish</option>
+          <option value="bullish">Altista</option>
+          <option value="bearish">Baixista</option>
         </select>
         <select aria-label="Regime" className={sel} value={regime} onChange={(e) => setRegime(e.target.value)}>
           <option value="all">Regime: todos</option>
           {REGIMES.map((r) => (
             <option key={r} value={r}>
-              {r}
+              {pt(REGIME_PT, r)}
             </option>
           ))}
         </select>
@@ -151,11 +152,11 @@ function ScannerInner() {
           ))}
         </select>
         <label className="flex items-center gap-1.5 text-[12.5px]">
-          Score ≥
-          <input type="number" min={0} max={100} step={5} value={minScore} onChange={(e) => setMinScore(Math.max(0, Math.min(100, Number(e.target.value))))} className={cn(sel, "w-16")} aria-label="Score mínimo" />
+          Nota ≥
+          <input type="number" min={0} max={100} step={5} value={minScore} onChange={(e) => setMinScore(Math.max(0, Math.min(100, Number(e.target.value))))} className={cn(sel, "w-16")} aria-label="Nota mínima" />
         </label>
         <label className="flex items-center gap-1.5 text-[12.5px]">
-          <input type="checkbox" checked={operable} onChange={(e) => setOperable(e.target.checked)} /> Ocultar NO TRADE
+          <input type="checkbox" checked={operable} onChange={(e) => setOperable(e.target.checked)} /> Ocultar sem entrada
         </label>
         <select aria-label="Estratégia" className={sel} value={strategyId} onChange={(e) => (setStrategyId(e.target.value), setStratRows(null))}>
           <option value="">Estratégia: nenhuma</option>
@@ -170,7 +171,7 @@ function ScannerInner() {
       <div className="mb-3 flex flex-wrap gap-1" role="group" aria-label="Estados do setup">
         {STATES.map((s) => (
           <button key={s} aria-pressed={states.includes(s)} onClick={() => setStates((x) => (x.includes(s) ? x.filter((y) => y !== s) : [...x, s]))} className={cn("h-7 rounded-full border px-2.5 text-[11px]", states.includes(s) ? "border-primary bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:text-foreground")}>
-            {s.replace("_", " ")}
+            {pt(SETUP_STATE_PT, s)}
           </button>
         ))}
       </div>
@@ -186,11 +187,11 @@ function ScannerInner() {
                 {th("changePct24h", "24h", true)}
                 <th className="px-2 py-2 font-medium">Setup</th>
                 <th className="px-2 py-2 font-medium">Regime</th>
-                {th("score", "Score", true)}
+                {th("score", "Nota", true)}
                 {th("rr", "R:R", true)}
                 {th("distanceToZoneAtr", "Dist. zona (ATR)", true)}
                 <th className="px-2 py-2 text-right font-medium">Zona</th>
-                <th className="px-2 py-2 text-right font-medium">Trigger</th>
+                <th className="px-2 py-2 text-right font-medium">Gatilho</th>
                 <th className="px-2 py-2 text-right font-medium">Stop</th>
                 <th className="px-2 py-2 text-right font-medium">TP1</th>
                 {th("rsi", "RSI", true)}
@@ -211,11 +212,11 @@ function ScannerInner() {
                     </td>
                     <td className={cn("tabular px-2 py-1.5 text-right", (r.changePct24h ?? 0) >= 0 ? "text-success" : "text-danger")}>{r.changePct24h != null ? formatPct(r.changePct24h) : "—"}</td>
                     <td className={cn("px-2 py-1.5", r.direction === "bullish" ? "text-success" : r.direction === "bearish" ? "text-danger" : "text-muted-foreground")}>
-                      {r.verdict === "NO_TRADE" ? <span className="text-muted-foreground">NO TRADE · {r.noTradeCode ?? r.condition.replace("_", " ")}</span> : `${r.direction === "bullish" ? "Bullish" : "Bearish"} · ${(r.state ?? "—").replace("_", " ")}`}
+                      {r.verdict === "NO_TRADE" ? <span className="text-muted-foreground">Sem entrada · {r.noTradeCode ? pt(NO_TRADE_CODE_PT, r.noTradeCode) : pt(CONDITION_PT, r.condition)}</span> : `${directionPt(r.direction)} · ${pt(SETUP_STATE_PT, r.state).toLowerCase()}`}
                     </td>
-                    <td className="px-2 py-1.5 text-muted-foreground">{r.regime}</td>
+                    <td className="px-2 py-1.5 text-muted-foreground">{pt(REGIME_PT, r.regime)}</td>
                     <td className="px-2 py-1.5 text-right">
-                      <span className={cn("tabular inline-block min-w-9 rounded px-1.5 py-0.5 text-center text-[11px] font-semibold", scoreTone(r.score))} title={r.label}>
+                      <span className={cn("tabular inline-block min-w-9 rounded px-1.5 py-0.5 text-center text-[11px] font-semibold", scoreTone(r.score))} title={pt(SCORE_LABEL_PT, r.label)}>
                         {r.score}
                       </span>
                     </td>
@@ -235,7 +236,7 @@ function ScannerInner() {
               })}
             </tbody>
           </table>
-          {rows.length === 0 ? <p className="p-4 text-[12.5px] text-muted-foreground">Nenhum ativo com esses filtros agora. Desmarque “Ocultar NO TRADE” ou reduza o score mínimo.</p> : null}
+          {rows.length === 0 ? <p className="p-4 text-[12.5px] text-muted-foreground">Nenhum ativo com esses filtros agora. Desmarque “Ocultar sem entrada” ou reduza a nota mínima.</p> : null}
           <p className="border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
             {rows.length} de {data.rows.length} ativos · gerado {timeAgo(data.generatedAt)} · atualiza a cada 2 min{data.errors.length ? ` · sem dados: ${data.errors.map((e) => e.split(":")[0]).join(", ")}` : ""}
           </p>

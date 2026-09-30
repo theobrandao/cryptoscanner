@@ -4,11 +4,16 @@ import { AppProviders } from "@/components/providers/app-providers";
 import { PwaRegister } from "@/components/providers/pwa-register";
 import { themeInitScript } from "@/components/providers/theme-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: { default: "CryptoScanner — Crypto Market Intelligence Terminal", template: "%s — CryptoScanner" },
-  description: "Scanner de padrões gráficos em Bitcoin e altcoins com sistema multiagente, dados públicos de mercado e análise técnica programática.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: "CryptoScanner — scanner cripto com sinais testados e alertas", template: "%s — CryptoScanner" },
+  description: "Padrões gráficos, sinais de rompimento testados fora da amostra, agentes com alertas por push e Telegram e análise técnica de 30 criptomoedas.",
   applicationName: "CryptoScanner",
+  openGraph: { type: "website", locale: "pt_BR", siteName: "CryptoScanner" },
+  twitter: { card: "summary_large_image" },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {

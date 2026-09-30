@@ -5,7 +5,7 @@ import { getSessionFromRequest } from "@/lib/auth";
 import { track } from "@/services/analytics-service";
 
 /** Eventos de produto emitidos pelo cliente — somente nomes da lista, propriedades técnicas curtas. */
-const CLIENT_EVENTS = ["dashboard_view", "context_change", "analyst_open", "plans_view", "onboarding_step", "strategy_scan"] as const;
+const CLIENT_EVENTS = ["dashboard_view", "context_change", "analyst_open", "analyst_message", "analyst_action_alert", "plans_view", "onboarding_step", "strategy_scan"] as const;
 const bodySchema = z.object({
   name: z.enum(CLIENT_EVENTS),
   anonId: z.string().max(40).optional(),

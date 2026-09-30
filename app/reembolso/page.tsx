@@ -3,7 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { EntityBlock, LegalDoc, legalEntity } from "@/components/legal/legal-doc";
 
-export const metadata: Metadata = { title: "Cancelamento e Reembolso — CryptoScanner" };
+export const metadata: Metadata = { title: "Cancelamento e Reembolso" };
 
 export default async function RefundPage() {
   await connection();

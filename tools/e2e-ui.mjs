@@ -456,7 +456,7 @@ await step("Risco: tamanho de posição 10.000 × 1% com stop de 5% = 20 unidade
 await step("Análise completa BTC/USDT 4H (link antigo /?symbol= redireciona): header, gráfico, estrutura, liquidez, confluência, setup, derivativos, histórico, risco", async () => {
   await goto("/?symbol=BTC&tf=4h&exchange=okx&instrument=perp");
   await page.waitForFunction(() => location.pathname === "/charts/BTC", null, { timeout: 30_000 });
-  const PANELS = ["Market Structure", "Liquidity", "Confluence Score", "Setup Status", "Derivatives", "Historical Performance", "Watchlist", "Market Overview", "Market Scanner", "Risk Management", "Raw", "Penalties", "Final", "Trigger Level", "Next Funding"];
+  const PANELS = ["Estrutura de mercado", "Liquidez", "Confluence Score", "Estado do setup", "Derivativos", "Desempenho histórico", "Favoritos", "Visão do mercado", "Scanner de setups", "Gestão de risco", "Componentes", "Penalidades", "Final", "Nível de gatilho", "Próximo funding"];
   await page.waitForFunction((ps) => ps.every((t) => document.body.innerText.includes(t)), PANELS, { timeout: 90_000 });
   const canvases = await page.locator("canvas").count();
   expect(canvases >= 3, `gráfico sem canvas (${canvases})`);
@@ -465,7 +465,7 @@ await step("Análise completa BTC/USDT 4H (link antigo /?symbol= redireciona): h
   const shot1 = await shot("dashboard-btc");
   // spot: sem funding/OI no header e painel explica
   await page.getByRole("radio", { name: "Spot" }).click();
-  await page.waitForFunction(() => location.search.includes("instrument=spot") && /Contexto okx:spot:BTC:4h/.test(document.body.innerText) && !/Next Funding/.test(document.querySelector("h1")?.closest("div.flex.flex-col")?.textContent ?? ""), null, { timeout: 90_000 });
+  await page.waitForFunction(() => location.search.includes("instrument=spot") && /Contexto okx:spot:BTC:4h/.test(document.body.innerText) && !/Próximo funding/.test(document.querySelector("h1")?.closest("div.flex.flex-col")?.textContent ?? ""), null, { timeout: 90_000 });
   // troca de timeframe atualiza todo o contexto
   await page.getByRole("tab", { name: "1D", exact: true }).first().click();
   await page.waitForFunction(() => location.search.includes("tf=1d") && /Contexto okx:spot:BTC:1d/.test(document.body.innerText), null, { timeout: 90_000 });
@@ -480,7 +480,9 @@ await step("Análise completa BTC/USDT 4H (link antigo /?symbol= redireciona): h
 
 await step("Analista IA: painel lê o contexto ativo e só usa números do contexto", async () => {
   await page.getByRole("button", { name: "Analista IA" }).first().click();
-  await page.waitForFunction(() => /SOL\/USDT · Binance Spot · 1H/.test(document.body.innerText) && /Confluence Score/i.test(document.body.innerText) && /ESTRUTURA|Estrutura/.test(document.body.innerText), null, { timeout: 60_000 });
+  await page.waitForFunction(() => /SOL\/USDT · Binance Spot · 1H/.test(document.querySelector("[role=dialog]")?.textContent ?? ""), null, { timeout: 60_000 });
+  await page.locator("[role=dialog]").getByRole("button", { name: /^Resuma SOL no 1H/ }).click();
+  await page.waitForFunction(() => { const t = document.querySelector("[role=dialog]")?.textContent ?? ""; return /Confluence Score/.test(t) && /Estrutura/.test(t) && /Regime/.test(t); }, null, { timeout: 90_000 });
   const file = await shot("ai-analyst");
   await page.keyboard.press("Escape");
   return file;
@@ -501,7 +503,7 @@ await step("Strategies: modelo → salvar → testar agora → rodar no universo
 await step("Scanner de setups: 30 ativos com estado, score, regime, R:R; filtros", async () => {
   await goto("/scanner?tf=4h");
   await page.waitForFunction(() => /Scanner de setups/.test(document.body.innerText) && /de 30 ativos|de \d+ ativos/.test(document.body.innerText), null, { timeout: 120_000 });
-  await page.getByLabel("Ocultar NO TRADE").uncheck();
+  await page.getByLabel("Ocultar sem entrada").uncheck();
   await page.waitForFunction(() => document.querySelectorAll("table tbody tr").length >= 25, null, { timeout: 30_000 });
   return await shot("market-scanner");
 });

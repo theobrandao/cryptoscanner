@@ -6,6 +6,7 @@ import { createLogger } from "@/lib/logger";
 import { INSTRUMENT_LABEL, VENUE_LABEL, type Instrument, type Venue } from "@/lib/venues";
 import { definitionSchema } from "@/lib/strategies/definition";
 import { formatPrice } from "@/lib/format";
+import { directionPt, pt, SCORE_LABEL_PT, SETUP_STATE_PT } from "@/lib/display-labels";
 import { getMarketContext, type MarketContext } from "@/services/market-context-service";
 import { evaluateLive } from "@/services/strategy-service";
 import { sendPushToUser } from "@/services/push-service";
@@ -136,10 +137,10 @@ function setupText(c: MarketContext) {
   const s = c.setup;
   const head = `${c.symbol}/USDT ${c.timeframe.toUpperCase()} · ${VENUE_LABEL[c.exchange]} ${INSTRUMENT_LABEL[c.instrument]}`;
   if (!s) return { title: `${head}: sem setup`, body: c.confluence.noTradeReasons[0] ?? "sem geometria de setup" };
-  const dir = s.direction === "bullish" ? "Bullish" : "Bearish";
+  const dir = directionPt(s.direction).toLowerCase();
   return {
-    title: `${head}: ${s.state.replace("_", " ")} (${dir})`,
-    body: `Confluence ${c.confluence.score}/100 (${c.confluence.label}) · zona ${formatPrice(s.entryZone.low)}–${formatPrice(s.entryZone.high)} · stop ${formatPrice(s.stop)} · TP1 ${s.targets[0] ? formatPrice(s.targets[0].price) : "—"}${s.triggerLevel ? ` · gatilho ${formatPrice(s.triggerLevel.price)}` : ""}. ${s.stateReason}.`,
+    title: `${head}: ${pt(SETUP_STATE_PT, s.state)} (${dir})`,
+    body: `Confluence ${c.confluence.score}/100 (${pt(SCORE_LABEL_PT, c.confluence.label).toLowerCase()}) · zona ${formatPrice(s.entryZone.low)}–${formatPrice(s.entryZone.high)} · stop ${formatPrice(s.stop)} · TP1 ${s.targets[0] ? formatPrice(s.targets[0].price) : "—"}${s.triggerLevel ? ` · gatilho ${formatPrice(s.triggerLevel.price)}` : ""}. ${s.stateReason}.`,
   };
 }
 

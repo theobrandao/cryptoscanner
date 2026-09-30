@@ -6,7 +6,15 @@ export const metadata: Metadata = {
   title: { absolute: "CryptoScanner — padrões, sinais testados e alertas de cripto" },
   description: "Scanner de 17 padrões gráficos, modelo de rompimento testado fora da amostra, agentes com alertas por push e Telegram e ferramentas de análise para 30 criptos. 3 dias grátis no PRO, sem cartão.",
   alternates: { canonical: "/vendas" },
-  openGraph: { title: "CryptoScanner — padrões, sinais testados e alertas de cripto", description: "3 dias grátis no PRO, sem cartão. Garantia de 7 dias na compra.", type: "website" },
+  openGraph: {
+    title: "CryptoScanner — padrões, sinais testados e alertas de cripto",
+    description: "3 dias grátis no PRO, sem cartão. Garantia de 7 dias na compra.",
+    type: "website",
+    url: "/vendas",
+    locale: "pt_BR",
+    siteName: "CryptoScanner",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "CryptoScanner" }],
+  },
 };
 
 /** Página de vendas: destino dos anúncios e URL da página de vendas cadastrada na Kiwify. */

@@ -2,7 +2,7 @@
  * Catálogo das ferramentas: UMA por finalidade. Usado no menu, na tela inicial e na página de venda,
  * para que o nome e a descrição de cada ferramenta sejam os mesmos em todo lugar.
  */
-export type ToolIcon = "home" | "book" | "globe" | "bubbles" | "radar" | "bot" | "shield" | "candles" | "ruler" | "wallet" | "calculator" | "signal" | "workflow" | "activity" | "flask" | "gauge" | "target" | "chart" | "percent";
+export type ToolIcon = "home" | "book" | "globe" | "bubbles" | "radar" | "bot" | "shield" | "candles" | "ruler" | "wallet" | "calculator" | "signal" | "workflow" | "activity" | "flask" | "gauge" | "target" | "chart" | "percent" | "sparkles";
 
 export type ToolCategory = "Início" | "Mercado" | "Análise" | "Automação" | "Planejamento" | "Aprender" | "Avançado";
 
@@ -33,6 +33,7 @@ export const MAIN_TOOLS: Tool[] = [
   { href: "/sentinela", name: "Sentinela", icon: "shield", category: "Automação", chips: ["24h", "Multipadrão", "Plano de trade"], purpose: "Vigia um ativo em vários padrões ao mesmo tempo, 24h no servidor, com plano de trade." },
   { href: "/graficos", name: "Gráficos", icon: "candles", category: "Análise", chips: ["Ao vivo", "Indicadores"], purpose: "Candles ao vivo com EMA, Bollinger, StochRSI, MACD e suportes/resistências." },
   { href: "/fibonacci", name: "Fibonacci", icon: "ruler", category: "Análise", chips: ["Retrações", "Extensões"], purpose: "Retrações e extensões calculadas do último swing do ativo, ou de máxima e mínima manuais." },
+  { href: "/analista", name: "Analista IA", icon: "sparkles", category: "Análise", chips: ["Conversa", "Só números do app"], purpose: "Converse sobre qualquer ativo: o analista consulta scanner, sinais, taxa de acerto e panorama e responde com os números." },
   { href: "/carteira", name: "Carteira", icon: "wallet", category: "Planejamento", chips: ["Favoritos", "Alertas de preço"], purpose: "Favoritos, posições simuladas, alertas de preço e análises salvas." },
   { href: "/simulador", name: "Simulador", icon: "calculator", category: "Planejamento", chips: ["DCA", "Aporte único", "Preços reais"], purpose: "Quanto teria rendido aportar (DCA mensal ou aporte único) com preços diários reais." },
 ];

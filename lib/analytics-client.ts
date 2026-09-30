@@ -1,7 +1,7 @@
 "use client";
 
 /** Evento de produto (best-effort; nunca bloqueia a interface). */
-export function trackClient(name: "dashboard_view" | "context_change" | "analyst_open" | "plans_view" | "onboarding_step" | "strategy_scan", props?: Record<string, string | number | boolean | null>) {
+export function trackClient(name: "dashboard_view" | "context_change" | "analyst_open" | "analyst_message" | "analyst_action_alert" | "plans_view" | "onboarding_step" | "strategy_scan", props?: Record<string, string | number | boolean | null>) {
   try {
     let anonId: string | undefined;
     try {

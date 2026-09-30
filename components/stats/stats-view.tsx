@@ -116,7 +116,7 @@ export function StatsView() {
                     <th className="px-3 py-2 text-right">3R</th>
                     <th className="px-3 py-2 text-right">Expectativa</th>
                     <th className="px-3 py-2 text-right">Ganho/Perda médios</th>
-                    <th className="px-3 py-2 text-right">Profit factor</th>
+                    <th className="px-3 py-2 text-right">Fator de lucro</th>
                     <th className="px-3 py-2 text-right">Máx. DD</th>
                     <th className="px-3 py-2 text-right">MFE/MAE</th>
                     <th className="px-3 py-2 text-right">Ao vivo</th>
@@ -223,7 +223,7 @@ function StatCard({ r, min }: { r: PatternStatRow; min: number }) {
             <div className="text-lg font-bold tabular">{pct(r.hitRate)}</div>
           </div>
           <div>
-            <div className="text-muted-foreground">Profit factor</div>
+            <div className="text-muted-foreground">Fator de lucro</div>
             <div className="text-lg font-bold tabular">{num(r.profitFactor)}</div>
           </div>
         </div>

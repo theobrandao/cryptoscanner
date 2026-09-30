@@ -26,22 +26,23 @@ import type { SetupRow } from "@/services/market-overview-service";
 import type { Timeframe } from "@/types/market";
 import { OnboardingCard } from "@/components/terminal/onboarding-card";
 import { trackClient } from "@/lib/analytics-client";
+import { DATA_STATUS_PT, poolShort, pt, REGIME_PT, VOLATILITY_PT } from "@/lib/display-labels";
 
 export const TERMINAL_TFS: Timeframe[] = SELECTION_TFS;
 const px = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? "—" : formatPrice(v));
 
 const OVERLAY_LABEL: Record<keyof Overlays, string> = {
   ema: "EMA 9 / 21 / 50 / 100 / 200",
-  bb: "Bollinger Bands (20, 2)",
+  bb: "Bandas de Bollinger (20, 2)",
   vwap: "VWAP (diária UTC)",
   volume: "Volume",
   rsi: "RSI 14",
   macd: "MACD 12 26 9",
   atr: "ATR 14",
-  structure: "Market Structure (HH/HL/LH/LL, BOS, CHoCH)",
-  liquidity: "Liquidity (EQH/EQL, PDH/PDL, sweeps)",
-  levels: "Support / Resistance",
-  setup: "Setup: Entry Zone, Stop, Targets, Trigger",
+  structure: "Estrutura de mercado (HH/HL/LH/LL, BOS, CHoCH)",
+  liquidity: "Liquidez (EQH/EQL, PDH/PDL, varreduras)",
+  levels: "Suporte / resistência",
+  setup: "Setup: zona de entrada, stop, alvos, gatilho",
 };
 
 const STATUS_CHIP: Record<string, string> = {
@@ -118,34 +119,34 @@ function AssetHeader({ ctx, sel, onChange, live }: { ctx: MarketContext; sel: Ma
           <div className={cn("tabular text-[13px]", (change ?? 0) >= 0 ? "text-success" : "text-danger")}>{change != null ? formatPct(change) : "—"} 24h</div>
         </div>
         <dl className="grid grid-cols-3 gap-x-6 gap-y-1 text-[12px] sm:flex sm:flex-wrap">
-          <Stat k="24h High" v={px(t?.high24h)} />
-          <Stat k="24h Low" v={px(t?.low24h)} />
-          <Stat k="24h Volume" v={t ? formatCompact(t.quoteVolume24h) : "—"} />
+          <Stat k="Máxima 24h" v={px(t?.high24h)} />
+          <Stat k="Mínima 24h" v={px(t?.low24h)} />
+          <Stat k="Volume 24h" v={t ? formatCompact(t.quoteVolume24h) : "—"} />
           {perp ? (
             <>
               <Stat k="Open Interest" v={d?.openInterestUsd != null ? formatCompact(d.openInterestUsd) : "n/d"} sub={d?.openInterestChange24hPct != null ? formatPct(d.openInterestChange24hPct, 1) : undefined} up={(d?.openInterestChange24hPct ?? 0) >= 0} />
-              <Stat k="Funding Rate" v={d && Number.isFinite(d.fundingRate) ? `${(d.fundingRate * 100).toFixed(4)}%` : "n/d"} />
-              <Stat k="Next Funding" v={d && Number.isFinite(d.nextFundingTime) && d.nextFundingTime > 0 ? countdown(d.nextFundingTime, now) : "n/d"} />
+              <Stat k="Funding" v={d && Number.isFinite(d.fundingRate) ? `${(d.fundingRate * 100).toFixed(4)}%` : "n/d"} />
+              <Stat k="Próximo funding" v={d && Number.isFinite(d.nextFundingTime) && d.nextFundingTime > 0 ? countdown(d.nextFundingTime, now) : "n/d"} />
             </>
           ) : null}
         </dl>
         <div className="ml-auto flex items-center gap-2">
-          <span className={cn("rounded px-2 py-1 text-[11px] font-semibold", REGIME_TONE[ctx.regime.regime] === "up" ? "bg-success/15 text-success" : REGIME_TONE[ctx.regime.regime] === "down" ? "bg-danger/15 text-danger" : REGIME_TONE[ctx.regime.regime] === "warn" ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground")} title={`Market Regime: ${ctx.regime.reasons.join(" · ")}`}>
-            {ctx.regime.regime}
+          <span className={cn("rounded px-2 py-1 text-[11px] font-semibold", REGIME_TONE[ctx.regime.regime] === "up" ? "bg-success/15 text-success" : REGIME_TONE[ctx.regime.regime] === "down" ? "bg-danger/15 text-danger" : REGIME_TONE[ctx.regime.regime] === "warn" ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground")} title={`Regime de mercado: ${ctx.regime.reasons.join(" · ")}`}>
+            {pt(REGIME_PT, ctx.regime.regime)}
           </span>
           {q ? (
             <span className={cn("rounded px-2 py-1 text-[11px] font-semibold", STATUS_CHIP[q.status] ?? "bg-muted")} title={`${provenance}${q.issues.length ? ` · ${q.issues.join(" · ")}` : ""}`}>
-              {q.status}
+              {pt(DATA_STATUS_PT, q.status)}
               {fallback ? ` · ${VENUE_LABEL[ctx.dataVenue]}` : ""}
             </span>
           ) : null}
           {user ? (
             <button onClick={() => void monitor()} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-[12px] text-muted-foreground hover:text-foreground" title="Monitorar este setup no servidor">
-              <Bell className="h-3.5 w-3.5" /> Monitor
+              <Bell className="h-3.5 w-3.5" /> Monitorar
             </button>
           ) : null}
           {user ? (
-            <button onClick={() => void addToWatchlist()} className="grid h-8 w-8 place-items-center rounded-md border border-border text-muted-foreground hover:text-warning" aria-label="Adicionar à watchlist" title="Adicionar à watchlist">
+            <button onClick={() => void addToWatchlist()} className="grid h-8 w-8 place-items-center rounded-md border border-border text-muted-foreground hover:text-warning" aria-label="Adicionar aos favoritos" title="Adicionar aos favoritos">
               <Star className="h-4 w-4" />
             </button>
           ) : null}
@@ -154,7 +155,7 @@ function AssetHeader({ ctx, sel, onChange, live }: { ctx: MarketContext; sel: Ma
       <div className="flex flex-wrap items-center gap-2">
         <Segmented items={VENUES} value={sel.exchange} onChange={(exchange) => onChange({ exchange })} label="Exchange" render={(v) => VENUE_LABEL[v]} />
         <Segmented items={INSTRUMENTS} value={sel.instrument} onChange={(instrument) => onChange({ instrument })} label="Instrumento" render={(v) => INSTRUMENT_LABEL[v]} />
-        {fallback ? <span className="text-[11px] text-info">{VENUE_LABEL[ctx.exchange]} indisponível agora: dados de {VENUE_LABEL[ctx.dataVenue]} (FALLBACK).</span> : null}
+        {fallback ? <span className="text-[11px] text-info">{VENUE_LABEL[ctx.exchange]} indisponível agora: dados de {VENUE_LABEL[ctx.dataVenue]} (fonte alternativa).</span> : null}
       </div>
     </div>
   );
@@ -194,9 +195,9 @@ function layers(ctx: MarketContext, o: Overlays): { zones: ChartZone[]; labels: 
     const from = Math.max(first, lastT - 60 * span);
     const a = ctx.liquidity.above;
     const b = ctx.liquidity.below;
-    if (a) zones.push({ top: a.high, bottom: a.low, from, label: `Liq ↑ ${a.kind.replace("SWING_", "")}`, color: "warning" });
-    if (b) zones.push({ top: b.high, bottom: b.low, from, label: `Liq ↓ ${b.kind.replace("SWING_", "")}`, color: "warning" });
-    for (const sw of ctx.liquidity.recentSweeps.slice(0, 2)) labels.push({ time: sw.time, price: sw.price, text: "Sweep", position: sw.direction === "bullish" ? "below" : "above", color: "info" });
+    if (a) zones.push({ top: a.high, bottom: a.low, from, label: `Liq ↑ ${poolShort(a.kind)}`, color: "warning" });
+    if (b) zones.push({ top: b.high, bottom: b.low, from, label: `Liq ↓ ${poolShort(b.kind)}`, color: "warning" });
+    for (const sw of ctx.liquidity.recentSweeps.slice(0, 2)) labels.push({ time: sw.time, price: sw.price, text: "Varredura", position: sw.direction === "bullish" ? "below" : "above", color: "info" });
   }
   if (o.levels) {
     const from = Math.max(first, lastT - 80 * span);
@@ -207,10 +208,10 @@ function layers(ctx: MarketContext, o: Overlays): { zones: ChartZone[]; labels: 
   }
   if (o.setup && ctx.setup) {
     const st = ctx.setup;
-    zones.push({ top: st.entryZone.high, bottom: st.entryZone.low, from: Math.max(first, lastT - 30 * span), label: "Entry Zone", color: "info" });
+    zones.push({ top: st.entryZone.high, bottom: st.entryZone.low, from: Math.max(first, lastT - 30 * span), label: "Zona de entrada", color: "info" });
     lines.push({ price: st.stop, label: "Stop", color: "danger", dashed: true });
     for (const t of st.targets) lines.push({ price: t.price, label: `${t.label} ${t.r.toFixed(1)}R`, color: "success", dashed: true });
-    if (st.triggerLevel) lines.push({ price: st.triggerLevel.price, label: "Trigger", color: "info", dashed: false });
+    if (st.triggerLevel) lines.push({ price: st.triggerLevel.price, label: "Gatilho", color: "info", dashed: false });
   }
   return { zones, labels, lines, segments };
 }
@@ -272,7 +273,7 @@ function ChartCard({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="inline-flex h-7 items-center gap-1.5 rounded px-2 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground">
-              <Layers className="h-3.5 w-3.5" /> Indicators <ChevronDown className="h-3 w-3" />
+              <Layers className="h-3.5 w-3.5" /> Indicadores <ChevronDown className="h-3 w-3" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-72">
@@ -294,13 +295,13 @@ function ChartCard({
           <Bell className="h-3.5 w-3.5" /> Alerta
         </Link>
         <div className="ml-auto flex items-center gap-0.5">
-          <button onClick={onFocus} className={cn("hidden h-7 items-center gap-1 rounded px-2 text-[12px] hover:bg-muted xl:inline-flex", focus ? "text-foreground" : "text-muted-foreground")} aria-pressed={focus} title="Focus Chart">
-            Focus
+          <button onClick={onFocus} className={cn("hidden h-7 items-center gap-1 rounded px-2 text-[12px] hover:bg-muted xl:inline-flex", focus ? "text-foreground" : "text-muted-foreground")} aria-pressed={focus} title="Foco no gráfico">
+            Foco
           </button>
-          <button onClick={onToggleAnalysis} className="hidden h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground xl:grid" aria-label={analysisOpen ? "Collapse analysis" : "Expand analysis"} title={analysisOpen ? "Collapse analysis" : "Expand analysis"}>
+          <button onClick={onToggleAnalysis} className="hidden h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground xl:grid" aria-label={analysisOpen ? "Recolher análise" : "Expandir análise"} title={analysisOpen ? "Recolher análise" : "Expandir análise"}>
             {analysisOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
           </button>
-          <button onClick={toggleFs} className="grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={fs ? "Sair da tela cheia" : "Tela cheia"} title="Fullscreen">
+          <button onClick={toggleFs} className="grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={fs ? "Sair da tela cheia" : "Tela cheia"} title="Tela cheia">
             {fs ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </button>
           <button onClick={onRefresh} className="grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Atualizar">
@@ -314,7 +315,7 @@ function ChartCard({
         </span>
         {legend ? (
           <span className="tabular text-muted-foreground">
-            O <span className="text-foreground">{px(legend.o)}</span> H <span className="text-foreground">{px(legend.h)}</span> L <span className="text-foreground">{px(legend.l)}</span> C{" "}
+            A <span className="text-foreground">{px(legend.o)}</span> Máx <span className="text-foreground">{px(legend.h)}</span> Mín <span className="text-foreground">{px(legend.l)}</span> F{" "}
             <span className="text-foreground">{px(legend.c)}</span> <span className={legend.chg >= 0 ? "text-success" : "text-danger"}>{legend.chg >= 0 ? "+" : ""}{formatNumber(legend.chg, 2)}</span>
           </span>
         ) : null}
@@ -334,7 +335,7 @@ function ChartCard({
       </div>
       <div className="flex flex-wrap items-center gap-3 border-t border-border px-3 py-1.5 text-[10.5px] text-muted-foreground">
         <span>Indicadores e estrutura sobre candles fechados; o candle em formação só é exibido.</span>
-        <span className="ml-auto">RSI {tech.rsi != null ? tech.rsi.toFixed(1) : "—"} · ATR {tech.atrPct != null ? `${tech.atrPct.toFixed(2)}%` : "—"} · Volatility {tech.volatility ?? "—"} · RVOL {tech.rvol != null ? `${tech.rvol.toFixed(2)}×` : "—"}</span>
+        <span className="ml-auto">RSI {tech.rsi != null ? tech.rsi.toFixed(1) : "—"} · ATR {tech.atrPct != null ? `${tech.atrPct.toFixed(2)}%` : "—"} · Volatilidade {pt(VOLATILITY_PT, tech.volatility)} · RVOL {tech.rvol != null ? `${tech.rvol.toFixed(2)}×` : "—"}</span>
       </div>
     </section>
   );
@@ -343,6 +344,7 @@ function ChartCard({
 /* ------------------------------------------------------------------ Right column */
 
 const RIGHT_TABS = ["Analysis", "Indicators", "Alerts"] as const;
+const RIGHT_LABEL: Record<(typeof RIGHT_TABS)[number], string> = { Analysis: "Análise", Indicators: "Indicadores", Alerts: "Alertas" };
 
 function RightColumn({ ctx, overlays, setOverlays, onViewChart, onSwitchPerp }: { ctx: MarketContext; overlays: Overlays; setOverlays: (o: Overlays) => void; onViewChart: () => void; onSwitchPerp: () => void }) {
   const [tab, setTab] = React.useState<(typeof RIGHT_TABS)[number]>("Analysis");
@@ -351,7 +353,7 @@ function RightColumn({ ctx, overlays, setOverlays, onViewChart, onSwitchPerp }: 
       <div className="grid grid-cols-3 rounded-lg border border-border bg-card p-1" role="tablist">
         {RIGHT_TABS.map((t) => (
           <button key={t} role="tab" aria-selected={t === tab} onClick={() => setTab(t)} className={cn("h-8 rounded-md text-[12.5px]", t === tab ? "bg-primary/15 font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
-            {t}
+            {RIGHT_LABEL[t]}
           </button>
         ))}
       </div>
@@ -365,7 +367,7 @@ function RightColumn({ ctx, overlays, setOverlays, onViewChart, onSwitchPerp }: 
           <HistoricalPanel ctx={ctx} className="@min-[560px]:col-span-2" />
         </div>
       ) : tab === "Indicators" ? (
-        <Panel title="Indicators & overlays">
+        <Panel title="Indicadores e camadas">
           <div className="flex flex-col gap-1">
             {(Object.keys(OVERLAY_LABEL) as Array<keyof Overlays>).map((k) => (
               <label key={k} className="flex min-h-9 cursor-pointer items-center gap-2 rounded px-2 text-[13px] hover:bg-muted">
@@ -374,14 +376,14 @@ function RightColumn({ ctx, overlays, setOverlays, onViewChart, onSwitchPerp }: 
               </label>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">Fibonacci estrutural: página Fibonacci. Volume profile: próximo pacote do Charts.</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">Fibonacci estrutural: página Fibonacci. Perfil de volume: em desenvolvimento.</p>
         </Panel>
       ) : (
-        <Panel title="Alerts">
+        <Panel title="Alertas">
           <p className="text-[12.5px] text-muted-foreground">Alertas de preço, indicador, padrão e volume para {ctx.symbol} ficam em Carteira → Alertas; vigilância contínua na Sentinela.</p>
           <div className="mt-3 flex gap-2">
             <Link href={`/carteira?tab=alerts&symbol=${ctx.symbol}`} className="flex h-9 flex-1 items-center justify-center rounded-md bg-primary text-[13px] font-semibold text-primary-foreground">
-              Create alert
+              Criar alerta
             </Link>
             <Link href="/sentinela" className="flex h-9 flex-1 items-center justify-center rounded-md border border-border text-[13px]">
               Sentinela
@@ -401,13 +403,13 @@ function AccessOrError({ error, sel, onReset }: { error: unknown; sel: MarketSel
   if (status === 401)
     return (
       <div className="mx-auto mt-10 max-w-xl rounded-xl border border-border bg-card p-6 text-center">
-        <h1 className="text-xl font-bold">Crypto market intelligence, in one workspace</h1>
+        <h1 className="text-xl font-bold">Inteligência de mercado cripto em uma só tela</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Gráfico, estrutura de mercado, liquidez, suporte/resistência, Confluence Score auditável, derivativos (Binance, Bybit, OKX), histórico do setup e gestão de risco — no mesmo contexto. {TRIAL_DAYS} dias grátis no PRO; depois PRO ou ELITE.
         </p>
         <div className="mt-5 flex justify-center gap-2">
           <Link href={`/registro?next=${next}`} className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">
-            Start 7-day trial
+            Testar {TRIAL_DAYS} dias grátis
           </Link>
           <Link href={`/login?next=${next}`} className="inline-flex h-10 items-center rounded-md border border-border px-5 text-sm">
             Entrar
@@ -419,17 +421,17 @@ function AccessOrError({ error, sel, onReset }: { error: unknown; sel: MarketSel
   if (status === 402)
     return (
       <div className="mx-auto mt-10 max-w-lg rounded-xl border border-border bg-card p-6 text-center">
-        <h1 className="text-xl font-bold">Choose your plan</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{(error as Error).message} Sua conta, watchlists e configurações continuam salvas.</p>
+        <h1 className="text-xl font-bold">Escolha seu plano</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{(error as Error).message} Sua conta, favoritos e configurações continuam salvos.</p>
         <Link href="/planos" className="mt-5 inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">
-          View Plans
+          Ver planos
         </Link>
       </div>
     );
   return (
     <div className="flex flex-col gap-2">
       <Unavailable>
-        DATA UNAVAILABLE — {sel.symbol}/USDT {VENUE_LABEL[sel.exchange]} {INSTRUMENT_LABEL[sel.instrument]} {TIMEFRAME_LABEL[sel.timeframe]}: {error instanceof Error ? error.message : "nenhuma fonte respondeu"}.
+        DADOS INDISPONÍVEIS — {sel.symbol}/USDT {VENUE_LABEL[sel.exchange]} {INSTRUMENT_LABEL[sel.instrument]} {TIMEFRAME_LABEL[sel.timeframe]}: {error instanceof Error ? error.message : "nenhuma fonte respondeu"}.
       </Unavailable>
       <button onClick={onReset} className="h-8 self-start rounded-md border border-border px-3 text-[12px] hover:bg-muted">
         Voltar para Binance Spot
@@ -567,7 +569,7 @@ export function TerminalWorkspace({ symbol: routeSymbol, mode = "dashboard" }: {
             </div>
           ) : null}
           <p className="text-[10.5px] text-muted-foreground">
-            Contexto {consistent.contextKey} · gerado {timeAgo(consistent.generatedAt)} · atualiza a cada 30 s · OBSERVED: preço, candles, volume, OI, funding · DERIVED: estrutura, liquidez, S/R, indicadores, setup, Confluence Score · histórico: backtest do setup ({consistent.historical?.dataSource ?? "—"}).
+            Contexto {consistent.contextKey} · gerado {timeAgo(consistent.generatedAt)} · atualiza a cada 30 s · observado: preço, candles, volume, OI, funding · derivado: estrutura, liquidez, S/R, indicadores, setup, Confluence Score · histórico: backtest do setup ({consistent.historical?.dataSource ?? "—"}).
           </p>
         </>
       ) : null}
