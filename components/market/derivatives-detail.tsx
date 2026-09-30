@@ -18,7 +18,6 @@ import { ASSETS } from "@/lib/assets";
 import {
   formatCompact,
   formatDateTime,
-  formatPct,
   formatPrice,
   timeAgo,
 } from "@/lib/format";
@@ -28,11 +27,12 @@ import type {
   DerivativesDetail,
   Point,
 } from "@/services/derivatives-detail-service";
+import { Change } from "@/components/market/change";
 
 function MiniChart({
   points,
   kind = "line",
-  color = "#2f6bff",
+  color = "#1687FF",
   format,
 }: {
   points: Point[];
@@ -46,13 +46,13 @@ function MiniChart({
     const el = ref.current;
     if (!el || points.length < 2) return;
     const dark = theme === "dark";
-    const grid = dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.06)";
+    const grid = dark ? "rgba(148,163,184,0.06)" : "rgba(100,116,139,0.10)";
     const chart = createChart(el, {
       autoSize: true,
       height: 180,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: dark ? "#8193a8" : "#5b6778",
+        textColor: dark ? "#94A3B8" : "#5b6778",
         fontSize: 10,
       },
       grid: { vertLines: { color: grid }, horzLines: { color: grid } },
@@ -71,7 +71,7 @@ function MiniChart({
       s.setData(
         data.map((d) => ({
           ...d,
-          color: d.value >= 0 ? "rgba(22,199,132,0.7)" : "rgba(234,57,67,0.7)",
+          color: d.value >= 0 ? "rgba(16,185,129,0.7)" : "rgba(239,68,68,0.7)",
         })),
       );
     } else {
@@ -143,7 +143,7 @@ function DetailInner() {
               aria-checked={prefer === v}
               onClick={() => go(symbol, v)}
               className={cn(
-                "h-8 rounded px-3",
+                "cursor-pointer h-8 rounded px-3",
                 prefer === v
                   ? "bg-primary/15 font-semibold"
                   : "text-muted-foreground",
@@ -216,17 +216,11 @@ function DetailInner() {
                             ? formatCompact(v.openInterestUsd)
                             : "—"}
                         </td>
-                        <td
-                          className={cn(
-                            "tabular px-3 py-2 text-right",
-                            (v.openInterestChange24hPct ?? 0) >= 0
-                              ? "text-success"
-                              : "text-danger",
-                          )}
-                        >
-                          {v.openInterestChange24hPct != null
-                            ? formatPct(v.openInterestChange24hPct, 1)
-                            : "—"}
+                        <td className="px-3 py-2 text-right">
+                          <Change
+                            value={v.openInterestChange24hPct}
+                            decimals={1}
+                          />
                         </td>
                         <td className="tabular px-3 py-2 text-right">
                           {v.longShortRatio != null
@@ -295,14 +289,14 @@ function DetailInner() {
                 p: h?.cvd ?? [],
                 kind: "line" as const,
                 f: fmtUsd,
-                c: "#16c784",
+                c: "#22D3EE",
               },
               {
                 t: "Taker buy % (1h)",
                 p: h?.takerBuyPct ?? [],
                 kind: "line" as const,
                 f: fmtPct1,
-                c: "#f5a524",
+                c: "#F59E0B",
               },
             ].map((x) => (
               <div

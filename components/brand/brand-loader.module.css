@@ -1,0 +1,62 @@
+/* Carregamento com a marca (design system → motion.loading / scanner_animation "horizontal scan", 2–4 s).
+   Uma linha fina percorre o símbolo de cima a baixo; sem glow forte e parada com prefers-reduced-motion. */
+.frame {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.line {
+  position: absolute;
+  inset-inline: 8%;
+  top: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--brand-1, #22d3ee) 30%, var(--brand-2, #1687ff) 70%, transparent);
+  opacity: 0;
+  animation: cs-brand-scan 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform, opacity;
+}
+
+.symbol {
+  animation: cs-brand-breathe 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes cs-brand-scan {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.9;
+  }
+  88%,
+  100% {
+    transform: translateY(var(--scan-distance, 40px));
+    opacity: 0;
+  }
+}
+
+@keyframes cs-brand-breathe {
+  0%,
+  100% {
+    opacity: 0.92;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line {
+    display: none;
+  }
+  .symbol {
+    animation: none;
+  }
+}

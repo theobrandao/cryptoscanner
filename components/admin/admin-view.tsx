@@ -84,12 +84,12 @@ function OverviewTab() {
       {!data ? <div className="skeleton h-64 rounded-lg" /> : null}
       {data && s ? (
         <div className="flex flex-col gap-4">
-          <section className={cn("rounded-lg border p-3", data.checkoutEnabled ? "border-success/40 bg-success/5" : "border-warning/40 bg-warning/5")}>
+          <section className={cn("rounded-lg border p-3", data.checkoutEnabled ? "border-info/40 bg-info/5" : "border-warning/40 bg-warning/5")}>
             <h2 className="text-[14px] font-semibold">{data.checkoutEnabled ? "Checkout liberado" : "Checkout bloqueado — itens pendentes para vender"}</h2>
             <ul className="mt-2 grid gap-1 text-[12.5px] md:grid-cols-2">
               {data.readiness.map((r) => (
                 <li key={r.key} className="flex items-start gap-2">
-                  {r.ok ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> : <X className="mt-0.5 h-4 w-4 shrink-0 text-danger" />}
+                  {r.ok ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-info" aria-label="Pronto" /> : <X className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-label="Pendente" />}
                   <span className={r.ok ? "text-muted-foreground" : ""}>{r.label}</span>
                 </li>
               ))}
@@ -128,7 +128,7 @@ function OverviewTab() {
             </section>
             <section className="rounded-lg border border-border bg-card p-3">
               <h2 className="mb-2 text-[13px] font-semibold">Eventos de cobrança</h2>
-              {data.recentBilling.length === 0 ? <p className="text-[12px] text-muted-foreground">Nenhum evento.</p> : null}
+              {data.recentBilling.length === 0 ? <p className="text-[12px] text-muted-foreground">Nenhum evento de cobrança registrado. Compras, renovações e cancelamentos aparecem aqui quando o pagamento for notificado.</p> : null}
               {data.recentBilling.map((b, i) => (
                 <div key={i} className="py-0.5 text-[12px]">
                   <span className={cn(b.error ? "text-danger" : b.processed ? "" : "text-warning")}>{b.type}</span> <span className="text-muted-foreground">· {formatDateTime(b.createdAt)}</span>

@@ -3,6 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { BookOpen, Gem, Lock, RotateCw } from "lucide-react";
+import { ELITE_BORDER, ELITE_CTA, ELITE_SOFT_BG, ELITE_TEXT, PREMIUM_CTA } from "@/components/account/plan-tier";
+import { cn } from "@/lib/utils";
 import { TRIAL_DAYS } from "@/lib/entitlements";
 import useSWR from "swr";
 import { usePathname } from "next/navigation";
@@ -31,7 +33,7 @@ function useGateView(feature: string, state: GateState | null) {
   }, [feature, state]);
 }
 
-const primaryBtn = "inline-flex h-10 items-center gap-1.5 rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground";
+const primaryBtn = "inline-flex h-10 items-center gap-1.5 rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground transition-[filter] hover:brightness-110 cursor-pointer";
 const secondaryBtn = "inline-flex h-10 items-center gap-1.5 rounded-md border border-border px-5 text-sm";
 
 /**
@@ -52,7 +54,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
     const pro = pub?.prices.PRO;
     return (
       <Gate title={copy.title} benefit={copy.benefit} text={`Disponível no teste grátis de ${TRIAL_DAYS} dias do PRO, sem cartão, e nos planos PRO e ELITE.`} price={pro != null ? `Depois do teste, a partir de ${formatBRL(pro)}/mês. Cancele quando quiser.` : null}>
-        <Link href={`/registro?next=${next}`} onClick={() => trackClient("cta_click", { origin: "bloqueio", target: "registro" })} className={primaryBtn}>
+        <Link href={`/registro?next=${next}`} onClick={() => trackClient("cta_click", { origin: "bloqueio", target: "registro" })} className={cn(primaryBtn, PREMIUM_CTA)}>
           Testar {TRIAL_DAYS} dias grátis
         </Link>
         <Link href={`/login?next=${next}`} className={secondaryBtn}>
@@ -79,7 +81,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
   if (!access.entitlements.core)
     return (
       <Gate title={copy.title} benefit={copy.benefit} text="Esta ferramenta faz parte dos planos PRO e ELITE. Sua conta, favoritos, estratégias e monitores continuam salvos." price={`A partir de ${formatBRL(prices.PRO)}/mês. Cancele quando quiser.`}>
-        <Link href="/planos" onClick={() => trackClient("cta_click", { origin: "bloqueio", target: "planos" })} className={primaryBtn}>
+        <Link href="/planos" onClick={() => trackClient("cta_click", { origin: "bloqueio", target: "planos" })} className={cn(primaryBtn, PREMIUM_CTA)}>
           Ver planos
         </Link>
         <Link href="/jornada" className={secondaryBtn}>
@@ -96,7 +98,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
         text={`Este recurso faz parte do plano ELITE, que não tem teste grátis. ${access.tier === "TRIAL" ? "Seu teste do PRO" : "Seu plano PRO"} continua igual.`}
         price={`${formatBRL(prices.ELITE)}/mês. Cancele quando quiser.`}
       >
-        <Link href="/planos" onClick={() => trackClient("cta_click", { origin: "bloqueio_elite", target: "planos", plan: "ELITE" })} className={primaryBtn}>
+        <Link href="/planos" onClick={() => trackClient("cta_click", { origin: "bloqueio_elite", target: "planos", plan: "ELITE" })} className={cn(primaryBtn, ELITE_CTA)}>
           <Gem className="h-4 w-4" aria-hidden /> Ver plano ELITE
         </Link>
       </Gate>
@@ -107,8 +109,8 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
 function Gate({ title, benefit, text, price, icon = "lock", children }: { title: string; benefit?: string; text: string; price?: string | null; icon?: "lock" | "elite"; children: React.ReactNode }) {
   const Icon = icon === "elite" ? Gem : Lock;
   return (
-    <div className="mx-auto mt-10 max-w-lg rounded-xl border border-border bg-card p-6 text-center">
-      <span aria-hidden className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-full bg-primary/10 text-primary">
+    <div className={cn("mx-auto mt-10 max-w-lg rounded-xl border bg-card p-6 text-center", icon === "elite" ? ELITE_BORDER : "border-border")}>
+      <span aria-hidden className={cn("mx-auto mb-3 grid h-10 w-10 place-items-center rounded-full", icon === "elite" ? cn(ELITE_SOFT_BG, ELITE_TEXT) : "bg-primary/10 text-primary")}>
         <Icon className="h-5 w-5" />
       </span>
       <h1 className="text-xl font-bold">{title}</h1>

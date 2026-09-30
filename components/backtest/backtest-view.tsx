@@ -31,11 +31,11 @@ function EquityChart({ data }: { data: BacktestResponse }) {
     const el = ref.current;
     if (!el || data.equity.length < 2) return;
     const dark = theme === "dark";
-    const grid = dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.06)";
+    const grid = dark ? "rgba(148,163,184,0.06)" : "rgba(100,116,139,0.10)";
     const chart = createChart(el, {
       autoSize: true,
       height: 280,
-      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: dark ? "#8193a8" : "#5b6778", fontSize: 11 },
+      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: dark ? "#94A3B8" : "#5b6778", fontSize: 11 },
       grid: { vertLines: { color: grid }, horzLines: { color: grid } },
       rightPriceScale: { borderColor: grid },
       timeScale: { borderColor: grid, timeVisible: true },
@@ -48,9 +48,9 @@ function EquityChart({ data }: { data: BacktestResponse }) {
       lastT = t;
       return { t: t as UTCTimestamp, eq: e.equityPct, dd: e.drawdownPct };
     });
-    const eq = chart.addSeries(LineSeries, { color: "#2f6bff", lineWidth: 2, priceLineVisible: false, title: "Capital %" });
+    const eq = chart.addSeries(LineSeries, { color: "#1687FF", lineWidth: 2, priceLineVisible: false, title: "Capital %" });
     eq.setData(pts.map((p) => ({ time: p.t, value: p.eq })));
-    const dd = chart.addSeries(LineSeries, { color: "#ea3943", lineWidth: 1, priceLineVisible: false, title: "Drawdown %" });
+    const dd = chart.addSeries(LineSeries, { color: "#EF4444", lineWidth: 1, priceLineVisible: false, title: "Drawdown %" });
     dd.setData(pts.map((p) => ({ time: p.t, value: p.dd })));
     chart.timeScale().fitContent();
     return () => chart.remove();
@@ -130,7 +130,7 @@ function BacktestInner() {
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex rounded-md border border-border p-0.5 text-[12.5px]" role="radiogroup" aria-label="Modo">
             {(["setup", "strategy"] as const).map((k) => (
-              <button key={k} role="radio" aria-checked={mode === k} onClick={() => setMode(k)} className={cn("h-8 rounded px-3", mode === k ? "bg-primary/15 font-semibold" : "text-muted-foreground")}>
+              <button key={k} role="radio" aria-checked={mode === k} onClick={() => setMode(k)} className={cn("cursor-pointer h-8 rounded px-3", mode === k ? "bg-primary/15 font-semibold" : "text-muted-foreground")}>
                 {k === "setup" ? "Setup CryptoScanner" : "Estratégia salva"}
               </button>
             ))}
@@ -198,7 +198,7 @@ function BacktestInner() {
             Risco/operação (%)
             <input type="number" min={0.1} max={10} step={0.1} value={riskPct} onChange={(e) => setRisk(Number(e.target.value))} className={cn(sel, "w-20")} />
           </label>
-          <button onClick={() => void run()} disabled={busy || (mode === "strategy" && !strategyId)} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-[13px] font-semibold text-primary-foreground disabled:opacity-50">
+          <button onClick={() => void run()} disabled={busy || (mode === "strategy" && !strategyId)} className="cursor-pointer inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-[13px] font-semibold text-primary-foreground disabled:opacity-50">
             <FlaskConical className="h-4 w-4" /> {busy ? "Rodando…" : "Rodar backtest"}
           </button>
         </div>
@@ -277,7 +277,7 @@ function BacktestInner() {
                     ))}
                   </tbody>
                 </table>
-                {res.trades.length === 0 ? <p className="p-3 text-[12.5px] text-muted-foreground">Nenhuma operação no período com essas regras.</p> : null}
+                {res.trades.length === 0 ? <p className="p-3 text-[12.5px] text-muted-foreground">Nenhuma operação no período com essas regras. Aumente o período ou teste outro timeframe.</p> : null}
               </div>
             </section>
           </div>

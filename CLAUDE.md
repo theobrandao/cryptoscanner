@@ -13,6 +13,8 @@ App web de análise técnica de criptomoedas (www.cryptoscanner.com.br), vendido
 
 ## Regras de produto (aprovadas)
 
+- **Design system oficial (obrigatório):** `docs/design-system/cryptoscanner_design_system.json` — dark premium institucional, navy quase preto, marca ciano/azul/violeta, verde/vermelho só com significado financeiro, dourado só para ELITE, Inter + Lucide, grid de 4 px, radius 8/12/16, microinterações 150–300 ms. Logo oficial em `public/brand/` (não esticar, não recolorir, sem glow obrigatório). Consulte as seções `anti_patterns` e `implementation_rules_for_agents` antes de qualquer interface.
+
 - Interface em português do Brasil, linguagem simples, sem jargão técnico (nada de nomes de variáveis de ambiente, "fallback", "orquestrador" etc. na tela).
 - Ícones lucide; sem emojis na interface (exceto o ícone que o usuário escolhe para um agente).
 - Nunca inventar números, depoimentos, contagem de usuários ou taxa de acerto. Todo material público leva o aviso de que não é recomendação de investimento.

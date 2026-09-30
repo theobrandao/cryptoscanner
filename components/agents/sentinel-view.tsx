@@ -220,7 +220,7 @@ export function SentinelView() {
                     <Badge
                       variant={
                         s.status === "ACTIVE"
-                          ? "success"
+                          ? "info"
                           : s.status === "PAUSED"
                             ? "warning"
                             : "muted"
@@ -596,7 +596,7 @@ function Reports({ sentinel }: { sentinel: SentinelItem }) {
                   <dt className="text-muted-foreground">Alvo</dt>
                   <dd className="tabular text-success">
                     {d.plan.target
-                      ? `${formatPrice(d.plan.target)} (${d.plan.potentialPct?.toFixed(2)}%)`
+                      ? `${formatPrice(d.plan.target)} (+${d.plan.potentialPct?.toFixed(2)}%)`
                       : "—"}
                   </dd>
                   <dt className="text-muted-foreground">Stop</dt>
@@ -619,7 +619,7 @@ function Reports({ sentinel }: { sentinel: SentinelItem }) {
                   {d.confluence.agree.map((a) => (
                     <span
                       key={`a-${a}`}
-                      className="inline-flex items-center gap-1 rounded bg-success/15 px-1.5 py-0.5 text-success"
+                      className="inline-flex items-center gap-1 rounded bg-info/15 px-1.5 py-0.5 text-info"
                     >
                       <Check className="h-3 w-3" aria-hidden /> {a}
                     </span>
@@ -627,7 +627,7 @@ function Reports({ sentinel }: { sentinel: SentinelItem }) {
                   {d.confluence.disagree.map((a) => (
                     <span
                       key={`d-${a}`}
-                      className="inline-flex items-center gap-1 rounded bg-danger/15 px-1.5 py-0.5 text-danger"
+                      className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-muted-foreground"
                     >
                       <X className="h-3 w-3" aria-hidden /> {a}
                     </span>

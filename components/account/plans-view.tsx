@@ -19,6 +19,7 @@ import type { PublicPrices } from "@/lib/billing/public-prices";
 import { CheckoutReturnNotice } from "@/components/account/plans/checkout-return-notice";
 import { CancelDialog } from "@/components/account/plans/cancel-dialog";
 import { SavedSummary, type SavedCounts } from "@/components/account/plans/saved-summary";
+import { ELITE_BORDER, ELITE_CTA, ELITE_TEXT, EliteBadge, PREMIUM_CTA, ProBadge } from "@/components/account/plan-tier";
 
 interface SubPayload extends AccessView {
   billing: { provider: BillingProvider; configured: boolean; prices: { PRO: number; ELITE: number }; currency: string };
@@ -122,7 +123,7 @@ export function PlansView({ initial }: { initial: PublicPrices }) {
         ) : (
           <ul className="flex flex-wrap gap-x-5 gap-y-1.5 text-muted-foreground">
             <li className="inline-flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-success" aria-hidden /> {trial} dias grátis no PRO, sem cartão
+              <Sparkles className="h-4 w-4 text-primary" aria-hidden /> {trial} dias grátis no PRO, sem cartão
             </li>
             <li className="inline-flex items-center gap-1.5">
               <CreditCard className="h-4 w-4 text-primary" aria-hidden /> Cancele quando quiser
@@ -145,16 +146,16 @@ export function PlansView({ initial }: { initial: PublicPrices }) {
           const highlight = p === "PRO" && st.ended;
           const badge =
             p === "ELITE" ? (
-              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">Mais recursos</span>
+              <EliteBadge className="normal-case tracking-normal">Mais recursos</EliteBadge>
             ) : st.ended && !st.endedPaid ? (
-              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">Plano do seu teste</span>
+              <ProBadge className="normal-case tracking-normal">Plano do seu teste</ProBadge>
             ) : data?.status === "TRIALING" ? (
-              <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">Em teste agora</span>
+              <ProBadge className="normal-case tracking-normal">Em teste agora</ProBadge>
             ) : st.trialUsed ? null : (
-              <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">{trial} dias grátis</span>
+              <ProBadge className="normal-case tracking-normal">{trial} dias grátis</ProBadge>
             );
           return (
-            <section key={p} className={cn("flex flex-col rounded-xl border bg-card p-5", highlight ? "border-primary ring-2 ring-primary/40" : p === "ELITE" ? "border-primary/40" : "border-border")}>
+            <section key={p} className={cn("flex flex-col rounded-xl border bg-card p-5", highlight ? "border-primary ring-2 ring-primary/40" : p === "ELITE" ? ELITE_BORDER : "border-border")}>
               <div className="flex min-h-6 items-center justify-between gap-2">
                 <h2 className="text-lg font-bold">{p}</h2>
                 {badge}
@@ -166,13 +167,13 @@ export function PlansView({ initial }: { initial: PublicPrices }) {
               <ul className="mt-4 flex flex-1 flex-col gap-2 text-sm">
                 {PLAN_FEATURES[p].map((f) => (
                   <li key={f} className="flex gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> {f}
+                    <Check className={cn("mt-0.5 h-4 w-4 shrink-0", p === "ELITE" ? ELITE_TEXT : "text-primary")} aria-hidden /> {f}
                   </li>
                 ))}
               </ul>
               {!user ? (
                 p === "PRO" ? (
-                  <Link href="/registro?next=/planos" onClick={() => trackClient("cta_click", { origin: "planos", plan: "PRO" })} className="mt-5 flex h-11 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+                  <Link href="/registro?next=/planos" onClick={() => trackClient("cta_click", { origin: "planos", plan: "PRO" })} className={cn("mt-5 flex h-11 items-center justify-center rounded-md text-sm font-semibold", PREMIUM_CTA)}>
                     Começar {trial} dias grátis
                   </Link>
                 ) : directUrl ? (
@@ -183,12 +184,12 @@ export function PlansView({ initial }: { initial: PublicPrices }) {
                       trackClient("cta_click", { origin: "planos", plan: "ELITE" });
                       e.currentTarget.href = withAffiliateParams(directUrl);
                     }}
-                    className="mt-5 flex h-11 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground"
+                    className={cn("mt-5 flex h-11 items-center justify-center rounded-md text-sm font-semibold", ELITE_CTA)}
                   >
                     Assinar ELITE
                   </a>
                 ) : (
-                  <Link href="/registro?next=/planos" className="mt-5 flex h-11 items-center justify-center rounded-md border border-border text-sm font-semibold">
+                  <Link href="/registro?next=/planos" className={cn("mt-5 flex h-11 items-center justify-center rounded-md border text-sm font-semibold hover:bg-muted", ELITE_BORDER)}>
                     Criar conta
                   </Link>
                 )
@@ -202,7 +203,7 @@ export function PlansView({ initial }: { initial: PublicPrices }) {
                 <button
                   onClick={() => void checkout(p)}
                   disabled={!pub.checkoutEnabled || busy !== null || data?.tier === "ADMIN"}
-                  className={cn("mt-5 h-11 rounded-md text-sm font-semibold disabled:opacity-50", st.ended && p === "ELITE" ? "border border-border hover:bg-muted" : "bg-primary text-primary-foreground hover:brightness-110")}
+                  className={cn("mt-5 h-11 rounded-md text-sm font-semibold disabled:opacity-50", st.ended && p === "ELITE" ? cn("border hover:bg-muted cursor-pointer", ELITE_BORDER) : p === "ELITE" ? ELITE_CTA : PREMIUM_CTA)}
                 >
                   {busy === p ? "Abrindo o pagamento…" : `Assinar ${p}`}
                 </button>

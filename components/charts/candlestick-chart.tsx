@@ -73,14 +73,18 @@ export interface ChartMarker {
   text: string;
 }
 
+/* design system → charts: candle alta #10B981 / baixa #EF4444, pavio na cor do corpo, grade rgba(148,163,184,.06),
+   indicadores em no máximo 5 cores (amarelo, ciano, violeta, azul, cinza) */
+const UP = "#10B981";
+const DOWN = "#EF4444";
 const COLORS = {
-  ema8: "#f59e0b",
-  ema25: "#22d3ee",
-  ema100: "#a78bfa",
-  ema200: "#f472b6",
-  bb: "#94a3b8",
-  macd: "#22d3ee",
-  signal: "#f59e0b",
+  ema8: "#F59E0B",
+  ema25: "#22D3EE",
+  ema100: "#8B5CF6",
+  ema200: "#1687FF",
+  bb: "#94A3B8",
+  macd: "#22D3EE",
+  signal: "#F59E0B",
 };
 
 function toTime(ms: number): UTCTimestamp {
@@ -133,25 +137,25 @@ export function CandlestickChart({
       height,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: dark ? "#9a94bf" : "#5f5a7a",
+        textColor: dark ? "#94A3B8" : "#5f5a7a",
         fontFamily: "ui-sans-serif, system-ui, sans-serif",
-        panes: { separatorColor: dark ? "#2a2550" : "#dcd8ec", separatorHoverColor: "rgba(139,92,246,0.3)", enableResize: true },
+        panes: { separatorColor: dark ? "rgba(148,163,184,0.12)" : "#dcd8ec", separatorHoverColor: "rgba(56,189,248,0.28)", enableResize: true },
       },
-      grid: { vertLines: { color: dark ? "rgba(42,37,80,0.6)" : "rgba(220,216,236,0.8)" }, horzLines: { color: dark ? "rgba(42,37,80,0.6)" : "rgba(220,216,236,0.8)" } },
+      grid: { vertLines: { color: dark ? "rgba(148,163,184,0.06)" : "rgba(100,116,139,0.10)" }, horzLines: { color: dark ? "rgba(148,163,184,0.06)" : "rgba(100,116,139,0.10)" } },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: dark ? "#2a2550" : "#dcd8ec" },
-      timeScale: { borderColor: dark ? "#2a2550" : "#dcd8ec", timeVisible: true, secondsVisible: false },
+      rightPriceScale: { borderColor: dark ? "rgba(148,163,184,0.12)" : "#dcd8ec" },
+      timeScale: { borderColor: dark ? "rgba(148,163,184,0.12)" : "#dcd8ec", timeVisible: true, secondsVisible: false },
       localization: { locale: "pt-BR" },
       autoSize: true,
     });
     chartRef.current = chart;
 
     const candle = chart.addSeries(CandlestickSeries, {
-      upColor: "#22c55e",
-      downColor: "#f43f5e",
+      upColor: UP,
+      downColor: DOWN,
       borderVisible: false,
-      wickUpColor: "#22c55e",
-      wickDownColor: "#f43f5e",
+      wickUpColor: UP,
+      wickDownColor: DOWN,
       priceFormat: { type: "price", precision: precisionFor(candles), minMove: minMoveFor(candles) },
     });
     candleRef.current = candle;
@@ -181,7 +185,7 @@ export function CandlestickChart({
     if (toggles.volume) {
       const vol = chart.addSeries(HistogramSeries, { priceFormat: { type: "volume" }, priceScaleId: "volume", lastValueVisible: false, priceLineVisible: false }, 0);
       vol.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-      vol.setData(candles.map((c) => ({ time: toTime(c.openTime), value: c.volume, color: c.close >= c.open ? "rgba(34,197,94,0.35)" : "rgba(244,63,94,0.35)" })));
+      vol.setData(candles.map((c) => ({ time: toTime(c.openTime), value: c.volume, color: c.close >= c.open ? "rgba(16,185,129,0.35)" : "rgba(239,68,68,0.35)" })));
     }
     if (series && toggles.stochRsi) {
       const k = addLine(series.stochK, COLORS.macd, 1, LineStyle.Solid, paneIndex, "StochRSI K");
@@ -196,7 +200,7 @@ export function CandlestickChart({
       const histData: Array<{ time: UTCTimestamp; value: number; color: string }> = [];
       candles.forEach((c, i) => {
         const v = series.macdHist[i];
-        if (v !== null && v !== undefined && Number.isFinite(v)) histData.push({ time: toTime(c.openTime), value: v, color: v >= 0 ? "rgba(34,197,94,0.6)" : "rgba(244,63,94,0.6)" });
+        if (v !== null && v !== undefined && Number.isFinite(v)) histData.push({ time: toTime(c.openTime), value: v, color: v >= 0 ? "rgba(16,185,129,0.6)" : "rgba(239,68,68,0.6)" });
       });
       hist.setData(histData);
       addLine(series.macd, COLORS.macd, 1, LineStyle.Solid, paneIndex, "MACD");

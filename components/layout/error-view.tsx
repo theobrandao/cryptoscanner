@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { AlertTriangle, Home, RotateCcw } from "lucide-react";
+import { LogoSymbol } from "@/components/brand/logo";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button, buttonVariants } from "@/components/ui/button";
 
@@ -16,10 +17,10 @@ export function ErrorView({ error, retry, area }: { error: Error & { digest?: st
   }, [error]);
   return (
     <PageShell className="flex min-h-[60svh] flex-col items-center justify-center py-16 text-center">
-      <span className="icon-tile grid h-12 w-12 place-items-center rounded-xl" aria-hidden>
-        <AlertTriangle className="h-6 w-6 text-warning" />
-      </span>
-      <h1 className="mt-4 text-2xl font-bold">Algo deu errado</h1>
+      <LogoSymbol size={36} />
+      <h1 className="mt-5 flex items-center gap-2 text-2xl font-bold tracking-[-0.025em]">
+        <AlertTriangle className="h-5 w-5 text-warning" aria-hidden /> Algo deu errado
+      </h1>
       <p className="mt-1 max-w-md text-sm text-muted-foreground">
         {area ? `Não conseguimos carregar ${area} agora.` : "Não conseguimos carregar esta página agora."} Tente de novo em instantes. Seus dados e configurações continuam salvos.
       </p>

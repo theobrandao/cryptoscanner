@@ -457,7 +457,7 @@ function DcaDemo() {
           <div className="text-[11px] text-muted-foreground">
             Preço médio pago
           </div>
-          <div className="tabular font-semibold text-success">{brl(avg)}</div>
+          <div className="tabular font-semibold text-primary">{brl(avg)}</div>
         </div>
         <div className="rounded-md border border-border p-2">
           <div className="text-[11px] text-muted-foreground">

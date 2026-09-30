@@ -21,7 +21,7 @@ import type { LiquidityPool } from "@/lib/engines/liquidity";
 import type { Timeframe } from "@/types/market";
 
 const TFS: Timeframe[] = ["15m", "30m", "1h", "4h", "1d", "1w"];
-const STATUS_VARIANT: Record<string, "success" | "warning" | "danger" | "muted"> = { LIVE: "success", FALLBACK: "muted", DEGRADED: "warning", DELAYED: "warning", OFFLINE: "danger" };
+const STATUS_VARIANT: Record<string, "info" | "warning" | "danger" | "muted"> = { LIVE: "info", FALLBACK: "muted", DEGRADED: "warning", DELAYED: "warning", OFFLINE: "danger" };
 const DIR_PT: Record<string, string> = { bullish: "alta", bearish: "baixa", neutral: "neutra" };
 const LOC_PT: Record<string, string> = { premium: "premium (metade superior)", discount: "desconto (metade inferior)", equilibrium: "equilíbrio" };
 const POOL_PT: Record<string, string> = {
@@ -38,7 +38,7 @@ const STATE_PT: Record<string, string> = { available: "disponível", swept: "cap
 
 const CHART_TOGGLES: ChartToggles = { ema8: false, ema25: false, ema100: false, ema200: false, bb: false, volume: true, stochRsi: false, macd: false, levels: true, fibonacci: false, trendlines: false };
 // semântica de cor: verde alta, vermelho baixa, azul informativo, cinza neutro, amarelo cautela
-const C = { up: "#22c55e", down: "#f43f5e", info: "#3b82f6", neutral: "#94a3b8", warn: "#f59e0b" };
+const C = { up: "#10B981", down: "#EF4444", info: "#38BDF8", neutral: "#94A3B8", warn: "#F59E0B" };
 
 const px = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? "—" : formatPrice(v));
 
@@ -78,7 +78,7 @@ export function TerminalView() {
             </Select>
             <div className="inline-flex flex-wrap rounded-md border border-border p-0.5" role="tablist" aria-label="Timeframe">
               {TFS.map((t) => (
-                <button key={t} role="tab" aria-selected={t === timeframe} onClick={() => set("timeframe", t)} className={cn("min-h-9 rounded px-2.5 text-sm font-semibold", t === timeframe ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                <button key={t} role="tab" aria-selected={t === timeframe} onClick={() => set("timeframe", t)} className={cn("cursor-pointer min-h-9 rounded px-2.5 text-sm font-semibold", t === timeframe ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
                   {TIMEFRAME_LABEL[t]}
                 </button>
               ))}
@@ -237,7 +237,9 @@ function StructureTab({ r }: { r: EngineReport }) {
                       .reverse()
                       .map((e) => (
                         <li key={`${e.type}-${e.index}`} className="flex flex-wrap items-center gap-2">
-                          <Badge variant={e.direction === "bullish" ? "success" : "danger"}>{e.type}</Badge>
+                          <Badge variant={e.direction === "bullish" ? "success" : "danger"}>
+                            <span aria-hidden>{e.direction === "bullish" ? "▲" : "▼"}</span> {e.type}
+                          </Badge>
                           <span className="tabular">{px(e.level)}</span>
                           <span className="text-xs text-muted-foreground">
                             {formatDateTime(e.time)} · deslocamento {formatNumber(e.displacementAtr, 1)} ATR
@@ -267,7 +269,7 @@ function StructureTab({ r }: { r: EngineReport }) {
                       ))}
                   </ul>
                 ) : (
-                  <p className="text-muted-foreground">Nenhuma.</p>
+                  <p className="text-muted-foreground">Nenhuma falha de rompimento na janela analisada.</p>
                 )}
               </div>
               <div>
@@ -301,7 +303,7 @@ function PoolRow({ p }: { p: LiquidityPool }) {
         {formatNumber(p.distanceAtr, 1)} ATR
       </td>
       <td className="px-3 py-2">
-        <Badge variant={p.state === "available" ? "success" : p.state === "swept" ? "warning" : "muted"}>{STATE_PT[p.state]}</Badge>
+        <Badge variant={p.state === "available" ? "info" : p.state === "swept" ? "warning" : "muted"}>{STATE_PT[p.state]}</Badge>
       </td>
       <td className="px-3 py-2 text-xs text-muted-foreground">{p.eventTime ? formatDateTime(p.eventTime) : ""}</td>
     </tr>
@@ -382,7 +384,9 @@ function MtfTab({ r }: { r: EngineReport }) {
                 </td>
                 <td className="px-3 py-2">{row.phase}</td>
                 <td className="px-3 py-2 text-xs">{row.lastEvent ? `${row.lastEvent.type} ${DIR_PT[row.lastEvent.direction]} ${px(row.lastEvent.level)}` : "—"}</td>
-                <td className={cn("px-3 py-2 text-right tabular", row.emaScore > 0 ? "text-success" : row.emaScore < 0 ? "text-danger" : "")}>{row.emaScore}</td>
+                <td className={cn("px-3 py-2 text-right tabular", row.emaScore > 0 ? "text-success" : row.emaScore < 0 ? "text-danger" : "")}>
+                  {row.emaScore > 0 ? `+${row.emaScore}` : row.emaScore}
+                </td>
                 <td className="px-3 py-2 text-right tabular">{Number.isFinite(row.rsi) ? formatNumber(row.rsi, 1) : "—"}</td>
                 <td className="px-3 py-2 text-xs">{row.location ?? "—"}</td>
                 <td className="px-3 py-2 text-right tabular">{Number.isFinite(row.atrPct) ? `${formatNumber(row.atrPct, 2)}%` : "—"}</td>

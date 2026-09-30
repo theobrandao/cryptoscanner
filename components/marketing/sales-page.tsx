@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import Image from "next/image";
-import { ArrowRight, BellRing, Bot, Check, CircleSlash, ListChecks, ScrollText, ShieldCheck, Smartphone, Target, UserPlus, X } from "lucide-react";
+import { ArrowRight, BellRing, Check, CircleSlash, ListChecks, ScrollText, ShieldCheck, Smartphone, Sparkles, Target, UserPlus, X } from "lucide-react";
 import { FaqList, PlanCards, StickyTrialCta, trackCta, trackCtaInside, type LandingData, type Prices } from "@/components/marketing/landing";
 import { fmtR, ValidatedModels } from "@/components/marketing/validated-models";
 import { Eyebrow, LineChart, SectionHeading, StatTile, TickerMarquee, ToolsGrid } from "@/components/ui/showcase";
@@ -12,6 +12,8 @@ import { billingNote } from "@/lib/plans-copy";
 import { captureAffiliateParams } from "@/lib/affiliate-params";
 import { ENTITLEMENTS } from "@/lib/entitlements";
 import { MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
+import { cn } from "@/lib/utils";
+import { PREMIUM_CTA } from "@/components/account/plan-tier";
 
 /**
  * Página de vendas (/vendas): destino dos anúncios e URL da página de vendas na Kiwify.
@@ -22,7 +24,7 @@ const BENEFITS = [
   { icon: BellRing, title: "Alertas no lugar de horas de tela", text: "Agentes IA e Sentinela vigiam os ativos 24h no servidor e avisam por push e Telegram quando a condição escolhida aparece." },
   { icon: ScrollText, title: "Regras fixas e auditáveis", text: "O scanner calcula padrões, alvo, stop e taxa de acerto histórica por regra. Cada número mostra a fonte e o horário do dado." },
   { icon: Target, title: "Modelo medido fora da amostra", text: "O modelo de rompimento foi publicado porque o resultado em um período não usado na escolha das regras foi positivo, já com taxa e slippage." },
-  { icon: Bot, title: "Analista IA com os números do app", text: "Pergunte sobre qualquer um dos 30 ativos. A IA consulta as ferramentas do CryptoScanner e só escreve números que vieram delas." },
+  { icon: Sparkles, title: "Analista IA com os números do app", text: "Pergunte sobre qualquer um dos 30 ativos. A IA consulta as ferramentas do CryptoScanner e só escreve números que vieram delas." },
 ];
 
 const SCREENS = [
@@ -81,7 +83,7 @@ export function SalesPage({ content, initialPrices }: { content: LandingData; in
         {/* HERO */}
         <section className="grid items-center gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
           <div className="flex min-w-0 flex-col items-start">
-            <Eyebrow tone="warning">Scanner · sinais testados · alertas no celular</Eyebrow>
+            <Eyebrow tone="info">Scanner · sinais testados · alertas no celular</Eyebrow>
             <h1 className="mt-5 text-balance text-[32px] font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-[56px]">
               Padrões, sinais testados e alertas de <span className="text-gradient">{content.assets} criptos</span> em um só lugar
             </h1>
@@ -89,7 +91,7 @@ export function SalesPage({ content, initialPrices }: { content: LandingData; in
               O CryptoScanner calcula por regras fixas os padrões gráficos, os níveis e os sinais do modelo de rompimento, e avisa no celular quando a condição aparece. Você vê de onde vem cada número e decide.
             </p>
             <div className="mt-7 flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row">
-              <Link href={cta} onClick={trackCta("hero")} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
+              <Link href={cta} onClick={trackCta("hero")} className={cn("inline-flex h-12 items-center justify-center gap-2 rounded-xl px-6 text-sm font-semibold", PREMIUM_CTA)}>
                 Testar o PRO grátis por {trial} dias <ArrowRight className="h-4 w-4" />
               </Link>
               <a href="#planos" className="inline-flex h-12 items-center justify-center rounded-xl border border-border bg-card px-6 text-sm font-semibold hover:border-primary/50">
@@ -99,16 +101,16 @@ export function SalesPage({ content, initialPrices }: { content: LandingData; in
             <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-muted-foreground">
               {["Sem cartão no teste", "Sem chaves da corretora", "7 dias de garantia na compra"].map((t) => (
                 <li key={t} className="flex items-center gap-1.5">
-                  <Check className="h-4 w-4 text-success" /> {t}
+                  <Check className="h-4 w-4 text-primary" aria-hidden /> {t}
                 </li>
               ))}
             </ul>
           </div>
           {main && m ? (
-            <aside className="card-glow flex min-w-0 flex-col gap-4 rounded-2xl border border-border p-4 sm:p-5" aria-label="Resultado do modelo fora da amostra">
+            <aside className="flex min-w-0 flex-col gap-4 rounded-2xl border border-border bg-card p-4 sm:p-5" aria-label="Resultado do modelo fora da amostra">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[13px] font-semibold">Modelo de rompimento {main.tf}</span>
-                <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">fora da amostra</span>
+                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">fora da amostra</span>
               </div>
               <LineChart values={main.curve} height={150} tone="up" label="R acumulado fora da amostra" />
               <div className="grid grid-cols-3 gap-2">
@@ -152,8 +154,8 @@ export function SalesPage({ content, initialPrices }: { content: LandingData; in
           <SectionHeading eyebrow="Por que usar" title="Menos tempo na tela," accent="mais critério" subtitle="O trabalho repetitivo de olhar gráfico fica com o servidor. Você recebe o aviso e confere os números." />
           <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {BENEFITS.map((b) => (
-              <article key={b.title} className="card-glow flex flex-col gap-3 rounded-2xl border border-border p-5">
-                <span className="icon-tile grid h-11 w-11 place-items-center rounded-xl">
+              <article key={b.title} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5">
+                <span aria-hidden className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary">
                   <b.icon className="h-5 w-5" />
                 </span>
                 <h3 className="text-[16px] font-bold">{b.title}</h3>
@@ -173,7 +175,7 @@ export function SalesPage({ content, initialPrices }: { content: LandingData; in
 
         {/* MODELO */}
         <section id="modelo" className="scroll-mt-20" aria-label="Modelo validado">
-          <SectionHeading eyebrow="Transparência" tone="warning" title="Os números do modelo," accent="com as ressalvas" subtitle="Regras escolhidas em um período e medidas em outro, em 30 criptos, descontando taxa e slippage. O setup que não passou nesse teste não é vendido como estratégia." />
+          <SectionHeading eyebrow="Transparência" tone="info" title="Os números do modelo," accent="com as ressalvas" subtitle="Regras escolhidas em um período e medidas em outro, em 30 criptos, descontando taxa e slippage. O setup que não passou nesse teste não é vendido como estratégia." />
           <div className="mt-8">
             <ValidatedModels models={content.validated} />
           </div>
@@ -200,22 +202,22 @@ export function SalesPage({ content, initialPrices }: { content: LandingData; in
         {/* PARA QUEM */}
         <section aria-labelledby="paraquem" className="grid gap-3 md:grid-cols-2">
           <h2 id="paraquem" className="sr-only">Para quem é</h2>
-          <div className="rounded-2xl border border-success/30 bg-success/5 p-5">
-            <h3 className="text-[16px] font-bold text-success">É para você se…</h3>
+          <div className="rounded-2xl border border-primary/30 bg-primary/5 p-5">
+            <h3 className="text-[16px] font-bold text-primary">É para você se…</h3>
             <ul className="mt-3 flex flex-col gap-2.5 text-[13.5px]">
               {FOR_WHO.yes.map((t) => (
                 <li key={t} className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> <span className="min-w-0">{t}</span>
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden /> <span className="min-w-0">{t}</span>
                 </li>
               ))}
             </ul>
           </div>
-          <div className="rounded-2xl border border-danger/30 bg-danger/5 p-5">
-            <h3 className="text-[16px] font-bold text-danger">Não é para você se…</h3>
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <h3 className="text-[16px] font-bold">Não é para você se…</h3>
             <ul className="mt-3 flex flex-col gap-2.5 text-[13.5px]">
               {FOR_WHO.no.map((t) => (
                 <li key={t} className="flex gap-2">
-                  <X className="mt-0.5 h-4 w-4 shrink-0 text-danger" /> <span className="min-w-0">{t}</span>
+                  <X className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden /> <span className="min-w-0">{t}</span>
                 </li>
               ))}
             </ul>
@@ -227,7 +229,7 @@ export function SalesPage({ content, initialPrices }: { content: LandingData; in
           <SectionHeading eyebrow="Planos" title="Teste o PRO" accent={`${trial} dias grátis`} subtitle="Sem cartão no teste. Assinatura mensal, cancelamento a qualquer momento." />
           <PlanCards data={data} trial={trial} />
           <div className="mx-auto mt-4 flex max-w-4xl flex-col items-start gap-3 rounded-2xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:p-5">
-            <ShieldCheck className="h-8 w-8 shrink-0 text-success" aria-hidden />
+            <ShieldCheck className="h-8 w-8 shrink-0 text-primary" aria-hidden />
             <div className="min-w-0">
               <h3 className="text-[15px] font-bold">Garantia de 7 dias</h3>
               <p className="text-[13px] leading-relaxed text-muted-foreground">Pediu o cancelamento em até 7 dias da compra, recebe o valor integral de volta (art. 49 do Código de Defesa do Consumidor).</p>
@@ -250,7 +252,7 @@ export function SalesPage({ content, initialPrices }: { content: LandingData; in
             Comece hoje com <span className="text-gradient">{trial} dias de PRO grátis</span>
           </h2>
           <p className="mt-2 text-[14px] text-muted-foreground">Sem cartão, sem chaves de API. Se gostar, escolha o plano.</p>
-          <Link href={cta} onClick={trackCta("final")} className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110 sm:w-auto">
+          <Link href={cta} onClick={trackCta("final")} className={cn("mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl px-7 text-sm font-semibold sm:w-auto", PREMIUM_CTA)}>
             Criar conta grátis <ArrowRight className="h-4 w-4" />
           </Link>
           <p className="mt-3 text-[12px] text-muted-foreground">

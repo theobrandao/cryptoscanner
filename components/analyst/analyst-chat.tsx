@@ -6,7 +6,7 @@ import useSWR from "swr";
 import {
   AlertTriangle,
   Bell,
-  Bot,
+  Sparkles,
   Check,
   History,
   Loader2,
@@ -347,7 +347,7 @@ export function AnalystChat({
           <button
             onClick={() => setShowHistory((v) => !v)}
             className={cn(
-              "inline-flex h-8 items-center gap-1 rounded-md px-2 hover:bg-muted",
+              "cursor-pointer inline-flex h-8 items-center gap-1 rounded-md px-2 hover:bg-muted",
               showHistory && "bg-muted text-foreground",
             )}
             aria-label="Conversas anteriores"
@@ -358,7 +358,7 @@ export function AnalystChat({
           </button>
           <button
             onClick={newConversation}
-            className="inline-flex h-8 items-center gap-1 rounded-md px-2 hover:bg-muted"
+            className="cursor-pointer inline-flex h-8 items-center gap-1 rounded-md px-2 hover:bg-muted"
             aria-label="Nova conversa"
           >
             <Plus className="h-3.5 w-3.5" />{" "}
@@ -378,7 +378,7 @@ export function AnalystChat({
               >
                 <button
                   onClick={() => void openConversation(c.id)}
-                  className="min-w-0 flex-1 truncate text-left"
+                  className="cursor-pointer min-w-0 flex-1 truncate text-left"
                 >
                   {c.title}{" "}
                   <span className="text-muted-foreground">
@@ -387,7 +387,7 @@ export function AnalystChat({
                 </button>
                 <button
                   onClick={() => void removeConversation(c.id)}
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-danger/10 hover:text-danger"
+                  className="cursor-pointer grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-danger/10 hover:text-danger"
                   aria-label="Apagar conversa"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -421,7 +421,7 @@ export function AnalystChat({
           <div className="flex flex-col gap-3">
             <div className="rounded-lg border border-border bg-card p-4">
               <p className="flex items-center gap-2 font-semibold">
-                <Bot className="h-4 w-4 text-primary" /> Analista IA
+                <Sparkles className="h-4 w-4 text-primary" aria-hidden /> Analista IA
               </p>
               <p className="mt-1 text-muted-foreground">
                 Pergunte sobre qualquer um dos 30 ativos. Eu consulto as
@@ -440,7 +440,7 @@ export function AnalystChat({
                 <button
                   key={s}
                   onClick={() => void send(s)}
-                  className="rounded-full border border-border bg-card px-3 py-1.5 text-left text-[12.5px] hover:border-primary/50"
+                  className="cursor-pointer rounded-full border border-border bg-card px-3 py-1.5 text-left text-[12.5px] hover:border-primary/50"
                 >
                   {s}
                 </button>
@@ -459,7 +459,7 @@ export function AnalystChat({
             >
               {m.role === "assistant" ? (
                 <span className="mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
-                  <Bot className="h-3.5 w-3.5" />
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden />
                 </span>
               ) : null}
               <div
@@ -503,10 +503,10 @@ export function AnalystChat({
                             key={`${m.id}-a${i}`}
                             onClick={() => void createAlert(a, m.id, i)}
                             disabled={/· criado$/.test(a.note)}
-                            className="inline-flex min-h-9 items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 text-left text-[12.5px] font-medium hover:bg-primary/20 disabled:opacity-60"
+                            className="cursor-pointer inline-flex min-h-9 items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 text-left text-[12.5px] font-medium hover:bg-primary/20 disabled:opacity-60"
                           >
                             {/· criado$/.test(a.note) ? (
-                              <Check className="h-4 w-4 text-success" />
+                              <Check className="h-4 w-4 text-info" aria-hidden />
                             ) : (
                               <Bell className="h-4 w-4 text-primary" />
                             )}
@@ -590,7 +590,7 @@ export function AnalystChat({
             <button
               type="button"
               onClick={() => abortRef.current?.abort()}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-border"
+              className="cursor-pointer grid h-10 w-10 shrink-0 place-items-center rounded-md border border-border"
               aria-label="Parar"
             >
               <Square className="h-4 w-4" />
@@ -599,7 +599,7 @@ export function AnalystChat({
             <button
               type="submit"
               disabled={!user || !input.trim()}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+              className="cursor-pointer grid h-10 w-10 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground disabled:opacity-50"
               aria-label="Enviar"
             >
               <Send className="h-4 w-4" />

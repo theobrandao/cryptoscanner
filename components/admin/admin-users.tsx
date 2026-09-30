@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import useSWR, { useSWRConfig } from "swr";
-import { ChevronLeft, ChevronRight, Download, Search, Send } from "lucide-react";
+import { Ban, ChevronLeft, ChevronRight, Download, Search, Send } from "lucide-react";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -84,7 +84,7 @@ const CHIPS: Chip[] = [
 
 const SORT_LABEL: Record<AdminSort, string> = { recentes: "Cadastro mais recente", ultimo_acesso: "Último acesso", nome: "Nome (A-Z)" };
 
-export const TIER_VARIANT: Record<Tier, BadgeProps["variant"]> = { TRIAL: "default", PRO: "outline", ELITE: "accent", NONE: "muted", ADMIN: "warning" };
+export const TIER_VARIANT: Record<Tier, BadgeProps["variant"]> = { TRIAL: "default", PRO: "pro", ELITE: "elite", NONE: "muted", ADMIN: "warning" };
 
 const ACCESS_EVENT_LABEL: Record<string, string> = { login: "Entrou", register: "Criou a conta", password_reset: "Redefiniu a senha", account_deleted: "Conta excluída" };
 const GRANT_STATUS_LABEL: Record<string, string> = { ACTIVE: "Ativa", PAST_DUE: "Pagamento pendente", CANCELLED: "Cancelada", EXPIRED: "Encerrada" };
@@ -105,7 +105,11 @@ export function AccessBadges({ u }: { u: Pick<UserRow, "tier" | "blockedAt"> }) 
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       <Badge variant={TIER_VARIANT[u.tier]}>{TIER_LABEL_ADMIN[u.tier]}</Badge>
-      {u.blockedAt ? <Badge variant="danger">Bloqueado</Badge> : null}
+      {u.blockedAt ? (
+        <Badge variant="warning">
+          <Ban className="h-3 w-3" aria-hidden /> Bloqueado
+        </Badge>
+      ) : null}
     </span>
   );
 }
@@ -192,7 +196,7 @@ export function AdminUsersTab() {
             key={x.key}
             onClick={() => setChip(x.key)}
             aria-pressed={chip === x.key}
-            className={cn("inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] transition-colors", chip === x.key ? "border-primary bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:bg-muted hover:text-foreground")}
+            className={cn("cursor-pointer inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] transition-colors", chip === x.key ? "border-primary bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:bg-muted hover:text-foreground")}
           >
             {x.label}
             <span className="tabular text-[11px] opacity-70">{data ? x.count(data.totals) : "·"}</span>
@@ -251,7 +255,7 @@ export function AdminUsersTab() {
           <ul className="flex flex-col gap-2 md:hidden">
             {data.rows.map((u) => (
               <li key={u.id}>
-                <button onClick={() => setOpenId(u.id)} className="flex w-full flex-col gap-2 rounded-lg border border-border bg-card p-3 text-left hover:bg-muted/50">
+                <button onClick={() => setOpenId(u.id)} className="cursor-pointer flex w-full flex-col gap-2 rounded-lg border border-border bg-card p-3 text-left hover:bg-muted/50">
                   <div className="flex w-full min-w-0 items-center gap-2.5">
                     <Avatar u={u} />
                     <div className="min-w-0 flex-1">

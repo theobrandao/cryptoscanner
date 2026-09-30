@@ -38,7 +38,7 @@ function SignalCard({ s }: { s: ActiveSignal }) {
   const hi = Math.max(s.price, s.entry + risk);
   const pos = (v: number) => `${Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100))}%`;
   return (
-    <Link href={`/graficos?symbol=${s.symbol}`} className="card-glow flex flex-col gap-3 rounded-2xl border border-border p-4 transition-colors hover:border-primary/50">
+    <Link href={`/graficos?symbol=${s.symbol}`} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/50">
       <div className="flex items-center gap-2">
         <span className={`grid h-8 w-8 place-items-center rounded-full bg-muted text-[14px] ${GLYPH_FONT_CLASS}`}>{asset?.glyph}</span>
         <span className="min-w-0 flex-1">
@@ -92,14 +92,14 @@ function Signals() {
     <section id="sinais" ref={attach} onClickCapture={mark} className="flex scroll-mt-20 flex-col gap-4" aria-label="Sinais ativos">
       <div className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
-          <Eyebrow tone="warning">Modelo de sinais</Eyebrow>
+          <Eyebrow tone="info">Modelo de sinais</Eyebrow>
           <h2 className="mt-2 text-xl font-extrabold tracking-tight sm:text-2xl">
-            Sinais ativos — <span className="text-gradient">rompimento testado</span>
+            Sinais ativos — rompimento testado
           </h2>
           <p className="mt-1 max-w-3xl text-[13px] text-muted-foreground">Fechamento acima da máxima de 55 candles e da EMA 200. Stop inicial em ATR; depois o stop sobe para a mínima dos últimos 20 candles.</p>
         </div>
         <PillGroup label="Timeframe" value={tf} onChange={setTf} options={[{ value: "all", label: "Todos" }, { value: "4h", label: "4H" }, { value: "1d", label: "1D" }]} />
-        <button onClick={() => void mutate()} className="grid h-9 w-9 place-items-center rounded-lg border border-border text-muted-foreground hover:text-foreground" aria-label="Atualizar sinais">
+        <button onClick={() => void mutate()} className="cursor-pointer grid h-9 w-9 place-items-center rounded-lg border border-border text-muted-foreground hover:text-foreground" aria-label="Atualizar sinais">
           <RefreshCw className={cn("h-4 w-4", isValidating && "animate-spin")} />
         </button>
       </div>
@@ -120,7 +120,7 @@ function Signals() {
             {!cards.length ? <p className="rounded-2xl border border-border bg-card p-4 text-[13px] text-muted-foreground sm:col-span-2 xl:col-span-4">Nenhuma posição aberta pelo modelo neste timeframe.</p> : null}
           </div>
           <div className="rounded-2xl border border-border bg-card">
-            <button onClick={() => setShowAll(!showAll)} aria-expanded={showAll} className="flex w-full items-center justify-between px-4 py-3 text-[13px] font-semibold">
+            <button onClick={() => setShowAll(!showAll)} aria-expanded={showAll} className="cursor-pointer flex w-full items-center justify-between px-4 py-3 text-[13px] font-semibold">
               Todas as {rows.length} posições em tabela
               <ChevronDown className={cn("h-4 w-4 transition-transform", showAll && "rotate-180")} />
             </button>
@@ -143,7 +143,7 @@ function Signals() {
                     {rows.map((a) => (
                       <tr key={`${a.model}:${a.symbol}`} className="hover:bg-muted/40">
                         <td className="px-4 py-1.5 font-semibold">
-                          <Link href={`/graficos?symbol=${a.symbol}`} className="hover:text-primary">
+                          <Link href={`/graficos?symbol=${a.symbol}`} className="hover:text-primary-text">
                             {a.symbol}
                           </Link>
                           {a.isNew ? <span className="ml-1.5 rounded bg-primary/15 px-1.5 py-px text-[10px] font-semibold text-primary">novo</span> : null}
@@ -173,7 +173,7 @@ function Signals() {
                     {r.symbol} {r.tf.toUpperCase()} <span className={cn("tabular font-semibold", r.rNet >= 0 ? "text-success" : "text-danger")}>{R(r.rNet)}</span>
                   </li>
                 ))}
-                {!recent.length ? <li className="text-muted-foreground">Nenhuma saída no período.</li> : null}
+                {!recent.length ? <li className="text-muted-foreground">Nenhuma saída nos últimos 30 dias. As operações encerradas pelo modelo aparecem aqui.</li> : null}
               </ul>
             </div>
             <div className="rounded-2xl border border-border bg-card p-4 text-[12.5px] text-muted-foreground">

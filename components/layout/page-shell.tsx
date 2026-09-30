@@ -9,9 +9,9 @@ export function PageTitle({ title, description, actions, icon }: { title: React.
   return (
     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight sm:text-3xl">
+        <h1 className="flex items-center gap-3 text-[26px] font-bold leading-tight tracking-[-0.035em] sm:text-[32px]">
           {icon ? (
-            <span aria-hidden className="icon-tile grid h-10 w-10 shrink-0 place-items-center rounded-xl shadow-lg shadow-primary/20 [&>svg]:h-5 [&>svg]:w-5">
+            <span aria-hidden className="icon-tile grid h-10 w-10 shrink-0 place-items-center rounded-xl [&>svg]:h-5 [&>svg]:w-5">
               {icon}
             </span>
           ) : null}

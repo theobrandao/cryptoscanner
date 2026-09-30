@@ -13,6 +13,7 @@ import { trackClient } from "@/lib/analytics-client";
 import { useSession } from "@/hooks/use-session";
 import { MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
 import { cn } from "@/lib/utils";
+import { ELITE_BORDER, ELITE_CTA, ELITE_TEXT, EliteBadge, PREMIUM_CTA, ProBadge } from "@/components/account/plan-tier";
 import { captureAffiliateParams, withAffiliateParams } from "@/lib/affiliate-params";
 
 export interface Prices {
@@ -41,9 +42,9 @@ export interface LandingData {
 }
 
 const LEVELS: Array<{ key: Level; label: string; tone: string; text: string }> = [
-  { key: "iniciante", label: "Iniciante", tone: "bg-success/15 text-success", text: "Bitcoin, candles, suportes e médias móveis." },
-  { key: "intermediario", label: "Intermediário", tone: "bg-warning/15 text-warning", text: "Indicadores, padrões do scanner, Fibonacci e gestão de risco." },
-  { key: "avancado", label: "Avançado", tone: "bg-danger/15 text-danger", text: "Derivativos, automação com agentes, psicologia e backtests." },
+  { key: "iniciante", label: "Iniciante", tone: "bg-accent/15 text-accent", text: "Bitcoin, candles, suportes e médias móveis." },
+  { key: "intermediario", label: "Intermediário", tone: "bg-primary/15 text-primary", text: "Indicadores, padrões do scanner, Fibonacci e gestão de risco." },
+  { key: "avancado", label: "Avançado", tone: "bg-muted text-foreground", text: "Derivativos, automação com agentes, psicologia e backtests." },
 ];
 
 const faq = (trial: number) => [
@@ -130,7 +131,7 @@ export function Simulator() {
   const label = "mb-1.5 block text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground";
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-      <div className="card-glow flex flex-col gap-4 rounded-2xl border border-border p-5">
+      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
         <div>
           <span className={label}>Ativo</span>
           <PillGroup label="Ativo" value={symbol} onChange={setSymbol} options={[{ value: "BTC", label: "₿ Bitcoin" }, { value: "ETH", label: "Ξ Ethereum" }, { value: "SOL", label: "◎ Solana" }, { value: "BNB", label: "⬡ BNB" }]} />
@@ -149,7 +150,7 @@ export function Simulator() {
           <span className={label}>Período</span>
           <PillGroup label="Período" value={months} onChange={setMonths} options={[6, 12, 24, 36].map((m) => ({ value: m as 6 | 12 | 24 | 36, label: m < 12 ? `${m} meses` : `${m / 12} ${m === 12 ? "ano" : "anos"}` }))} />
         </div>
-        <button onClick={() => void run()} disabled={busy} className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-60">
+        <button onClick={() => void run()} disabled={busy} className="cursor-pointer mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-60">
           {busy ? "Calculando…" : "Simular com preços reais"} <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -198,10 +199,10 @@ export function PlanCards({ data, trial }: { data: Prices | undefined; trial: nu
       {(["PRO", "ELITE"] as const).map((p) => {
         const buy = data?.checkoutUrls?.[p] ?? null;
         return (
-          <div key={p} className={cn("flex min-w-0 flex-col rounded-2xl border p-5 sm:p-6", p === "ELITE" ? "card-glow border-primary/50" : "border-border bg-card")}>
+          <div key={p} className={cn("flex min-w-0 flex-col rounded-2xl border p-5 sm:p-6", p === "ELITE" ? cn("bg-card", ELITE_BORDER) : "border-border bg-card")}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-lg font-extrabold tracking-tight">{p}</h3>
-              {p === "PRO" ? <span className="rounded-full bg-success/15 px-2.5 py-0.5 text-[11px] font-semibold text-success">{trial} dias grátis</span> : <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold text-primary">Mais recursos</span>}
+              {p === "PRO" ? <ProBadge className="normal-case tracking-normal">{trial} dias grátis</ProBadge> : <EliteBadge className="normal-case tracking-normal">Mais recursos</EliteBadge>}
             </div>
             <div className="mt-2">
               <span className="tabular text-4xl font-extrabold">{data ? `R$ ${data.prices[p]}` : "—"}</span>
@@ -210,24 +211,24 @@ export function PlanCards({ data, trial }: { data: Prices | undefined; trial: nu
             <ul className="mt-5 flex flex-1 flex-col gap-2 text-[13.5px]">
               {PLAN_FEATURES[p].map((i) => (
                 <li key={i} className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> <span className="min-w-0">{i}</span>
+                  <Check className={cn("mt-0.5 h-4 w-4 shrink-0", p === "ELITE" ? ELITE_TEXT : "text-primary")} aria-hidden /> <span className="min-w-0">{i}</span>
                 </li>
               ))}
             </ul>
             <div className="mt-6 flex flex-col gap-2">
               {p === "PRO" ? (
-                <Link href="/registro?next=/" className="flex h-12 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground hover:brightness-110">
+                <Link href="/registro?next=/" className={cn("flex h-12 items-center justify-center rounded-xl text-sm font-semibold", PREMIUM_CTA)}>
                   Começar {trial} dias grátis
                 </Link>
               ) : null}
               {!data ? (
                 <div className="skeleton h-12 rounded-xl" aria-hidden="true" />
               ) : buy ? (
-                <a href={buy} rel="noopener" data-testid={`buy-${p}`} onClick={(e) => (e.currentTarget.href = withAffiliateParams(buy))} className={cn("flex h-12 items-center justify-center rounded-xl text-sm font-semibold", p === "ELITE" ? "bg-primary text-primary-foreground hover:brightness-110" : "border border-border hover:border-primary/50")}>
+                <a href={buy} rel="noopener" data-testid={`buy-${p}`} onClick={(e) => (e.currentTarget.href = withAffiliateParams(buy))} className={cn("flex h-12 items-center justify-center rounded-xl text-sm font-semibold", p === "ELITE" ? ELITE_CTA : "border border-border hover:border-primary/50")}>
                   Assinar {p} agora
                 </a>
               ) : p === "ELITE" ? (
-                <Link href="/registro?next=/planos" className="flex h-12 items-center justify-center rounded-xl border border-border text-sm font-semibold hover:border-primary/50">
+                <Link href="/registro?next=/planos" className={cn("flex h-12 items-center justify-center rounded-xl border text-sm font-semibold hover:bg-muted", ELITE_BORDER)}>
                   Criar conta e assinar o ELITE
                 </Link>
               ) : null}
@@ -264,7 +265,7 @@ export function Landing({ content }: { content: LandingData }) {
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-20 px-4 py-12 sm:py-16">
         {/* HERO */}
         <section ref={heroRef} className="flex flex-col items-center text-center">
-          <Eyebrow tone="warning">Modelo testado fora da amostra</Eyebrow>
+          <Eyebrow tone="info">Modelo testado fora da amostra</Eyebrow>
           <h1 className="mt-5 max-w-4xl text-balance text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
             Cripto com ferramentas claras e <span className="text-gradient">sinais testados</span>
           </h1>
@@ -272,7 +273,7 @@ export function Landing({ content }: { content: LandingData }) {
             Scanner de padrões gráficos, agentes que avisam no celular, Sentinela 24h, gráficos, Fibonacci, simulador e aulas. Cada ferramenta faz uma coisa, e o modelo de sinais mostra o resultado medido em um período que não foi usado para criá-lo.
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-2.5">
-            <Link href="/registro?next=/" onClick={trackCta("hero")} className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
+            <Link href="/registro?next=/" onClick={trackCta("hero")} className={cn("inline-flex h-12 items-center gap-2 rounded-xl px-6 text-sm font-semibold", PREMIUM_CTA)}>
               Testar o PRO grátis por {trial} dias <ArrowRight className="h-4 w-4" />
             </Link>
             <a href="#modelo" className="inline-flex h-12 items-center gap-2.5 rounded-xl border border-border bg-card px-4 text-left hover:border-primary/50">
@@ -299,7 +300,7 @@ export function Landing({ content }: { content: LandingData }) {
             ].map(([v, l]) => (
               <div key={l}>
                 <dt className="sr-only">{l}</dt>
-                <dd className="text-gradient text-3xl font-extrabold tabular-nums sm:text-4xl">{v}</dd>
+                <dd className="text-3xl font-bold tabular-nums text-foreground sm:text-4xl">{v}</dd>
                 <dd className="mt-1 text-[12px] text-muted-foreground">{l}</dd>
               </div>
             ))}
@@ -329,7 +330,7 @@ export function Landing({ content }: { content: LandingData }) {
         <section id="modelo" className="scroll-mt-20" aria-label="Modelo validado">
           <SectionHeading
             eyebrow="Modelo de sinais"
-            tone="warning"
+            tone="info"
             title="Resultado medido"
             accent="fora da amostra"
             subtitle="Regras escolhidas em um período e medidas em outro, já descontando taxa e slippage, em 30 criptos. O setup de pullback que testamos junto não passou e por isso não é oferecido como estratégia."
@@ -354,7 +355,7 @@ export function Landing({ content }: { content: LandingData }) {
             {LEVELS.map((lv) => {
               const list = content.lessons.filter((l) => l.level === lv.key);
               return (
-                <article key={lv.key} className="card-glow flex flex-col gap-3 rounded-2xl border border-border p-5">
+                <article key={lv.key} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5">
                   <span className={cn("self-start rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide", lv.tone)}>{lv.label}</span>
                   <p className="text-[13px] text-muted-foreground">{lv.text}</p>
                   <ol className="flex flex-col gap-1.5 text-[13px]">
@@ -395,7 +396,7 @@ export function Landing({ content }: { content: LandingData }) {
               <Chip key={c}>{c}</Chip>
             ))}
           </div>
-          <Link href="/registro?next=/" onClick={trackCta("final")} className="mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110">
+          <Link href="/registro?next=/" onClick={trackCta("final")} className={cn("mt-6 inline-flex h-12 items-center gap-2 rounded-xl px-7 text-sm font-semibold", PREMIUM_CTA)}>
             Testar o PRO grátis por {trial} dias <ArrowRight className="h-4 w-4" />
           </Link>
           <p className="mt-3 text-[12px] text-muted-foreground">

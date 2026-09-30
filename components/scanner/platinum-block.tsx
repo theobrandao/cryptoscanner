@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { useAccess } from "@/components/account/access-gate";
 import { ELITE_DIFFERENTIALS, formatBRL } from "@/lib/plans-copy";
+import { ELITE_BORDER, ELITE_CTA, ELITE_TEXT, EliteBadge } from "@/components/account/plan-tier";
+import { cn } from "@/lib/utils";
 
 /** Preço do ELITE da conta (PRICE_ELITE_BRL via /api/billing/subscription); espaço reservado enquanto carrega. */
 function ElitePrice({ className }: { className?: string }) {
@@ -33,12 +35,12 @@ export function PlatinumBlock({ currentPlan }: { currentPlan: string }) {
   const router = useRouter();
   if (currentPlan === "PLATINUM") return null;
   return (
-    <Card className="border-accent/40 bg-gradient-to-br from-accent/10 via-card to-primary/10">
+    <Card className={ELITE_BORDER}>
       <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2 text-base font-semibold">
-            <Gem className="h-4 w-4 text-accent" aria-hidden /> Recursos do
-            plano ELITE
+            <Gem className={cn("h-4 w-4", ELITE_TEXT)} aria-hidden /> Recursos do
+            plano <EliteBadge />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             <Lock className="mr-1 inline h-3 w-3" aria-hidden /> Os timeframes
@@ -48,7 +50,7 @@ export function PlatinumBlock({ currentPlan }: { currentPlan: string }) {
             {ELITE_DIFFERENTIALS.map((b) => (
               <li key={b} className="flex items-center gap-1.5">
                 <Check
-                  className="h-3.5 w-3.5 shrink-0 text-success"
+                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                   aria-hidden
                 />{" "}
                 {b}
@@ -59,6 +61,7 @@ export function PlatinumBlock({ currentPlan }: { currentPlan: string }) {
         </div>
         <Button
           size="lg"
+          variant="elite"
           className="shrink-0"
           onClick={() => router.push("/planos")}
         >
@@ -84,7 +87,7 @@ export function UpgradeDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Gem className="h-4 w-4 text-accent" aria-hidden /> Recurso do plano
+            <Gem className={cn("h-4 w-4", ELITE_TEXT)} aria-hidden /> Recurso do plano
             ELITE
           </DialogTitle>
           <DialogDescription>{feature}</DialogDescription>
@@ -94,7 +97,7 @@ export function UpgradeDialog({
           {ELITE_DIFFERENTIALS.map((b) => (
             <li key={b} className="flex items-center gap-1.5">
               <Check
-                className="h-3.5 w-3.5 shrink-0 text-success"
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                 aria-hidden
               />{" "}
               {b}
@@ -108,7 +111,7 @@ export function UpgradeDialog({
           </Button>
           <Link
             href="/planos"
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className={cn("inline-flex h-9 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium", ELITE_CTA)}
           >
             <Gem className="h-4 w-4" aria-hidden /> Ver plano ELITE{" "}
             <ArrowRight className="h-4 w-4" aria-hidden />

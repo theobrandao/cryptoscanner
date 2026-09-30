@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/misc";
 import { ASSETS } from "@/lib/assets";
-import { formatCompact, formatPct, formatPrice } from "@/lib/format";
+import { formatCompact, formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Change } from "@/components/market/change";
 
 type Period = "1h" | "24h" | "7d" | "30d";
 const PERIODS: Period[] = ["1h", "24h", "7d", "30d"];
@@ -56,12 +57,12 @@ const BUCKETS: Array<{
   test: (c: number) => boolean;
   rgb: string;
 }> = [
-  { label: "> +5%", test: (c) => c > 5, rgb: "22,163,74" },
-  { label: "+2% a +5%", test: (c) => c > 2 && c <= 5, rgb: "34,197,94" },
-  { label: "0% a +2%", test: (c) => c >= 0 && c <= 2, rgb: "74,222,128" },
-  { label: "0% a −2%", test: (c) => c < 0 && c >= -2, rgb: "251,113,133" },
-  { label: "−2% a −5%", test: (c) => c < -2 && c >= -5, rgb: "244,63,94" },
-  { label: "< −5%", test: (c) => c < -5, rgb: "190,18,60" },
+  { label: "> +5%", test: (c) => c > 5, rgb: "5,150,105" },
+  { label: "+2% a +5%", test: (c) => c > 2 && c <= 5, rgb: "16,185,129" },
+  { label: "0% a +2%", test: (c) => c >= 0 && c <= 2, rgb: "52,211,153" },
+  { label: "0% a −2%", test: (c) => c < 0 && c >= -2, rgb: "248,113,113" },
+  { label: "−2% a −5%", test: (c) => c < -2 && c >= -5, rgb: "239,68,68" },
+  { label: "< −5%", test: (c) => c < -5, rgb: "220,38,38" },
 ];
 
 function bucketRgb(change: number): string {
@@ -206,9 +207,9 @@ export function BubblesView() {
           ctx.fillText(b.symbol, b.x, b.y - (b.r >= 22 ? b.r * 0.05 : -3));
           if (b.r >= 22) {
             ctx.font = `500 ${Math.max(8, Math.min(16, b.r * 0.3))}px ui-sans-serif, system-ui`;
-            ctx.fillStyle = b.change >= 0 ? "#22c55e" : "#f43f5e";
+            ctx.fillStyle = b.change >= 0 ? "#10B981" : "#EF4444";
             ctx.fillText(
-              `${b.change >= 0 ? "+" : ""}${b.change.toFixed(1)}%`,
+              `${b.change > 0 ? "▲ +" : b.change < 0 ? "▼ " : ""}${b.change.toFixed(1)}%`,
               b.x,
               b.y + b.r * 0.38,
             );
@@ -352,11 +353,7 @@ export function BubblesView() {
               </div>
               <div className="tabular">
                 {formatPrice(hover.price)} ·{" "}
-                <span
-                  className={hover.change >= 0 ? "text-success" : "text-danger"}
-                >
-                  {formatPct(hover.change)} ({period})
-                </span>
+                <Change value={hover.change} suffix={` (${period})`} />
               </div>
               <div className="tabular text-xs text-muted-foreground">
                 vol 24h {formatCompact(hover.volume)} · cap.{" "}

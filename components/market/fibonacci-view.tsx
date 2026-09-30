@@ -37,6 +37,7 @@ import { fibonacciLevels } from "@/lib/fibonacci";
 import { formatNumber, formatPct } from "@/lib/format";
 import { TIMEFRAME_LABEL } from "@/lib/timeframes";
 import { cn } from "@/lib/utils";
+import { Change } from "@/components/market/change";
 
 interface AutoPayload {
   mode: "auto";
@@ -281,14 +282,8 @@ function FibTable({
                 <TableCell className="text-right tabular">
                   {formatNumber(l.price, 4)}
                 </TableCell>
-                <TableCell
-                  className={cn(
-                    "text-right tabular",
-                    dist !== null && dist > 0 && "text-success",
-                    dist !== null && dist < 0 && "text-danger",
-                  )}
-                >
-                  {dist !== null ? formatPct(dist) : "—"}
+                <TableCell className="text-right">
+                  <Change value={dist} />
                 </TableCell>
               </TableRow>
             );

@@ -92,7 +92,7 @@ export function StatsView() {
                   aria-selected={tf === t}
                   onClick={() => set("timeframe", t)}
                   className={cn(
-                    "min-h-10 min-w-14 rounded px-3 text-sm font-semibold",
+                    "cursor-pointer min-h-10 min-w-14 rounded px-3 text-sm font-semibold",
                     tf === t
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground",

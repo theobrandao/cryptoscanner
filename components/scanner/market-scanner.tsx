@@ -4,14 +4,15 @@ import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ArrowUp, RefreshCw } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, RefreshCw } from "lucide-react";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
 import { AccessGate } from "@/components/account/access-gate";
 import { Alert } from "@/components/ui/misc";
 import { scoreTone } from "@/components/terminal/bottom-panels";
 import { ASSET_CATEGORIES } from "@/lib/asset-categories";
-import { formatPct, formatPrice, timeAgo } from "@/lib/format";
+import { formatPrice, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Change } from "@/components/market/change";
 import { postJson } from "@/lib/client-api";
 import type { SetupRow } from "@/services/market-overview-service";
 import type { ScanRow, StrategyRecord } from "@/services/strategy-service";
@@ -26,7 +27,7 @@ type SortKey = "score" | "symbol" | "changePct24h" | "rr" | "distanceToZoneAtr" 
 function SortTh({ k, label, right, sort, onSort }: { k: SortKey; label: string; right?: boolean; sort: { key: SortKey; dir: 1 | -1 }; onSort: (k: SortKey) => void }) {
   return (
     <th className={cn("px-2 py-2 font-medium", right && "text-right")} aria-sort={sort.key === k ? (sort.dir === -1 ? "descending" : "ascending") : "none"}>
-      <button onClick={() => onSort(k)} className="inline-flex items-center gap-0.5 hover:text-foreground">
+      <button onClick={() => onSort(k)} className="cursor-pointer inline-flex items-center gap-0.5 hover:text-foreground">
         {label}
         {sort.key === k ? sort.dir === -1 ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" /> : null}
       </button>
@@ -116,7 +117,7 @@ function ScannerInner() {
             <Link href="/scanner/padroes" className="inline-flex h-9 items-center rounded-md border border-border px-3 text-[13px] hover:bg-muted">
               Padrões gráficos
             </Link>
-            <button onClick={() => void mutate()} className="grid h-9 w-9 place-items-center rounded-md border border-border hover:bg-muted" aria-label="Atualizar">
+            <button onClick={() => void mutate()} className="cursor-pointer grid h-9 w-9 place-items-center rounded-md border border-border hover:bg-muted" aria-label="Atualizar">
               <RefreshCw className={cn("h-4 w-4", isValidating && "animate-spin")} />
             </button>
           </>
@@ -125,7 +126,7 @@ function ScannerInner() {
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-2">
         <div className="flex gap-0.5" role="tablist" aria-label="Timeframe">
           {TFS.map((t) => (
-            <button key={t} role="tab" aria-selected={t === tf} onClick={() => router.replace(`/scanner?tf=${t}`, { scroll: false })} className={cn("h-8 rounded px-2.5 text-[12px] font-medium", t === tf ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>
+            <button key={t} role="tab" aria-selected={t === tf} onClick={() => router.replace(`/scanner?tf=${t}`, { scroll: false })} className={cn("cursor-pointer h-8 rounded px-2.5 text-[12px] font-medium", t === tf ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>
               {t.toUpperCase()}
             </button>
           ))}
@@ -155,7 +156,7 @@ function ScannerInner() {
           Nota ≥
           <input type="number" min={0} max={100} step={5} value={minScore} onChange={(e) => setMinScore(Math.max(0, Math.min(100, Number(e.target.value))))} className={cn(sel, "w-16")} aria-label="Nota mínima" />
         </label>
-        <label className="flex items-center gap-1.5 text-[12.5px]">
+        <label className="flex cursor-pointer items-center gap-1.5 text-[12.5px]">
           <input type="checkbox" checked={operable} onChange={(e) => setOperable(e.target.checked)} /> Ocultar sem entrada
         </label>
         <select aria-label="Estratégia" className={sel} value={strategyId} onChange={(e) => (setStrategyId(e.target.value), setStratRows(null))}>
@@ -170,7 +171,7 @@ function ScannerInner() {
       </div>
       <div className="mb-3 flex flex-wrap gap-1" role="group" aria-label="Estados do setup">
         {STATES.map((s) => (
-          <button key={s} aria-pressed={states.includes(s)} onClick={() => setStates((x) => (x.includes(s) ? x.filter((y) => y !== s) : [...x, s]))} className={cn("h-7 rounded-full border px-2.5 text-[11px]", states.includes(s) ? "border-primary bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:text-foreground")}>
+          <button key={s} aria-pressed={states.includes(s)} onClick={() => setStates((x) => (x.includes(s) ? x.filter((y) => y !== s) : [...x, s]))} className={cn("cursor-pointer h-7 rounded-full border px-2.5 text-[11px]", states.includes(s) ? "border-primary bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:text-foreground")}>
             {pt(SETUP_STATE_PT, s)}
           </button>
         ))}
@@ -203,14 +204,16 @@ function ScannerInner() {
               {rows.map((r) => {
                 const st = stratRows?.get(r.symbol);
                 return (
-                  <tr key={r.symbol} className="border-t border-border/60 hover:bg-muted/40">
+                  <tr key={r.symbol} className="h-11 border-t border-border/60 hover:bg-muted/40">
                     <td className="px-2 py-1.5">
                       <Link href={`/charts/${r.symbol}?tf=${tf}&exchange=binance&instrument=spot`} className="font-semibold hover:underline">
                         {r.symbol}/USDT
                       </Link>
                       <span className="ml-2 text-muted-foreground">{px(r.price)}</span>
                     </td>
-                    <td className={cn("tabular px-2 py-1.5 text-right", (r.changePct24h ?? 0) >= 0 ? "text-success" : "text-danger")}>{r.changePct24h != null ? formatPct(r.changePct24h) : "—"}</td>
+                    <td className="px-2 py-1.5 text-right">
+                      <Change value={r.changePct24h} />
+                    </td>
                     <td className={cn("px-2 py-1.5", r.direction === "bullish" ? "text-success" : r.direction === "bearish" ? "text-danger" : "text-muted-foreground")}>
                       {r.verdict === "NO_TRADE" ? <span className="text-muted-foreground">Sem entrada · {r.noTradeCode ? pt(NO_TRADE_CODE_PT, r.noTradeCode) : pt(CONDITION_PT, r.condition)}</span> : `${directionPt(r.direction)} · ${pt(SETUP_STATE_PT, r.state).toLowerCase()}`}
                     </td>
@@ -229,7 +232,10 @@ function ScannerInner() {
                     <td className="tabular px-2 py-1.5 text-right">{r.rsi != null ? r.rsi.toFixed(1) : "—"}</td>
                     <td className="tabular px-2 py-1.5 text-right">{r.rvol != null ? `${r.rvol.toFixed(2)}×` : "—"}</td>
                     {strategyId ? (
-                      <td className={cn("tabular px-2 py-1.5 text-right", st?.pass ? "text-success" : "text-muted-foreground")}>{st ? `${st.passedConditions}/${st.totalConditions}` : "…"}</td>
+                      <td className={cn("tabular px-2 py-1.5 text-right", st?.pass ? "font-semibold text-info" : "text-muted-foreground")}>
+                        {st?.pass ? <Check className="mr-1 inline h-3.5 w-3.5" aria-label="Atende" /> : null}
+                        {st ? `${st.passedConditions}/${st.totalConditions}` : "…"}
+                      </td>
                     ) : null}
                   </tr>
                 );

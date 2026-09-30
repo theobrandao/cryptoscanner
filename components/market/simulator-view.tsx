@@ -43,6 +43,7 @@ import { ApiClientError, apiFetch, postJson } from "@/lib/client-api";
 import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { formatDateTime, formatPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Change, changeArrow } from "@/components/market/change";
 import type {
   SimulationInput,
   SimulationResult,
@@ -430,7 +431,7 @@ export function SimulatorView() {
                 />
                 <Stat
                   label="Resultado"
-                  value={`${money(result.profit, cur)} (${formatPct(result.profitPct)})`}
+                  value={`${changeArrow(result.profit)} ${money(result.profit, cur)} (${formatPct(result.profitPct)})`.trim()}
                   sub={
                     result.cagrPct !== null
                       ? `${formatPct(result.cagrPct)} ao ano`
@@ -527,14 +528,8 @@ export function SimulatorView() {
                           <TableCell className="text-right tabular">
                             {money(m.value, cur)}
                           </TableCell>
-                          <TableCell
-                            className={cn(
-                              "text-right tabular",
-                              m.pct > 0 && "text-success",
-                              m.pct < 0 && "text-danger",
-                            )}
-                          >
-                            {formatPct(m.pct)}
+                          <TableCell className="text-right">
+                            <Change value={m.pct} />
                           </TableCell>
                         </TableRow>
                       ))}
@@ -602,13 +597,8 @@ export function SimulatorView() {
                           <TableCell className="text-right tabular">
                             {money(s.finalValue, s.currency)}
                           </TableCell>
-                          <TableCell
-                            className={cn(
-                              "text-right tabular",
-                              s.profitPct >= 0 ? "text-success" : "text-danger",
-                            )}
-                          >
-                            {formatPct(s.profitPct)}
+                          <TableCell className="text-right">
+                            <Change value={s.profitPct} />
                           </TableCell>
                           <TableCell className="text-right">
                             <button

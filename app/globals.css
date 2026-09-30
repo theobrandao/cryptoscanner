@@ -3,85 +3,222 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ------------------------------------------------------------------
-   Tokens de tema (próprios). Escuro é o padrão; claro via .light no <html>.
+   Tokens de tema — design system oficial (docs/design-system/cryptoscanner_design_system.json).
+   Escuro é o padrão (.dark no <html>); claro via .light. Toda cor de texto definida aqui foi medida
+   (WCAG AA: 4,5:1 texto normal, 3:1 texto grande/controles) sobre fundo, cartão e tons /10–/15.
    ------------------------------------------------------------------ */
 :root {
-  /* cores da logo (degradê ciano → azul → violeta); versão mais escura no tema claro */
+  /* ---- tema claro (harmonizado com a marca: neutros slate, azul/ciano/violeta mais escuros para contraste) ---- */
   --brand-1: #0891b2;
-  --brand-2: #2f5bea;
-  --brand-3: #7c3aed;
-  --background: #f6f5fb;
-  --foreground: #16122b;
+  --brand-2: #1466d8;
+  --brand-3: #6d28d9;
+  --brand-gradient: linear-gradient(135deg, #0891b2 0%, #1466d8 38%, #2f4be0 65%, #6d28d9 100%);
+  --background: #f5f7fb;
+  --background-secondary: #eef2f7;
+  --background-tertiary: #e8edf4;
+  --foreground: #0f172a;
   --card: #ffffff;
-  --card-foreground: #16122b;
-  --muted: #eceaf6;
-  --muted-foreground: #5f5a7a;
-  --border: #dcd8ec;
-  --input: #dcd8ec;
-  --primary: #6d3df5;
-  --primary-foreground: #ffffff;
-  --accent: #0ea5b7;
-  --accent-foreground: #ffffff;
-  --success: #12a66b;
-  --danger: #e2445c;
-  --warning: #d98a06;
-  /* tema claro: versões mais escuras das cores de estado para texto (contraste AA ≥ 4,5:1 sobre fundo, cartão e tons /10–/15) */
-  --success-text: #096b43;
-  --danger-text: #b51f36;
-  --warning-text: #8a5600;
-  --ring: #6d3df5;
-  --chart-up: #12a66b;
-  --chart-down: #e2445c;
-  --radius: 0.5rem;
+  --card-foreground: #0f172a;
   --elevated: #ffffff;
-  --ai: #6d4aff;
-  --info: #1f6feb;
+  --surface-3: #f1f5f9;
+  --surface-hover: #eef2f7;
+  --muted: #eef2f7;
+  --muted-foreground: #475569;
+  --text-muted: #64748b;
+  --text-disabled: #94a3b8;
+  --secondary: #ffffff;
+  --secondary-foreground: #334155;
+  --secondary-border: #cbd5e1;
+  --border: #e2e8f0;
+  --border-hover: rgba(14, 116, 144, 0.35);
+  --border-active: rgba(14, 116, 144, 0.6);
+  --input: #cbd5e1;
+  --input-background: #ffffff;
+  --primary: #2563eb;
+  --primary-text: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --accent: #0e7490;
+  --accent-text: #155e75;
+  --accent-foreground: #ffffff;
+  --ai: #6d28d9;
+  --ai-text: #6d28d9;
+  --success: #059669;
+  --danger: #dc2626;
+  --danger-strong: #dc2626;
+  --warning: #d97706;
+  --info: #0284c7;
+  /* tema claro: versões mais escuras das cores de estado para texto (contraste AA ≥ 4,5:1 sobre fundo, cartão e tons /10–/15) */
+  --success-text: #047857;
+  --danger-text: #b91c1c;
+  --warning-text: #92400e;
+  --info-text: #0369a1;
+  --pro-text: #1d4ed8;
+  --pro-bg: rgba(37, 99, 235, 0.08);
+  --pro-border: rgba(37, 99, 235, 0.35);
+  --elite: #b98932;
+  --elite-light: #ffd980;
+  --elite-dark: #8a6116;
+  --elite-text: #7a5412;
+  --elite-bg: rgba(185, 137, 50, 0.1);
+  --elite-border: rgba(185, 137, 50, 0.5);
+  --elite-gradient: linear-gradient(135deg, #ffd980, #ddaa48, #fff1b8);
+  --pro-gradient: linear-gradient(135deg, #1687ff, #7c3aed);
+  --ring: #0e7490;
+  --chart-up: #059669;
+  --chart-down: #dc2626;
+  --chart-grid: rgba(71, 85, 105, 0.12);
+  --row-hover: rgba(15, 23, 42, 0.03);
+  --switch-off: #64748b;
+  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 16px rgba(15, 23, 42, 0.04);
+  --brand-glow: 0 0 30px rgba(8, 145, 178, 0.12);
+  --ambient-glow: radial-gradient(circle at 20% 0%, rgba(37, 99, 235, 0.05), transparent 35%);
+  --skeleton-gradient: linear-gradient(90deg, #eef2f7, #e2e8f0, #eef2f7);
+  --glass-background: rgba(255, 255, 255, 0.85);
+  --glass-border: 1px solid rgba(15, 23, 42, 0.08);
+
+  /* ---- escala independente de tema ---- */
+  --radius: 0.75rem;
+  --cs-radius-sm: 8px; /* campos, botões */
+  --cs-radius-md: 12px; /* cartões */
+  --cs-radius-lg: 16px; /* modais */
+  --radius-pill: 999px;
+  --duration-micro: 150ms;
+  --duration-hover: 200ms;
+  --duration-dropdown: 250ms;
+  --duration-modal: 300ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-modal: 40;
+  /* conteúdo flutuante com portal (select, menu, tooltip) precisa ficar acima do modal, senão some dentro de diálogos */
+  --z-popover: 45;
+  --z-toast: 50;
+  --z-command: 60;
 }
 
 .dark {
+  /* ---- tema escuro = valores oficiais do design system ---- */
   --brand-1: #22d3ee;
-  --brand-2: #3b7bff;
-  --brand-3: #a855f7;
-  /* Terminal V2 — referência visual aprovada: navy/grafite, bordas muito leves, azul elétrico controlado */
-  --background: #07101a;
-  --foreground: #e6edf5;
-  --card: #0b1420;
-  --card-foreground: #e6edf5;
-  --elevated: #0e1926;
-  --muted: #111d2b;
-  --muted-foreground: #8193a8;
-  --border: rgba(255, 255, 255, 0.07);
-  --input: rgba(255, 255, 255, 0.1);
-  --primary: #2d67f7;
-  --primary-text: #5b8cff;
+  --brand-2: #1687ff;
+  --brand-3: #8b2cff;
+  --brand-gradient: linear-gradient(135deg, #22d3ee 0%, #1687ff 38%, #3655ff 65%, #8b2cff 100%);
+  --background: #070b14;
+  --background-secondary: #0b1120;
+  --background-tertiary: #101827;
+  --foreground: #f8fafc;
+  --card: #0d1424;
+  --card-foreground: #f8fafc;
+  --elevated: #111a2c;
+  --surface-3: #162033;
+  --surface-hover: #19253a;
+  --muted: #162033;
+  /* texto secundário: #94a3b8 (#64748b fica em 3,9:1 sobre o cartão e não serve para texto de leitura) */
+  --muted-foreground: #94a3b8;
+  --text-muted: #64748b; /* só para texto não essencial ou grande (≥ 3:1) */
+  --text-disabled: #475569;
+  --secondary: #111a2c;
+  --secondary-foreground: #cbd5e1;
+  --secondary-border: rgba(148, 163, 184, 0.16);
+  --border: rgba(148, 163, 184, 0.12);
+  --border-hover: rgba(56, 189, 248, 0.28);
+  --border-active: rgba(34, 211, 238, 0.5);
+  --input: rgba(148, 163, 184, 0.16);
+  --input-background: #0b1120;
+  /* fundo azul com texto branco: #2563eb (5,2:1); #1687ff com branco fica em 3,5:1 */
+  --primary: #2563eb;
+  --primary-text: #60a5fa;
   --primary-foreground: #ffffff;
-  --accent: #3aa0ff;
-  --accent-foreground: #061018;
-  --ai: #7c5cff;
-  --success: #16c784;
-  --danger: #ea3943;
-  --warning: #f5a524;
-  --info: #3aa0ff;
-  --ring: #2f6bff;
-  --chart-up: #16c784;
-  --chart-down: #ea3943;
+  --accent: #22d3ee;
+  --accent-text: #22d3ee;
+  --accent-foreground: #070b14;
+  --ai: #8b5cf6;
+  --ai-text: #a78bfa; /* #8b5cf6 como texto fica em 4,3:1 sobre o cartão */
+  --success: #10b981;
+  --danger: #ef4444;
+  --danger-strong: #dc2626; /* fundo de botão com texto branco (#ef4444 + branco = 3,8:1) */
+  --warning: #f59e0b;
+  --info: #38bdf8;
+  --success-text: #10b981;
+  --danger-text: #f87171;
+  --warning-text: #f59e0b;
+  --info-text: #38bdf8;
+  --pro-text: #60a5fa;
+  --pro-bg: rgba(37, 99, 235, 0.12);
+  --pro-border: rgba(59, 130, 246, 0.35);
+  --elite: #f4c460;
+  --elite-light: #ffd980;
+  --elite-dark: #b98932;
+  --elite-text: #f4c460;
+  --elite-bg: rgba(244, 196, 96, 0.1);
+  --elite-border: rgba(244, 196, 96, 0.4);
+  --ring: #22d3ee;
+  --chart-up: #10b981;
+  --chart-down: #ef4444;
+  --chart-grid: rgba(148, 163, 184, 0.06);
+  --row-hover: rgba(255, 255, 255, 0.025);
+  --switch-off: rgba(148, 163, 184, 0.4);
+  --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.22);
+  --brand-glow: 0 0 30px rgba(34, 211, 238, 0.14);
+  --ambient-glow: radial-gradient(circle at 20% 0%, rgba(37, 99, 235, 0.08), transparent 35%);
+  --skeleton-gradient: linear-gradient(90deg, #111827, #1e293b, #111827);
+  --glass-background: rgba(15, 23, 42, 0.7);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Aliases com os nomes exatos de design_tokens_css (seguem o tema ativo). */
+:root {
+  --cs-bg: var(--background);
+  --cs-bg-secondary: var(--background-secondary);
+  --cs-surface-1: var(--card);
+  --cs-surface-2: var(--elevated);
+  --cs-surface-3: var(--surface-3);
+  --cs-border: var(--border);
+  --cs-border-hover: var(--border-hover);
+  --cs-text-primary: var(--foreground);
+  --cs-text-secondary: var(--muted-foreground);
+  --cs-text-muted: var(--text-muted);
+  --cs-blue: var(--brand-2);
+  --cs-cyan: var(--brand-1);
+  --cs-violet: var(--ai);
+  --cs-positive: var(--success);
+  --cs-negative: var(--danger);
+  --cs-warning: var(--warning);
+  --cs-elite: var(--elite);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-surface-3: var(--surface-3);
+  --color-surface-hover: var(--surface-hover);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-text-muted: var(--text-muted);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
   --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
+  --color-border-active: var(--border-active);
   --color-input: var(--input);
+  --color-input-background: var(--input-background);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-text: var(--primary-text);
+  --color-accent-text: var(--accent-text);
+  --color-ai-text: var(--ai-text);
+  --color-success-text: var(--success-text);
+  --color-danger-text: var(--danger-text);
+  --color-warning-text: var(--warning-text);
+  --color-info-text: var(--info-text);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-success: var(--success);
   --color-danger: var(--danger);
+  --color-danger-strong: var(--danger-strong);
   --color-warning: var(--warning);
   --color-ring: var(--ring);
   --color-chart-up: var(--chart-up);
@@ -89,9 +226,17 @@
   --color-elevated: var(--elevated);
   --color-ai: var(--ai);
   --color-info: var(--info);
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --color-pro: var(--pro-text);
+  --color-elite: var(--elite);
+  --color-elite-text: var(--elite-text);
+  --color-elite-light: var(--elite-light);
+  --color-elite-dark: var(--elite-dark);
+  /* raios (DS 8/12/16 px): rounded-md = 8 px (campos, botões), rounded-lg = 12 px (cartões), rounded-2xl = 16 px (modais), rounded-full = selos.
+     Os tokens --cs-radius-sm/md/lg ficam em :root; aqui mantemos nomes que o tailwind-merge (cn) reconhece. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
@@ -104,22 +249,74 @@ html.light {
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
+  /* brilho ambiente oficial (radial azul a 8% no topo esquerdo); não repete ao rolar */
+  background-image: var(--ambient-glow);
+  background-repeat: no-repeat;
   color: var(--foreground);
   font-family: var(--font-sans);
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-}
-
-.dark body {
-  background-image: none;
 }
 
 * {
   border-color: var(--border);
 }
 
-.tabular {
+/* números financeiros: largura fixa por dígito (valores não "pulam" ao atualizar) */
+.tabular,
+.tabular-nums {
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* tipografia oficial como classes (prefixo type-, que o cn/tailwind-merge não confunde com cor de texto) */
+@utility type-h1 {
+  font-size: 32px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+@utility type-h2 {
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+@utility type-h3 {
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+@utility type-body {
+  font-size: 14px;
+  line-height: 1.5;
+}
+@utility type-data {
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* hierarquia oficial nos títulos; classes utilitárias (text-*, font-*, tracking-*) continuam prevalecendo */
+@layer base {
+  h1 {
+    font-size: 32px;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+  }
+  h2 {
+    font-size: 24px;
+    line-height: 1.25;
+    font-weight: 650;
+    letter-spacing: -0.025em;
+  }
+  h3 {
+    font-weight: 600;
+  }
 }
 
 /* barra de rolagem discreta */
@@ -156,7 +353,7 @@ body {
   }
 }
 .skeleton {
-  background: linear-gradient(90deg, var(--muted) 25%, color-mix(in oklab, var(--muted) 60%, var(--card)) 37%, var(--muted) 63%);
+  background: var(--skeleton-gradient);
   background-size: 800px 100%;
   animation: shimmer 1.4s infinite linear;
 }
@@ -193,18 +390,68 @@ body {
 }
 
 /* ---------------------------------------------------------------- Apresentação (v4) */
+/* degradê oficial da marca: só em logo, CTA premium, selos, IA e destaques (não em todo cartão) */
 .text-gradient {
-  background: linear-gradient(90deg, var(--brand-1), var(--brand-2) 55%, var(--brand-3));
+  background: var(--brand-gradient);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
+.bg-brand-gradient {
+  background: var(--brand-gradient);
+}
 .icon-tile {
-  background: linear-gradient(135deg, var(--brand-1), var(--brand-2) 55%, var(--brand-3));
+  background: var(--brand-gradient);
   color: #fff;
 }
+/* cartão de destaque: superfície normal com um brilho ambiente muito leve (o design system pede gradiente só em destaques) */
 .card-glow {
-  background: radial-gradient(120% 80% at 0% 0%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 60%), var(--card);
+  background: radial-gradient(120% 80% at 0% 0%, rgba(37, 99, 235, 0.05), transparent 55%), var(--card);
+}
+/* vidro: só em modal, menu, tooltip e sobreposições */
+.glass {
+  background: var(--glass-background);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: var(--glass-border);
+}
+/* cartão clicável: borda ciano e sobe 1 px no hover */
+.card-interactive {
+  transition: border-color var(--duration-hover) var(--ease-standard), transform var(--duration-hover) var(--ease-standard), background-color var(--duration-hover) var(--ease-standard);
+}
+.card-interactive:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-interactive:hover {
+    transform: none;
+  }
+}
+/* entrada de modal (300 ms, curva padrão); só opacidade/escala, sem conflitar com o translate de centralização */
+@keyframes cs-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes cs-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.cs-fade-in {
+  animation: cs-fade-in var(--duration-modal) var(--ease-standard);
+}
+.cs-pop-in {
+  animation: cs-pop-in var(--duration-modal) var(--ease-standard);
 }
 @keyframes marquee {
   from {
@@ -223,7 +470,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .marquee-track,
   .live-dot,
-  .skeleton {
+  .skeleton,
+  .cs-fade-in,
+  .cs-pop-in {
     animation: none;
   }
 }
@@ -255,6 +504,24 @@ body {
 }
 :root:not(.dark) .text-warning {
   color: var(--warning-text);
+}
+:root:not(.dark) .text-info {
+  color: var(--info-text);
+}
+/* textos de marca: azul e ciano mais escuros no claro, violeta mais claro no escuro (AA também sobre tons /15) */
+.text-primary,
+.dark .text-primary {
+  color: var(--primary-text);
+}
+.text-accent {
+  color: var(--accent-text);
+}
+.text-ai {
+  color: var(--ai-text);
+}
+/* escuro: #ef4444 como texto cai para 4,3:1 sobre tons bg-danger/15; o texto usa #f87171 (gráficos seguem com #ef4444) */
+.dark .text-danger {
+  color: var(--danger-text);
 }
 /* selo verde com texto branco no tema claro: fundo mais escuro (branco sobre #12a66b fica em 3,1:1) */
 :root:not(.dark) .bg-success.text-white {
@@ -305,6 +572,6 @@ html[data-nav] .page-enter {
   background: color-mix(in oklab, var(--primary) 35%, transparent);
 }
 :where(a, button, [role="button"], [role="tab"], input, select, textarea, summary):focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }

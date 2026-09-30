@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import useSWR from "swr";
-import { ExternalLink, Loader2, RefreshCw, Send, Unlink } from "lucide-react";
+import { CircleCheck, ExternalLink, Loader2, RefreshCw, Send, Unlink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -300,7 +300,9 @@ export function TelegramConnect({
     return (
       <div className="flex flex-col gap-3 text-sm">
         <div className="flex items-center gap-2">
-          <Badge variant="success">Conectado</Badge>
+          <Badge variant="info">
+            <CircleCheck className="h-3 w-3" aria-hidden /> Conectado
+          </Badge>
           <span className="text-xs text-muted-foreground">
             Os alertas dos seus agentes e monitores chegam no Telegram.
           </span>

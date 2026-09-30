@@ -497,16 +497,16 @@ await step("Análise completa BTC/USDT 4H (link antigo /?symbol= redireciona): h
   // troca de ativo pela watchlist mantém exchange/instrumento/timeframe
   await page.locator("tr", { hasText: "ETH/USDT" }).first().click();
   await page.waitForFunction(() => !!document.querySelector('[data-context="okx:spot:ETH:1d"]') && /ETH\/USDT/.test(document.querySelector("h1")?.textContent ?? ""), null, { timeout: 90_000 });
-  // Charts usa o mesmo workspace
+  // Charts usa o mesmo workspace; 1H é do ELITE: no teste grátis o link com tf=1h abre em 4H
   await goto("/charts/SOL?tf=1h&exchange=binance&instrument=spot");
-  await page.waitForFunction(() => !!document.querySelector('[data-context="binance:spot:SOL:1h"]'), null, { timeout: 90_000 });
-  return `${canvases} canvas · OKX perp→spot, 4H→1D, BTC→ETH e /charts/SOL sincronizados · ${shot1}`;
+  await page.waitForFunction(() => !!document.querySelector('[data-context="binance:spot:SOL:4h"]'), null, { timeout: 90_000 });
+  return `${canvases} canvas · OKX perp→spot, 4H→1D, BTC→ETH e /charts/SOL sincronizados (1H → 4H no teste) · ${shot1}`;
 });
 
 await step("Analista IA: painel lê o contexto ativo e só usa números do contexto", async () => {
   await page.getByRole("button", { name: "Analista IA" }).first().click();
-  await page.waitForFunction(() => /SOL\/USDT · Binance Spot · 1H/.test(document.querySelector("[role=dialog]")?.textContent ?? ""), null, { timeout: 60_000 });
-  await page.locator("[role=dialog]").getByRole("button", { name: /^Resuma SOL no 1H/ }).click();
+  await page.waitForFunction(() => /SOL\/USDT · Binance Spot · 4H/.test(document.querySelector("[role=dialog]")?.textContent ?? ""), null, { timeout: 60_000 });
+  await page.locator("[role=dialog]").getByRole("button", { name: /^Resuma SOL no 4H/ }).click();
   await page.waitForFunction(() => { const t = document.querySelector("[role=dialog]")?.textContent ?? ""; return /Confluence Score/.test(t) && /Estrutura/.test(t) && /Regime/.test(t); }, null, { timeout: 90_000 });
   const file = await shot("ai-analyst");
   await page.keyboard.press("Escape");

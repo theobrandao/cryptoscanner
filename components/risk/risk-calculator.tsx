@@ -103,7 +103,7 @@ export function RiskCalculator({ prefill }: { prefill?: RiskPrefill }) {
               <button
                 key={r}
                 onClick={() => setRiskPct(String(r))}
-                className={cn("min-h-9 rounded-md border px-3 text-sm", num(riskPct) === r ? "border-primary bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:text-foreground")}
+                className={cn("cursor-pointer min-h-9 rounded-md border px-3 text-sm", num(riskPct) === r ? "border-primary bg-primary/15 text-foreground" : "border-border text-muted-foreground hover:text-foreground")}
               >
                 {r}%
               </button>
@@ -148,7 +148,7 @@ export function RiskCalculator({ prefill }: { prefill?: RiskPrefill }) {
               <Label>Modo de margem</Label>
               <div className="inline-flex rounded-md border border-border p-0.5">
                 {(["isolated", "cross"] as const).map((m) => (
-                  <button key={m} onClick={() => setMode(m)} className={cn("min-h-9 flex-1 rounded px-3 text-sm", mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>
+                  <button key={m} onClick={() => setMode(m)} className={cn("cursor-pointer min-h-9 flex-1 rounded px-3 text-sm", mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>
                     {m === "isolated" ? "Isolada" : "Cruzada"}
                   </button>
                 ))}
@@ -182,7 +182,7 @@ export function RiskCalculator({ prefill }: { prefill?: RiskPrefill }) {
           </CardHeader>
           <CardContent className="grid gap-2 md:grid-cols-3">
             {stops.map((s) => (
-              <button key={s.kind} onClick={() => setStop(String(Number(s.price.toPrecision(8))))} className="rounded-md border border-border p-3 text-left text-sm hover:bg-muted/40">
+              <button key={s.kind} onClick={() => setStop(String(Number(s.price.toPrecision(8))))} className="cursor-pointer rounded-md border border-border p-3 text-left text-sm hover:bg-muted/40">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold">{s.kind === "structural" ? "Estrutural" : s.kind === "volatility" ? "Volatilidade" : "Curto"}</span>
                   <span className="tabular">{px(s.price)}</span>
@@ -255,7 +255,11 @@ export function RiskCalculator({ prefill }: { prefill?: RiskPrefill }) {
                   <tr key={r.movePct} className={cn("border-b border-border/50", r.liquidated && "bg-danger/10")}>
                     <td className="px-3 py-2 tabular">{r.movePct > 0 ? `+${r.movePct}` : r.movePct}%</td>
                     <td className="px-3 py-2 text-right tabular">{px(r.price)}</td>
-                    <td className={cn("px-3 py-2 text-right tabular", r.pnl >= 0 ? "text-success" : "text-danger")}>{fmt(r.pnl)}</td>
+                    <td className={cn("px-3 py-2 text-right tabular", r.pnl >= 0 ? "text-success" : "text-danger")}>
+                      <span aria-hidden>{r.pnl > 0 ? "▲ " : r.pnl < 0 ? "▼ " : ""}</span>
+                      {r.pnl > 0 ? "+" : ""}
+                      {fmt(r.pnl)}
+                    </td>
                     <td className="px-3 py-2 text-right tabular">{fmt(r.pnlPctOfMargin, 1)}%</td>
                     <td className="px-3 py-2 text-right tabular">{r.equityImpactPct != null ? `${fmt(r.equityImpactPct, 2)}%` : "—"}</td>
                     <td className="px-3 py-2 text-right tabular">{Number.isFinite(r.marginRatioPct) ? `${fmt(r.marginRatioPct, 1)}%` : "∞"}</td>

@@ -10,8 +10,10 @@ import { TIER_LABEL, useSession } from "@/hooks/use-session";
 import { useTickers } from "@/hooks/use-tickers";
 import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { LESSONS, lessonPath } from "@/lib/content/lessons";
-import { formatPct, formatPrice } from "@/lib/format";
+import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Change } from "@/components/market/change";
+import { EliteBadge, ProBadge } from "@/components/account/plan-tier";
 import { trackClient } from "@/lib/analytics-client";
 import { postJson } from "@/lib/client-api";
 
@@ -103,11 +105,11 @@ type PanelData = ReturnType<typeof usePanelData>;
 
 /* ───────────────────────── peças visuais ───────────────────────── */
 
-const cardCls = "card-glow group relative flex min-h-[132px] flex-col gap-3 rounded-2xl border border-border p-4 transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+const cardCls = "group relative flex min-h-[132px] flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-[transform,border-color] duration-200 hover:-translate-y-px hover:border-primary/50 motion-reduce:transition-none motion-reduce:hover:translate-y-0";
 
 function Tile({ icon: Icon }: { icon: React.ComponentType<{ className?: string }> }) {
   return (
-    <span aria-hidden className="icon-tile grid h-9 w-9 shrink-0 place-items-center rounded-xl shadow-md shadow-primary/20">
+    <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
       <Icon className="h-[18px] w-[18px]" />
     </span>
   );
@@ -118,7 +120,7 @@ function CardHead({ icon, label }: { icon: React.ComponentType<{ className?: str
     <div className="flex items-center gap-2.5">
       <Tile icon={icon} />
       <span className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
-      <ArrowRight aria-hidden className="ml-auto h-4 w-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-primary motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" />
+      <ArrowRight aria-hidden className="ml-auto h-4 w-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-primary-text motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" />
     </div>
   );
 }
@@ -179,7 +181,7 @@ function RetryNote({ onRetry, dash }: { onRetry: () => void; dash?: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground" role="alert">
       <span>{dash ? "“—” = não foi possível carregar." : "Não foi possível carregar."}</span>
-      <button type="button" onClick={onRetry} className="font-semibold text-primary hover:underline">
+      <button type="button" onClick={onRetry} className="cursor-pointer font-semibold text-primary hover:underline">
         Tentar de novo
       </button>
     </div>
@@ -220,7 +222,7 @@ function AccessCard({ d }: { d: PanelData }) {
     } else {
       body = (
         <div>
-          <div className="text-[15px] font-bold leading-tight">{TIER_LABEL[a.tier] ?? a.tier}</div>
+          <div className="flex items-center gap-2 text-[15px] font-bold leading-tight">{a.tier === "ELITE" ? <>Plano <EliteBadge className="text-[12px]" /></> : a.tier === "PRO" ? <>Plano <ProBadge className="text-[12px]" /></> : (TIER_LABEL[a.tier] ?? a.tier)}</div>
           <div className="text-[12.5px] text-muted-foreground">{a.cancelAtPeriodEnd ? "Cancelamento no fim do período" : a.status === "PAST_DUE" ? "Pagamento pendente" : "Acesso ativo"}</div>
         </div>
       );
@@ -250,7 +252,7 @@ function AgentsCard({ d }: { d: PanelData }) {
             {agents.active}
             <span className="text-[14px] font-semibold text-muted-foreground">/{agents.data?.limit ?? "—"}</span>
           </div>
-          <div className="mt-1 text-[12.5px] text-muted-foreground">{agents.total ? `ativos · ${agents.total} no total` : "Nenhum agente criado"}</div>
+          <div className="mt-1 text-[12.5px] text-muted-foreground">{agents.total ? `ativos · ${agents.total} no total` : "Nenhum agente ainda. Crie um para vigiar um ativo por você."}</div>
         </div>
       )}
     </CardLink>
@@ -318,7 +320,7 @@ function FavoritesCard({ d }: { d: PanelData }) {
   const { bySymbol } = useTickers();
   const list = d.favorites.slice(0, 5);
   return (
-    <div className="card-glow col-span-2 flex min-h-[132px] flex-col gap-3 rounded-2xl border border-border p-4 lg:col-span-4">
+    <div className="col-span-2 flex min-h-[132px] flex-col gap-3 rounded-2xl border border-border bg-card p-4 lg:col-span-4">
       <div className="flex items-center gap-2.5">
         <Tile icon={Star} />
         <span className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Favoritos</span>
@@ -350,7 +352,7 @@ function FavoritesCard({ d }: { d: PanelData }) {
                     <span className="block text-[13px] font-bold leading-tight">{sym}</span>
                     <span className="tabular block truncate text-[11.5px] text-muted-foreground">{t ? formatPrice(t.price) : "—"}</span>
                   </span>
-                  {t ? <span className={cn("tabular text-[12px] font-semibold", t.changePct24h >= 0 ? "text-success" : "text-danger")}>{formatPct(t.changePct24h, 1)}</span> : <span className="skeleton h-3.5 w-9 rounded" />}
+                  {t ? <Change value={t.changePct24h} decimals={1} className="text-[12px] font-semibold" /> : <span className="skeleton h-3.5 w-9 rounded" />}
                 </Link>
               </li>
             );
@@ -453,7 +455,7 @@ function Onboarding({ d }: { d: PanelData }) {
           <h2 className="text-[15px] font-bold leading-tight">Primeiros passos</h2>
           <p className="tabular h-5 text-[12.5px] text-muted-foreground">{ready ? `${n} de ${items.length} concluídos` : " "}</p>
         </div>
-        <button onClick={dismiss} className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Ocultar primeiros passos">
+        <button onClick={dismiss} className="cursor-pointer grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Ocultar primeiros passos">
           <X aria-hidden className="h-4 w-4" />
         </button>
       </div>
@@ -473,14 +475,14 @@ function Onboarding({ d }: { d: PanelData }) {
             const done = ready && i.done;
             const body = (
               <>
-                <span aria-hidden className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-full border", done ? "border-success bg-success text-white dark:text-background" : "border-muted-foreground/40")}>{done ? <Check className="h-3 w-3" /> : null}</span>
+                <span aria-hidden className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-full border", done ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40")}>{done ? <Check className="h-3 w-3" /> : null}</span>
                 <span className={cn("truncate", done && "line-through decoration-muted-foreground/40")}>
                   {i.label}
                   <span className="sr-only"> {done ? "(concluído)" : "(pendente)"}</span>
                 </span>
               </>
             );
-            const cls = cn("flex h-10 items-center gap-2 rounded-lg border px-3 text-[13px] transition-colors", done ? "border-success/30 bg-success/5 text-muted-foreground" : "border-border hover:border-primary/50 hover:text-foreground");
+            const cls = cn("flex h-10 items-center gap-2 rounded-lg border px-3 text-[13px] transition-colors", done ? "border-primary/30 bg-primary/5 text-muted-foreground" : "border-border hover:border-primary/50 hover:text-foreground");
             return (
               <li key={i.key}>
                 {i.key === "conta" ? (
@@ -515,7 +517,7 @@ export function QuickActions() {
         <Link key={a.href} href={a.href} className="group flex h-12 items-center gap-2.5 rounded-xl border border-border bg-card px-3 text-[13px] font-semibold transition-[transform,border-color] hover:-translate-y-0.5 hover:border-primary/50 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
           <a.icon aria-hidden className="h-4 w-4 shrink-0 text-primary" />
           <span className="truncate">{a.label}</span>
-          <ArrowRight aria-hidden className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground/50 group-hover:text-primary" />
+          <ArrowRight aria-hidden className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground/50 group-hover:text-primary-text" />
         </Link>
       ))}
     </nav>

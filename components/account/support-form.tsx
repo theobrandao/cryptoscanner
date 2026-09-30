@@ -1,18 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  BookOpen,
-  ClipboardList,
-  Inbox,
-  LifeBuoy,
-  Lock,
-  Send,
-  Ticket,
-  Trash2,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
+import { BookOpen, CircleCheck, ClipboardList, Inbox, LifeBuoy, Lock, Send, Ticket, Trash2, Zap, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
@@ -154,9 +143,9 @@ export function SupportForm({ initialSubject = "" }: { initialSubject?: string }
                 <Badge
                   variant={
                     plan.key === "PLATINUM"
-                      ? "accent"
+                      ? "elite"
                       : plan.key === "PRO"
-                        ? "default"
+                        ? "pro"
                         : "muted"
                   }
                 >
@@ -222,7 +211,9 @@ function Channel({
         <div className="flex items-center justify-between gap-2">
           <span className="font-semibold">{title}</span>
           {available ? (
-            <Badge variant="success">disponível</Badge>
+            <Badge variant="info">
+              <CircleCheck className="h-3 w-3" aria-hidden /> disponível
+            </Badge>
           ) : (
             <Badge variant="muted" className="inline-flex items-center gap-1">
               <Lock className="h-3 w-3" aria-hidden /> bloqueado

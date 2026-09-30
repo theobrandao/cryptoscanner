@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { Activity } from "lucide-react";
+import { Activity, CircleAlert, CircleCheck, Clock, Minus, TriangleAlert } from "lucide-react";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,9 +17,9 @@ const JOB_LABEL: Record<string, string> = {
 };
 const STATE: Record<
   string,
-  { label: string; variant: "success" | "warning" | "danger" | "muted" }
+  { label: string; variant: "info" | "warning" | "danger" | "muted" }
 > = {
-  ok: { label: "OK", variant: "success" },
+  ok: { label: "OK", variant: "info" },
   late: { label: "Atrasado", variant: "warning" },
   failing: { label: "Falhando", variant: "danger" },
   never: { label: "Sem execução", variant: "muted" },
@@ -55,7 +55,7 @@ export function StatusView() {
           <Alert
             variant={
               data.overall === "ok"
-                ? "success"
+                ? "info"
                 : data.overall === "degraded"
                   ? "warning"
                   : "danger"
@@ -85,6 +85,7 @@ export function StatusView() {
                       {JOB_LABEL[j.job] ?? j.job}
                     </span>
                     <Badge variant={STATE[j.state]?.variant ?? "muted"}>
+                      <StateIcon state={j.state} />
                       {STATE[j.state]?.label ?? j.state}
                     </Badge>
                   </div>
@@ -137,7 +138,8 @@ export function StatusView() {
                     <span className="capitalize">{p.provider}</span>
                     <span className="flex items-center gap-2 text-xs text-muted-foreground">
                       {p.latencyMs != null ? `${p.latencyMs} ms` : ""}
-                      <Badge variant={p.ok ? "success" : "danger"}>
+                      <Badge variant={p.ok ? "info" : "danger"}>
+                        {p.ok ? <CircleCheck className="h-3 w-3" aria-hidden /> : <CircleAlert className="h-3 w-3" aria-hidden />}
                         {p.ok ? "OK" : (p.error ?? "erro").slice(0, 40)}
                       </Badge>
                     </span>
@@ -186,9 +188,9 @@ export function StatusView() {
 
 const STATUS_VARIANT: Record<
   string,
-  "success" | "warning" | "danger" | "muted"
+  "info" | "warning" | "danger" | "muted"
 > = {
-  LIVE: "success",
+  LIVE: "info",
   FALLBACK: "muted",
   DEGRADED: "warning",
   DELAYED: "warning",
@@ -273,9 +275,15 @@ function Row({
   return (
     <div className="flex items-center justify-between gap-2">
       <span>{label}</span>
-      <Badge variant={ok ? "success" : "warning"}>
+      <Badge variant={ok ? "info" : "warning"}>
+        {ok ? <CircleCheck className="h-3 w-3" aria-hidden /> : <TriangleAlert className="h-3 w-3" aria-hidden />}
         {ok ? okText : failText}
       </Badge>
     </div>
   );
+}
+
+function StateIcon({ state }: { state: string }) {
+  const Icon = state === "ok" ? CircleCheck : state === "late" ? Clock : state === "failing" ? CircleAlert : Minus;
+  return <Icon className="h-3 w-3" aria-hidden />;
 }

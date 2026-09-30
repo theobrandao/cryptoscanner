@@ -480,8 +480,8 @@ export function AgentsView() {
               <CardTitle className="flex items-center gap-2">
                 <ClipboardList className="h-4 w-4 text-primary" aria-hidden />{" "}
                 Log de Operações em Tempo Real{" "}
-                <span className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-success">
-                  <span className="h-2 w-2 rounded-full bg-success live-dot" />{" "}
+                <span className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-info">
+                  <span aria-hidden className="h-2 w-2 rounded-full bg-info live-dot" />{" "}
                   AO VIVO
                 </span>
               </CardTitle>
@@ -506,7 +506,7 @@ export function AgentsView() {
                       className={cn(
                         "rounded-md border-l-2 bg-muted/40 px-2 py-1.5",
                         l.level === "signal"
-                          ? "border-l-success"
+                          ? "border-l-primary"
                           : l.level === "error"
                             ? "border-l-danger"
                             : l.level === "warn"
@@ -639,7 +639,7 @@ function AgentCard({
       className={cn(
         "border-l-4",
         agent.status === "ACTIVE"
-          ? "border-l-success"
+          ? "border-l-primary"
           : agent.status === "PAUSED"
             ? "border-l-warning"
             : "border-l-muted-foreground",
@@ -679,12 +679,13 @@ function AgentCard({
           <Badge
             variant={
               agent.status === "ACTIVE"
-                ? "success"
+                ? "info"
                 : agent.status === "PAUSED"
                   ? "warning"
                   : "muted"
             }
           >
+            {agent.status === "ACTIVE" ? <Play className="h-3 w-3" aria-hidden /> : agent.status === "PAUSED" ? <Pause className="h-3 w-3" aria-hidden /> : null}
             {STATUS_LABEL[agent.status]}
           </Badge>
         </div>
@@ -733,7 +734,7 @@ function AgentCard({
           <div
             className={cn(
               "truncate rounded bg-muted/50 px-2 py-1 text-[11px]",
-              last.level === "signal" && "text-success",
+              last.level === "signal" && "text-primary",
             )}
           >
             {last.message}

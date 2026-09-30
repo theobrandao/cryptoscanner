@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useTickers } from "@/hooks/use-tickers";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
-import { formatCompact, formatPct, formatPrice } from "@/lib/format";
+import { formatCompact, formatPrice } from "@/lib/format";
 import { Skeleton } from "@/components/ui/misc";
 import { cn } from "@/lib/utils";
+import { Change } from "@/components/market/change";
 
 /** Bloco "Os 30 ativos mais negociados" da home: preço (USD/BRL) e variação 24h ao vivo. */
 export function HomeMarket() {
@@ -18,7 +19,7 @@ export function HomeMarket() {
       <div className="mb-2 flex items-center justify-between">
         <div className="text-sm font-semibold">Os 30 ativos monitorados</div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className={cn("h-2 w-2 rounded-full", connected ? "bg-success live-dot" : "bg-warning")} />
+          <span aria-hidden className={cn("h-2 w-2 rounded-full", connected ? "bg-info live-dot" : "bg-warning")} />
           {data?.source ?? "…"}
           <div className="ml-2 flex rounded-md border border-border p-0.5">
             {(["USD", "BRL"] as const).map((c) => (
@@ -46,8 +47,8 @@ export function HomeMarket() {
                 {t ? (
                   <span className="text-right">
                     <span className="block text-sm tabular">{currency === "BRL" && !rate ? formatPrice(t.price, "USD") : formatPrice(t.price, currency, rate ?? 1)}</span>
-                    <span className={cn("block text-[11px] tabular", t.changePct24h > 0 ? "text-success" : t.changePct24h < 0 ? "text-danger" : "text-muted-foreground")}>
-                      {t.changePct24h > 0 ? "▲" : t.changePct24h < 0 ? "▼" : "•"} {formatPct(t.changePct24h)} · {formatCompact(t.quoteVolume24h)}
+                    <span className="block text-[11px] tabular">
+                      <Change value={t.changePct24h} /> <span className="text-muted-foreground">· {formatCompact(t.quoteVolume24h)}</span>
                     </span>
                   </span>
                 ) : (

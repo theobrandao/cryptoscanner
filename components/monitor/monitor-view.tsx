@@ -117,7 +117,7 @@ function MonitorInner() {
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex rounded-md border border-border p-0.5 text-[12.5px]" role="radiogroup" aria-label="Tipo">
                 {(["SETUP", "STRATEGY"] as const).map((k) => (
-                  <button key={k} role="radio" aria-checked={kind === k} onClick={() => setKind(k)} className={cn("h-8 rounded px-3", kind === k ? "bg-primary/15 font-semibold" : "text-muted-foreground")}>
+                  <button key={k} role="radio" aria-checked={kind === k} onClick={() => setKind(k)} className={cn("cursor-pointer h-8 rounded px-3", kind === k ? "bg-primary/15 font-semibold" : "text-muted-foreground")}>
                     {k === "SETUP" ? "Setup" : "Estratégia"}
                   </button>
                 ))}
@@ -170,7 +170,7 @@ function MonitorInner() {
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 <span className="text-[12px] text-muted-foreground">Notificar em:</span>
                 {(data?.states ?? ["FORMING", "READY", "TRIGGERED", "ACTIVE", "TARGET_HIT", "INVALIDATED", "EXPIRED"]).map((s) => (
-                  <button key={s} aria-pressed={states.includes(s)} onClick={() => setStates((x) => (x.includes(s) ? x.filter((y) => y !== s) : [...x, s]))} className={cn("h-7 rounded-full border px-2.5 text-[11px]", states.includes(s) ? "border-primary bg-primary/15" : "border-border text-muted-foreground")}>
+                  <button key={s} aria-pressed={states.includes(s)} onClick={() => setStates((x) => (x.includes(s) ? x.filter((y) => y !== s) : [...x, s]))} className={cn("cursor-pointer h-7 rounded-full border px-2.5 text-[11px]", states.includes(s) ? "border-primary bg-primary/15" : "border-border text-muted-foreground")}>
                     {s.replace("_", " ")}
                   </button>
                 ))}
@@ -183,14 +183,14 @@ function MonitorInner() {
               <p className="mt-3 text-[12px] text-muted-foreground">Notifica quando todas as condições passam a valer no fechamento de um candle (transição falso → verdadeiro).</p>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-3 text-[12.5px]">
-              <label className="flex items-center gap-1.5">
+              <label className="flex cursor-pointer items-center gap-1.5">
                 <input type="checkbox" checked={push} onChange={(e) => setPush(e.target.checked)} /> Push no navegador
               </label>
-              <label className="flex items-center gap-1.5">
+              <label className="flex cursor-pointer items-center gap-1.5">
                 <input type="checkbox" checked={telegram} onChange={(e) => setTelegram(e.target.checked)} /> Telegram
               </label>
               <span className="text-[11px] text-muted-foreground">No app sempre. Push e Telegram configurados em Preferências.</span>
-              <button onClick={() => void create()} disabled={busy || (kind === "STRATEGY" && !strategyId)} className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-[13px] font-semibold text-primary-foreground disabled:opacity-50">
+              <button onClick={() => void create()} disabled={busy || (kind === "STRATEGY" && !strategyId)} className="cursor-pointer ml-auto inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-[13px] font-semibold text-primary-foreground disabled:opacity-50">
                 <BellRing className="h-4 w-4" /> Criar monitor
               </button>
             </div>
@@ -204,7 +204,8 @@ function MonitorInner() {
             <ul className="divide-y divide-border">
               {(data?.items ?? []).map((m) => (
                 <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-[12.5px]">
-                  <span className={cn("h-2 w-2 rounded-full", m.active ? (m.lastError ? "bg-warning" : "bg-success") : "bg-muted-foreground/50")} />
+                  <span aria-hidden className={cn("h-2 w-2 rounded-full", m.active ? (m.lastError ? "bg-warning" : "bg-info") : "bg-muted-foreground/50")} />
+                  <span className="sr-only">{m.active ? (m.lastError ? "ativo com erro" : "ativo") : "pausado"}</span>
                   <Link href={`/charts/${m.symbol}?tf=${m.timeframe}&exchange=${m.exchange}&instrument=${m.instrument}`} className="font-semibold hover:underline">
                     {m.symbol}/USDT {m.kind === "SETUP" ? m.timeframe.toUpperCase() : ""}
                   </Link>
@@ -214,10 +215,10 @@ function MonitorInner() {
                   <span className="ml-auto text-[11.5px] text-muted-foreground" title={m.lastError ?? undefined}>
                     {m.lastState ? `${m.lastState}${m.lastScore != null ? ` · ${m.lastScore}` : ""}` : "aguardando 1º ciclo"} · {m.lastCheckedAt ? timeAgo(m.lastCheckedAt) : "—"}
                   </span>
-                  <button onClick={() => void toggle(m)} className="grid h-7 w-7 place-items-center rounded hover:bg-muted" aria-label={m.active ? "Pausar" : "Retomar"}>
+                  <button onClick={() => void toggle(m)} className="cursor-pointer grid h-7 w-7 place-items-center rounded hover:bg-muted" aria-label={m.active ? "Pausar" : "Retomar"}>
                     {m.active ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
                   </button>
-                  <button onClick={() => void remove(m)} className="grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-danger" aria-label="Excluir monitor">
+                  <button onClick={() => void remove(m)} className="cursor-pointer grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-danger" aria-label="Excluir monitor">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                   {m.lastError ? <p className="w-full pl-5 text-[11px] text-warning">{m.lastError}</p> : null}
@@ -230,7 +231,7 @@ function MonitorInner() {
           <div className="flex items-center justify-between border-b border-border px-3 py-2 text-[13px]">
             <span className="font-semibold">Eventos {events?.unread ? <span className="ml-1 rounded-full bg-primary px-1.5 text-[10.5px] text-primary-foreground">{events.unread}</span> : null}</span>
             {events?.unread ? (
-              <button onClick={() => void readAll()} className="text-[11.5px] text-muted-foreground hover:text-foreground">
+              <button onClick={() => void readAll()} className="cursor-pointer text-[11.5px] text-muted-foreground hover:text-foreground">
                 Marcar como lidos
               </button>
             ) : null}

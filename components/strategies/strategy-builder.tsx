@@ -96,7 +96,7 @@ function ConditionRow({ c, catalog, onChange, onRemove }: { c: Condition; catalo
           ))}
         </select>
       )}
-      <button onClick={onRemove} className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-danger" aria-label="Remover condição">
+      <button onClick={onRemove} className="cursor-pointer grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-danger" aria-label="Remover condição">
         <X className="h-4 w-4" />
       </button>
       {spec?.hint ? <p className="w-full px-1 text-[10.5px] text-muted-foreground">{spec.hint}</p> : null}
@@ -112,7 +112,7 @@ function Editor({ def, setDef, catalog }: { def: StrategyDefinition; setDef: (d:
         <span className="text-muted-foreground">Direção</span>
         <div className="flex rounded-md border border-border p-0.5" role="radiogroup" aria-label="Direção">
           {(["long", "short"] as const).map((d) => (
-            <button key={d} role="radio" aria-checked={def.direction === d} onClick={() => setDef({ ...def, direction: d })} className={cn("h-7 rounded px-3", def.direction === d ? (d === "long" ? "bg-success/20 text-success" : "bg-danger/20 text-danger") : "text-muted-foreground")}>
+            <button key={d} role="radio" aria-checked={def.direction === d} onClick={() => setDef({ ...def, direction: d })} className={cn("cursor-pointer h-7 rounded px-3", def.direction === d ? (d === "long" ? "bg-success/20 text-success" : "bg-danger/20 text-danger") : "text-muted-foreground")}>
               {d === "long" ? "Long" : "Short"}
             </button>
           ))}
@@ -132,7 +132,7 @@ function Editor({ def, setDef, catalog }: { def: StrategyDefinition; setDef: (d:
               <option value="OR">OR — qualquer condição</option>
             </select>
             {def.groups.length > 1 ? (
-              <button onClick={() => setDef({ ...def, groups: def.groups.filter((_, j) => j !== i) })} className="ml-auto text-[11.5px] text-muted-foreground hover:text-danger">
+              <button onClick={() => setDef({ ...def, groups: def.groups.filter((_, j) => j !== i) })} className="cursor-pointer ml-auto text-[11.5px] text-muted-foreground hover:text-danger">
                 Remover grupo
               </button>
             ) : null}
@@ -151,7 +151,7 @@ function Editor({ def, setDef, catalog }: { def: StrategyDefinition; setDef: (d:
           <button
             onClick={() => setGroup(i, { ...g, conditions: [...g.conditions, { tf: g.conditions[g.conditions.length - 1]?.tf ?? "4h", feature: "rsi", op: "<", value: 50 }] })}
             disabled={g.conditions.length >= 12}
-            className="mt-2 inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-[12px] hover:bg-muted disabled:opacity-50"
+            className="cursor-pointer mt-2 inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-[12px] hover:bg-muted disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" /> Condição
           </button>
@@ -160,7 +160,7 @@ function Editor({ def, setDef, catalog }: { def: StrategyDefinition; setDef: (d:
       <button
         onClick={() => setDef({ ...def, groups: [...def.groups, { logic: "AND", conditions: [{ tf: "1h", feature: "last_event", op: "==", value: "BOS_bullish" }] }] })}
         disabled={def.groups.length >= 6}
-        className="inline-flex h-8 items-center gap-1 self-start rounded-md border border-dashed border-border px-2.5 text-[12px] hover:bg-muted disabled:opacity-50"
+        className="cursor-pointer inline-flex h-8 items-center gap-1 self-start rounded-md border border-dashed border-border px-2.5 text-[12px] hover:bg-muted disabled:opacity-50"
       >
         <Plus className="h-3.5 w-3.5" /> Grupo
       </button>
@@ -209,7 +209,7 @@ function Editor({ def, setDef, catalog }: { def: StrategyDefinition; setDef: (d:
 function Results({ ev }: { ev: LiveEvaluation }) {
   return (
     <div className="flex flex-col gap-2 text-[12.5px]">
-      <div className={cn("rounded-md px-3 py-2 font-semibold", ev.pass ? "bg-success/15 text-success" : "bg-muted text-muted-foreground")}>
+      <div className={cn("rounded-md px-3 py-2 font-semibold", ev.pass ? "bg-info/15 text-info" : "bg-muted text-muted-foreground")}>
         {ev.symbol}/USDT · {VENUE_LABEL[ev.dataVenue]} {INSTRUMENT_LABEL[ev.instrument]} · {ev.pass ? "Condições atendidas agora" : "Condições não atendidas"}
         {ev.price != null ? <span className="ml-2 font-normal">preço {formatPrice(ev.price)}</span> : null}
       </div>
@@ -220,7 +220,7 @@ function Results({ ev }: { ev: LiveEvaluation }) {
           </div>
           {g.results.map((r, k) => (
             <div key={k} className="flex items-center gap-2 px-2 py-1">
-              {r.pass ? <Check className="h-3.5 w-3.5 text-success" /> : <X className={cn("h-3.5 w-3.5", r.missing ? "text-warning" : "text-danger")} />}
+              {r.pass ? <Check className="h-3.5 w-3.5 text-info" aria-label="Atende" /> : <X className={cn("h-3.5 w-3.5", r.missing ? "text-warning" : "text-muted-foreground")} aria-label={r.missing ? "Sem dado" : "Não atende"} />}
               <span className="min-w-0 flex-1 truncate">{describeCondition(r.condition)}</span>
               <span className="tabular text-muted-foreground">{r.missing ? "n/d" : typeof r.actual === "number" ? r.actual.toFixed(2) : String(r.actual)}</span>
             </div>
@@ -324,16 +324,16 @@ function BuilderInner() {
             </div>
             <div className="flex flex-col gap-1">
               {(data?.items ?? []).map((s) => (
-                <button key={s.id} onClick={() => load(s)} className={cn("rounded-md px-2 py-1.5 text-left text-[12.5px] hover:bg-muted", selected === s.id && "bg-primary/15 font-semibold")}>
+                <button key={s.id} onClick={() => load(s)} className={cn("cursor-pointer rounded-md px-2 py-1.5 text-left text-[12.5px] hover:bg-muted", selected === s.id && "bg-primary/15 font-semibold")}>
                   {s.name}
                   <span className="block text-[10.5px] font-normal text-muted-foreground">
                     {s.definition.direction === "long" ? "Long" : "Short"} · {s.definition.groups.reduce((a, g) => a + g.conditions.length, 0)} condições
                   </span>
                 </button>
               ))}
-              {data && data.items.length === 0 ? <p className="text-[12px] text-muted-foreground">Nenhuma estratégia salva.</p> : null}
+              {data && data.items.length === 0 ? <p className="text-[12px] text-muted-foreground">Nenhuma estratégia salva. Monte as condições e clique em “Salvar”, ou comece por um modelo abaixo.</p> : null}
             </div>
-            <button onClick={() => load({ name: "Nova estratégia", definition: EMPTY })} className="mt-2 inline-flex h-8 w-full items-center justify-center gap-1 rounded-md border border-border text-[12px] hover:bg-muted">
+            <button onClick={() => load({ name: "Nova estratégia", definition: EMPTY })} className="cursor-pointer mt-2 inline-flex h-8 w-full items-center justify-center gap-1 rounded-md border border-border text-[12px] hover:bg-muted">
               <Plus className="h-3.5 w-3.5" /> Nova
             </button>
           </div>
@@ -341,11 +341,11 @@ function BuilderInner() {
             <div className="mb-2 text-[12.5px] font-semibold">Modelos</div>
             {(data?.templates ?? []).map((t) => (
               <div key={t.name} className="mb-1">
-                <button onClick={() => load({ name: t.name, description: t.description, definition: t.definition })} className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-[12px] hover:bg-muted">
+                <button onClick={() => load({ name: t.name, description: t.description, definition: t.definition })} className="cursor-pointer flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-[12px] hover:bg-muted">
                   <Copy className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span>
                     {t.name}
-                    {t.validation ? <span className="ml-1.5 inline-block rounded bg-success/15 px-1.5 py-px text-[10px] font-semibold text-success">{t.validation.label}</span> : null}
+                    {t.validation ? <span className="ml-1.5 inline-block rounded bg-primary/15 px-1.5 py-px text-[10px] font-semibold text-primary">{t.validation.label}</span> : null}
                     <span className="block text-[10.5px] text-muted-foreground">{t.description}</span>
                   </span>
                 </button>
@@ -364,11 +364,11 @@ function BuilderInner() {
           <section className="rounded-lg border border-border bg-card p-3">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <input aria-label="Nome" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring" />
-              <button onClick={() => void save()} disabled={busy !== null || !data} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-[13px] font-semibold text-primary-foreground disabled:opacity-50">
+              <button onClick={() => void save()} disabled={busy !== null || !data} className="cursor-pointer inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-[13px] font-semibold text-primary-foreground disabled:opacity-50">
                 <Save className="h-4 w-4" /> Salvar
               </button>
               {selected ? (
-                <button onClick={() => void remove()} disabled={busy !== null} className="grid h-9 w-9 place-items-center rounded-md border border-border text-muted-foreground hover:text-danger" aria-label="Excluir estratégia">
+                <button onClick={() => void remove()} disabled={busy !== null} className="cursor-pointer grid h-9 w-9 place-items-center rounded-md border border-border text-muted-foreground hover:text-danger" aria-label="Excluir estratégia">
                   <Trash2 className="h-4 w-4" />
                 </button>
               ) : null}
@@ -399,10 +399,10 @@ function BuilderInner() {
                   </option>
                 ))}
               </select>
-              <button onClick={() => void test()} disabled={busy !== null} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 font-semibold hover:bg-muted disabled:opacity-50">
+              <button onClick={() => void test()} disabled={busy !== null} className="cursor-pointer inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 font-semibold hover:bg-muted disabled:opacity-50">
                 <Play className="h-3.5 w-3.5" /> {busy === "test" ? "Avaliando…" : "Testar agora"}
               </button>
-              <button onClick={() => void runScan()} disabled={busy !== null} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 font-semibold hover:bg-muted disabled:opacity-50">
+              <button onClick={() => void runScan()} disabled={busy !== null} className="cursor-pointer inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 font-semibold hover:bg-muted disabled:opacity-50">
                 <Radar className="h-3.5 w-3.5" /> {busy === "scan" ? "Varrendo 30 ativos…" : "Rodar no universo"}
               </button>
               {selected && !liveOnly ? (
@@ -438,7 +438,7 @@ function BuilderInner() {
                             {r.symbol}/USDT
                           </Link>
                         </td>
-                        <td className={cn("px-2 py-1 font-semibold", r.pass ? "text-success" : "text-muted-foreground")}>{r.pass ? "Atende" : "—"}</td>
+                        <td className={cn("px-2 py-1", r.pass ? "font-semibold text-info" : "text-muted-foreground")}>{r.pass ? "Atende" : "Não atende"}</td>
                         <td className="tabular px-2 py-1 text-right">
                           {r.passedConditions}/{r.totalConditions}
                         </td>

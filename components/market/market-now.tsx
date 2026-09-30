@@ -7,8 +7,9 @@ import { ExternalLink } from "lucide-react";
 import { StatTile } from "@/components/ui/showcase";
 import { useTickers } from "@/hooks/use-tickers";
 import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
-import { formatCompact, formatPct, formatPrice, timeAgo } from "@/lib/format";
+import { formatCompact, formatPrice, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Change } from "@/components/market/change";
 
 interface GlobalPayload {
   global: { total_market_cap: Record<string, number>; total_volume: Record<string, number>; market_cap_percentage: Record<string, number>; market_cap_change_percentage_24h_usd: number } | null;
@@ -30,7 +31,7 @@ export function MarketStrip() {
   const ethDom = g?.market_cap_percentage.eth;
   return (
     <section aria-label="Métricas do mercado" className="grid grid-cols-2 gap-2 md:grid-cols-4">
-      <StatTile label="Capitalização total" value={g ? formatCompact(g.total_market_cap.usd) : "—"} sub={chg != null ? <span className={chg >= 0 ? "text-success" : "text-danger"}>{formatPct(chg)} em 24h</span> : "\u00a0"} />
+      <StatTile label="Capitalização total" value={g ? formatCompact(g.total_market_cap.usd) : "—"} sub={chg != null ? <Change value={chg} suffix=" em 24h" /> : "\u00a0"} />
       <StatTile label="Volume 24h" value={g ? formatCompact(g.total_volume.usd) : "—"} sub="todas as corretoras" />
       <StatTile label="Dominância" value={btcDom != null ? `${btcDom.toFixed(1)}%` : "—"} sub={ethDom != null ? `BTC · ETH ${ethDom.toFixed(1)}%` : "\u00a0"} />
       <StatTile label="Medo & Ganância" value={fg ? fg.value : "—"} sub={fg?.classificationPt ?? "\u00a0"} tone={fg ? (fg.value >= 55 ? "up" : fg.value <= 45 ? "down" : undefined) : undefined} />
@@ -65,7 +66,7 @@ export function MoversCard({ limit = 8 }: { limit?: number }) {
         <h3 className="text-[15px] font-bold">Mercado agora</h3>
         <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Lista">
           {TABS.map((t) => (
-            <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} className={cn("whitespace-nowrap rounded-md px-2.5 py-1 text-[12.5px]", tab === t.key ? "bg-primary/15 font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
+            <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)} className={cn("cursor-pointer whitespace-nowrap rounded-md px-2.5 py-1 text-[12.5px]", tab === t.key ? "bg-primary/15 font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
               {t.label}
             </button>
           ))}
@@ -99,9 +100,9 @@ export function MoversCard({ limit = 8 }: { limit?: number }) {
                   </span>
                 </span>
                 <span className="tabular text-right">{formatPrice(t.price)}</span>
-                <span className={cn("tabular text-right font-semibold", t.changePct24h >= 0 ? "text-success" : "text-danger")}>{formatPct(t.changePct24h)}</span>
-                <span className={cn("tabular text-right text-[12px]", d7 == null ? "text-muted-foreground" : d7 >= 0 ? "text-success" : "text-danger")} title="7 dias">
-                  {d7 == null ? "—" : formatPct(d7, 1)}
+                <Change value={t.changePct24h} className="text-right font-semibold" />
+                <span className="text-right text-[12px]" title="7 dias">
+                  <Change value={d7} decimals={1} />
                 </span>
                 <span className="tabular hidden text-right text-[12px] text-muted-foreground sm:block">{formatCompact(t.quoteVolume24h)}</span>
               </Link>
@@ -139,7 +140,7 @@ export function NewsCard({ limit = 6 }: { limit?: number }) {
         {(n?.top ?? []).slice(0, limit).map((a) => (
           <li key={a.title} className="px-4 py-2.5">
             {a.link ? (
-              <a href={a.link} target="_blank" rel="noopener noreferrer" className="group text-[13px] font-medium leading-snug hover:text-primary">
+              <a href={a.link} target="_blank" rel="noopener noreferrer" className="group text-[13px] font-medium leading-snug hover:text-primary-text">
                 {a.title} <ExternalLink className="inline h-3 w-3 opacity-50 group-hover:opacity-100" />
               </a>
             ) : (

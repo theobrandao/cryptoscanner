@@ -6,12 +6,13 @@ import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import {
   Bell,
-  Brain,
   Briefcase,
   ClipboardList,
   Plus,
   Send,
   Trash2,
+  BellRing,
+  Sparkles,
 } from "lucide-react";
 import type { ChartImageAnalysis } from "@/services/chart-image-service";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
@@ -54,6 +55,7 @@ import { ApiClientError, apiFetch, postJson } from "@/lib/client-api";
 import { PATTERN_LIST } from "@/lib/patterns/catalog";
 import { formatDateTime, formatPct, formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Change, changeArrow } from "@/components/market/change";
 
 interface WatchItem {
   id: string;
@@ -157,7 +159,7 @@ export function PortfolioView() {
             <Bell className="h-4 w-4" aria-hidden /> Alertas
           </TabsTrigger>
           <TabsTrigger value="analises">
-            <Brain className="h-4 w-4" aria-hidden /> Análises salvas
+            <Sparkles className="h-4 w-4" aria-hidden /> Análises salvas
           </TabsTrigger>
         </TabsList>
         <TabsContent value="carteira">
@@ -227,9 +229,9 @@ function WatchlistPanel() {
         <Stat label="Custo" value={formatPrice(totalCost, currency, rate)} />
         <Stat
           label="P&L"
-          value={formatPrice(totalPnl, currency, rate)}
+          value={`${changeArrow(totalPnl)} ${formatPrice(totalPnl, currency, rate)}`.trim()}
           tone={totalPnl > 0 ? "up" : totalPnl < 0 ? "down" : "muted"}
-          sub={totalCost ? formatPct((totalPnl / totalCost) * 100) : "—"}
+          sub={totalCost ? formatPct((totalPnl / totalCost) * 100) : "Adicione quantidade e preço médio para ver o resultado"}
         />
         <Stat
           label="Ativos"
@@ -334,14 +336,8 @@ function WatchlistPanel() {
                     <TableCell className="text-right tabular">
                       {formatPrice(i.price, currency, rate)}
                     </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right tabular",
-                        (i.changePct24h ?? 0) > 0 && "text-success",
-                        (i.changePct24h ?? 0) < 0 && "text-danger",
-                      )}
-                    >
-                      {formatPct(i.changePct24h)}
+                    <TableCell className="text-right">
+                      <Change value={i.changePct24h} />
                     </TableCell>
                     <TableCell className="text-right tabular">
                       {i.quantity ?? "—"}
@@ -364,7 +360,7 @@ function WatchlistPanel() {
                       )}
                     >
                       {i.pnl !== null
-                        ? `${formatPrice(i.pnl, currency, rate)} (${formatPct(i.pnlPct)})`
+                        ? `${changeArrow(i.pnl)} ${formatPrice(i.pnl, currency, rate)} (${formatPct(i.pnlPct)})`.trim()
                         : "—"}
                     </TableCell>
                     <TableCell className="text-right">
@@ -625,7 +621,9 @@ function AlertsPanel({ telegramAllowed }: { telegramAllowed: boolean }) {
                     </TableCell>
                     <TableCell>
                       {a.active ? (
-                        <Badge variant="success">ativo</Badge>
+                        <Badge variant="info">
+                          <BellRing className="h-3 w-3" aria-hidden /> ativo
+                        </Badge>
                       ) : (
                         <Badge variant="warning">
                           disparado{" "}
@@ -684,7 +682,7 @@ function SavedAnalyses() {
   if (!data || data.items.length === 0)
     return (
       <EmptyState
-        icon={<Brain className="h-8 w-8 text-muted-foreground" aria-hidden />}
+        icon={<Sparkles className="h-8 w-8 text-muted-foreground" aria-hidden />}
         title="Nenhuma análise salva"
         description="As análises de gráfico por IA feitas no Scanner ficam registradas aqui."
         action={

@@ -16,9 +16,11 @@ import { useFavorites } from "@/hooks/use-local-storage";
 import { useTickers } from "@/hooks/use-tickers";
 import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { ApiClientError } from "@/lib/client-api";
-import { DIRECTION_LABEL, MOMENTUM_LABEL, formatCompact, formatPct, formatPrice, timeAgo } from "@/lib/format";
+import { DIRECTION_LABEL, MOMENTUM_LABEL, formatCompact, formatPrice, timeAgo } from "@/lib/format";
 import { TIMEFRAME_LABEL } from "@/lib/timeframes";
 import { cn } from "@/lib/utils";
+import { Change } from "@/components/market/change";
+import { ConfidenceBar } from "@/components/scanner/confidence-bar";
 import type { Timeframe } from "@/types/market";
 
 interface TablePayload {
@@ -244,7 +246,7 @@ export function ScannerTable({
         <div className="ml-auto flex items-center gap-2">
           <Hint text={connected ? "Preços ao vivo via SSE" : "Preços por polling (10 s)"}>
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className={cn("h-2 w-2 rounded-full", connected ? "bg-success live-dot" : "bg-warning")} /> {connected ? "AO VIVO" : "POLLING"}
+              <span aria-hidden className={cn("h-2 w-2 rounded-full", connected ? "bg-info live-dot" : "bg-warning")} /> {connected ? "AO VIVO" : "POLLING"}
             </span>
           </Hint>
           <Button size="sm" variant="outline" onClick={() => setAutoRefresh((v) => !v)} aria-pressed={autoRefresh}>
@@ -310,7 +312,7 @@ export function ScannerTable({
               const asset = ASSETS.find((a) => a.symbol === r.symbol);
               const top = r.patterns[0];
               return (
-                <TableRow key={r.symbol}>
+                <TableRow key={r.symbol} className="h-11">
                   <TableCell>
                     <button onClick={() => toggle(r.symbol)} aria-label={isFavorite(r.symbol) ? "Remover dos favoritos" : "Adicionar aos favoritos"} className="cursor-pointer">
                       <Star className={cn("h-4 w-4", isFavorite(r.symbol) ? "fill-warning text-warning" : "text-muted-foreground/60 hover:text-warning")} />
@@ -324,7 +326,9 @@ export function ScannerTable({
                     </Link>
                   </TableCell>
                   <TableCell className="text-right tabular font-medium">{formatPrice(r.price, currency, usdBrl ?? 1)}</TableCell>
-                  <TableCell className={cn("text-right tabular", (r.changePct24h ?? 0) > 0 && "text-success", (r.changePct24h ?? 0) < 0 && "text-danger")}>{formatPct(r.changePct24h)}</TableCell>
+                  <TableCell className="text-right">
+                    <Change value={r.changePct24h} />
+                  </TableCell>
                   <TableCell className="text-right tabular text-muted-foreground">{formatCompact(r.quoteVolume24h)}</TableCell>
                   <TableCell className={cn("text-right tabular", r.relativeVolume >= 2 && "text-warning font-semibold")}>
                     {Number.isFinite(r.relativeVolume) ? `${r.relativeVolume.toFixed(2)}×` : "—"}
@@ -339,7 +343,10 @@ export function ScannerTable({
                       <span className="text-xs text-muted-foreground tabular">{r.trendStrength}</span>
                     </div>
                   </TableCell>
-                  <TableCell className={cn("text-right tabular", r.rsi14 >= 70 && "text-danger", r.rsi14 <= 30 && "text-success")}>{Number.isFinite(r.rsi14) ? r.rsi14.toFixed(1) : "—"}</TableCell>
+                  <TableCell className={cn("text-right tabular", (r.rsi14 >= 70 || r.rsi14 <= 30) && "font-semibold text-warning")} title={r.rsi14 >= 70 ? "Sobrecomprado (RSI ≥ 70)" : r.rsi14 <= 30 ? "Sobrevendido (RSI ≤ 30)" : undefined}>
+                    {Number.isFinite(r.rsi14) ? r.rsi14.toFixed(1) : "—"}
+                    {r.rsi14 >= 70 ? <span className="sr-only"> sobrecomprado</span> : r.rsi14 <= 30 ? <span className="sr-only"> sobrevendido</span> : null}
+                  </TableCell>
                   <TableCell className="hidden min-[1600px]:table-cell">
                     <Badge variant={r.momentum.includes("up") ? "success" : r.momentum.includes("down") ? "danger" : "muted"}>{MOMENTUM_LABEL[r.momentum]}</Badge>
                   </TableCell>
@@ -353,13 +360,17 @@ export function ScannerTable({
                   <TableCell>
                     {top ? (
                       <Hint text={top.summary}>
-                        <span className={cn("inline-flex max-w-[170px] items-baseline gap-1 whitespace-nowrap text-xs font-medium", top.direction === "bullish" && "text-success", top.direction === "bearish" && "text-danger")}>
-                          <span className="truncate">{top.label}</span> <span className="text-muted-foreground">({top.confidence})</span>
+                        <span className="inline-flex items-center gap-2 whitespace-nowrap text-xs font-medium">
+                          <span className={cn("inline-flex max-w-[150px] items-baseline gap-1", top.direction === "bullish" && "text-success", top.direction === "bearish" && "text-danger")}>
+                            {top.direction === "bullish" ? <span aria-hidden>▲</span> : top.direction === "bearish" ? <span aria-hidden>▼</span> : null}
+                            <span className="truncate">{top.label}</span>
+                          </span>
+                          <ConfidenceBar value={top.confidence} />
                           {r.patterns.length > 1 ? <span className="text-muted-foreground"> +{r.patterns.length - 1}</span> : null}
                         </span>
                       </Hint>
                     ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <span className="text-xs text-muted-foreground">Nenhum</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right text-xs text-muted-foreground">

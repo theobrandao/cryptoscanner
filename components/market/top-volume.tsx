@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/misc";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { ASSETS } from "@/lib/assets";
-import { formatCompact, formatPct, formatPrice } from "@/lib/format";
+import { formatCompact, formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Change } from "@/components/market/change";
 
 interface Payload {
   bubbles: Array<{ id: string; symbol: string; name: string; image: string; price: number; rank: number | null; volume24h: number; change: { "24h": number | null } }>;
@@ -53,8 +54,8 @@ export function TopVolume() {
                 </span>
                 <span className="text-right">
                   <span className="block text-sm tabular">{formatPrice(b.price, currency)}</span>
-                  <span className={cn("block text-[11px] tabular", chg > 0 ? "text-success" : chg < 0 ? "text-danger" : "text-muted-foreground")}>
-                    {formatPct(chg)} · vol {formatCompact(b.volume24h, currency === "BRL" ? "R$" : "$")}
+                  <span className="block text-[11px] tabular">
+                    <Change value={chg} /> <span className="text-muted-foreground">· vol {formatCompact(b.volume24h, currency === "BRL" ? "R$" : "$")}</span>
                   </span>
                 </span>
               </>

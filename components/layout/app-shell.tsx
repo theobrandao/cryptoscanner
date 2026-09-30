@@ -2,11 +2,10 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import Link from "next/link";
 import useSWR from "swr";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowRight, Bell, Bot, Briefcase, CandlestickChart, ChevronDown, Clock, Home, LogIn, LogOut, Menu, Moon, Radar, Search, Eye, EyeOff, ShieldCheck, Sun } from "lucide-react";
+import { ArrowRight, Bell, Bot, Briefcase, CandlestickChart, ChevronDown, Clock, CreditCard, Home, LogIn, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Radar, Search, Eye, EyeOff, ShieldCheck, SlidersHorizontal, Sun } from "lucide-react";
 import { ADVANCED_TOOLS, MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
 import { RouteProgress } from "@/components/layout/route-progress";
 import { ADVANCED_NAV, FOOT_NAV, PRIMARY_NAV, type NavLink } from "@/components/layout/nav-links";
@@ -17,7 +16,10 @@ import { INSTRUMENT_LABEL, VENUE_LABEL } from "@/lib/venues";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTheme } from "@/components/providers/theme-provider";
-import { TIER_LABEL, useSession } from "@/hooks/use-session";
+import { useSession } from "@/hooks/use-session";
+import { LogoLockup } from "@/components/brand/logo";
+import { PLAN_BADGE_LABEL, PlanBadge } from "@/components/brand/plan-badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTickers } from "@/hooks/use-tickers";
 import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import { trackClient } from "@/lib/analytics-client";
@@ -60,14 +62,38 @@ function isActive(pathname: string, l: NavLink) {
   return roots.some((r) => (r === "/" || l.exact ? pathname === r : pathname === r || pathname.startsWith(r + "/")));
 }
 
-export function BrandMark({ compact }: { compact?: boolean }) {
+/** Logo oficial com link para o início: lockup completo ou só o símbolo (barra recolhida, cabeçalho do celular). */
+export function BrandLink({ symbolOnly, size = 32, className }: { symbolOnly?: boolean; size?: number; className?: string }) {
   return (
-    <Link href="/" className="flex min-h-10 items-center gap-2" aria-label="CryptoScanner — início">
-      {/* logo oficial (public/brand); 96 px para telas de alta densidade */}
-      <Image src="/brand/logo-96.png" alt="" width={32} height={32} priority className="h-8 w-8" />
-      {!compact ? <span className="text-[17px] font-bold tracking-tight">CryptoScanner</span> : null}
+    <Link href="/" className={cn("flex min-h-10 items-center rounded-md", className)} aria-label="CryptoScanner — início">
+      <LogoLockup size={size} symbolOnly={symbolOnly} priority />
     </Link>
   );
+}
+
+/** Dica lateral com o nome do item quando a barra lateral está recolhida (aparece no hover e no foco pelo teclado). */
+function SideHint({ show, text, children }: { show?: boolean; text: string; children: React.ReactElement }) {
+  if (!show) return children;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8}>
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** Rótulo de seção da barra lateral; recolhida, vira um divisor fino (o nome continua para leitores de tela). */
+function SectionLabel({ children, collapsed }: { children: React.ReactNode; collapsed?: boolean }) {
+  if (collapsed)
+    return (
+      <>
+        <span className="sr-only">{children}</span>
+        <span aria-hidden className="mx-3 my-1.5 h-px bg-border" />
+      </>
+    );
+  return <span className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{children}</span>;
 }
 
 interface SubscriptionView {
@@ -120,43 +146,87 @@ function useTrialState(): TrialState | null {
 
 const daysText = (n: number) => `${n} ${n === 1 ? "dia" : "dias"}`;
 
-/** Cartão do teste na barra lateral: "Teste grátis · N dias" + barra fina + Ver planos; teste encerrado → Escolher plano; pagamento pendente → suporte. */
-function TrialCard() {
+const CTA_BASE = "mt-2.5 flex h-8 items-center justify-center rounded-md text-[12.5px] font-semibold transition-colors duration-150";
+const CTA_PRIMARY = "bg-primary text-primary-foreground hover:brightness-110";
+const CTA_QUIET = "border border-border text-muted-foreground hover:bg-muted hover:text-foreground";
+
+/**
+ * Cartão "Plano atual" no pé da barra lateral: selo do plano + ação. Teste grátis mantém dias restantes, barra fina e a
+ * ênfase pelo tempo que falta (Ver planos → Escolher plano); teste encerrado → Escolher plano; pagamento pendente →
+ * Resolver pagamento (suporte); PRO/ELITE → Gerenciar plano; sem plano → Escolher plano; administrador só vê o selo.
+ * Recolhida, a barra mostra só um botão com ícone e dica.
+ */
+function PlanCard({ collapsed }: { collapsed?: boolean }) {
+  const { user, tier } = useSession();
   const trial = useTrialState();
-  if (!trial) return null;
-  if (trial.kind === "ended")
-    return (
-      <div className="mx-3 rounded-lg border border-warning/40 bg-warning/10 p-3">
-        <div className="text-[13px] font-semibold">{trial.status === "PAST_DUE" ? "Pagamento pendente" : "Teste encerrado"}</div>
+  if (!user || !tier) return null;
+  let tone = "border-border bg-elevated";
+  let urgent = false;
+  let body: React.ReactNode = null;
+  let cta: { href: string; label: string; primary: boolean; track?: Record<string, string | number> } | null = null;
+  if (trial?.kind === "ended") {
+    const pastDue = trial.status === "PAST_DUE";
+    tone = "border-warning/40 bg-warning/10";
+    urgent = true;
+    body = (
+      <>
+        <div className="mt-2 text-[13px] font-semibold">{pastDue ? "Pagamento pendente" : "Teste encerrado"}</div>
         <div className="mt-0.5 text-[11px] text-muted-foreground">Sua conta e configurações continuam salvas.</div>
-        <Link href={trial.status === "PAST_DUE" ? SUPPORT_PATHS.payment : "/planos"} onClick={() => trackClient("trial_card_click", { origin: "barra_lateral", level: trial.status === "PAST_DUE" ? "pagamento_pendente" : "encerrado" })} className="mt-2 flex h-8 items-center justify-center rounded-md bg-primary text-[12.5px] font-semibold text-primary-foreground hover:brightness-110">
-          {trial.status === "PAST_DUE" ? "Resolver pagamento" : "Escolher plano"}
-        </Link>
+      </>
+    );
+    cta = { href: pastDue ? SUPPORT_PATHS.payment : "/planos", label: pastDue ? "Resolver pagamento" : "Escolher plano", primary: true, track: { origin: "barra_lateral", level: pastDue ? "pagamento_pendente" : "encerrado" } };
+  } else if (trial?.kind === "trial") {
+    const high = trial.level === "high";
+    tone = high ? "border-warning/50 bg-warning/10" : trial.level === "mid" ? "border-primary/30 bg-elevated" : "border-border bg-elevated";
+    urgent = high;
+    body = (
+      <>
+        <div className="mt-2 flex items-center justify-between text-[12px]">
+          <span className="text-muted-foreground">Restam</span>
+          <span className={cn("tabular", high ? "font-semibold text-warning" : "text-foreground")}>{high && trial.ending ? "último dia" : daysText(trial.daysLeft)}</span>
+        </div>
+        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Tempo restante do teste" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(trial.pct)}>
+          <div className={cn("h-full rounded-full", high ? "bg-warning" : "bg-primary/70")} style={{ width: `${trial.pct}%` }} />
+        </div>
+        {high && trial.ending ? (
+          <p className="mt-1.5 flex items-center gap-1 text-[11.5px] font-medium text-warning">
+            <Clock className="h-3 w-3" aria-hidden /> {trial.ending}
+          </p>
+        ) : null}
+      </>
+    );
+    cta = { href: "/planos", label: high ? "Escolher plano" : "Ver planos", primary: trial.level !== "low", track: { origin: "barra_lateral", day: trial.day, level: trial.level } };
+  } else if (tier === "NONE") cta = { href: "/planos", label: "Escolher plano", primary: true };
+  else if (tier !== "ADMIN") cta = { href: "/planos", label: tier === "TRIAL" ? "Ver planos" : "Gerenciar plano", primary: false };
+  const track = cta?.track;
+  const onCta = track ? () => trackClient("trial_card_click", track) : undefined;
+  if (collapsed) {
+    if (!cta) return null;
+    const hint = `Plano atual: ${PLAN_BADGE_LABEL[tier]} — ${cta.label}`;
+    return (
+      <div className="px-2">
+        <SideHint show text={hint}>
+          <Link href={cta.href} onClick={onCta} aria-label={hint} className={cn("relative flex h-9 w-full items-center justify-center rounded-md transition-colors duration-150 hover:bg-[rgba(148,163,184,.08)]", urgent ? "text-warning" : "text-muted-foreground hover:text-foreground")}>
+            <CreditCard className="h-[18px] w-[18px] stroke-[1.75]" aria-hidden />
+            {urgent ? <span aria-hidden className="absolute right-3 top-1.5 h-2 w-2 rounded-full bg-warning" /> : null}
+          </Link>
+        </SideHint>
       </div>
     );
-  const high = trial.level === "high";
+  }
   return (
-    <div className={cn("mx-3 rounded-lg border p-3", high ? "border-warning/50 bg-warning/10" : trial.level === "mid" ? "border-primary/30 bg-elevated" : "border-border bg-elevated")}>
-      <div className="flex items-center justify-between text-[12.5px]">
-        <span className="font-semibold">Teste grátis</span>
-        <span className={cn("tabular", high ? "font-semibold text-warning" : "text-muted-foreground")}>{high && trial.ending ? "último dia" : daysText(trial.daysLeft)}</span>
+    <section aria-label="Plano atual" className={cn("mx-3 rounded-xl border p-3", tone)}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11.5px] font-medium text-muted-foreground">Plano atual</span>
+        <PlanBadge plan={tier} />
       </div>
-      <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
-        <div className={cn("h-full rounded-full", high ? "bg-warning" : "bg-primary/70")} style={{ width: `${trial.pct}%` }} />
-      </div>
-      {high && trial.ending ? (
-        <p className="mt-1.5 flex items-center gap-1 text-[11.5px] font-medium text-warning">
-          <Clock className="h-3 w-3" aria-hidden /> {trial.ending}
-        </p>
+      {body}
+      {cta ? (
+        <Link href={cta.href} onClick={onCta} className={cn(CTA_BASE, cta.primary ? CTA_PRIMARY : CTA_QUIET)}>
+          {cta.label}
+        </Link>
       ) : null}
-      <Link
-        href="/planos"
-        onClick={() => trackClient("trial_card_click", { origin: "barra_lateral", day: trial.day, level: trial.level })}
-        className={cn("mt-2 flex h-8 items-center justify-center rounded-md text-[12.5px] font-semibold", trial.level === "low" ? "border border-border text-muted-foreground hover:text-foreground" : "bg-primary text-primary-foreground hover:brightness-110")}
-      >
-        {high ? "Escolher plano" : "Ver planos"}
-      </Link>
-    </div>
+    </section>
   );
 }
 
@@ -180,102 +250,141 @@ function MobileTrialStrip({ trial }: { trial: Extract<TrialState, { kind: "trial
   );
 }
 
-function SideLink({ l, pathname, onClick, badge }: { l: NavLink; pathname: string; onClick?: () => void; badge?: number }) {
+function SideLink({ l, pathname, onClick, badge, collapsed }: { l: NavLink; pathname: string; onClick?: () => void; badge?: number; collapsed?: boolean }) {
   const { user } = useSession();
   const active = isActive(pathname, l);
   const Icon = l.icon;
+  const extra = badge ? String(badge) : l.badge;
   return (
-    <Link
-      href={l.href}
-      prefetch={prefetchFor(l.href, !!user)}
-      onClick={onClick}
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "relative flex h-9 items-center gap-3 rounded-md px-3 text-[13.5px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-        active && "bg-primary/15 text-foreground before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-primary",
-      )}
-    >
-      <Icon className="h-4 w-4 shrink-0" />
-      <span className="truncate">{l.label}</span>
-      {badge ? <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">{badge}</span> : null}
-      {!badge && l.badge ? <span className="ml-auto rounded-full bg-warning/15 px-1.5 py-px text-[10px] font-semibold text-warning">{l.badge}</span> : null}
-    </Link>
+    <SideHint show={collapsed} text={extra ? `${l.label} · ${extra}` : l.label}>
+      <Link
+        href={l.href}
+        prefetch={prefetchFor(l.href, !!user)}
+        onClick={onClick}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "relative flex h-9 items-center rounded-md text-[13.5px] text-muted-foreground transition-colors duration-150 hover:bg-[rgba(148,163,184,.08)] hover:text-foreground",
+          collapsed ? "justify-center px-0" : "gap-3 px-3",
+          active && "bg-[rgba(37,99,235,.12)] font-medium text-foreground hover:bg-[rgba(37,99,235,.16)] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-[var(--brand-1,#22D3EE)]",
+        )}
+      >
+        <Icon className={cn("h-[18px] w-[18px] shrink-0 stroke-[1.75]", active && "text-[var(--brand-1,#22D3EE)]")} aria-hidden />
+        <span className={collapsed ? "sr-only" : "truncate"}>{l.label}</span>
+        {collapsed ? (
+          extra ? <span aria-hidden className={cn("absolute right-3 top-1.5 h-2 w-2 rounded-full", badge ? "bg-danger" : "bg-warning")} /> : null
+        ) : (
+          <>
+            {badge ? <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">{badge}</span> : null}
+            {!badge && l.badge ? <span className="ml-auto rounded-full border border-info/30 bg-info/10 px-1.5 py-px text-[10px] font-semibold text-info-text">{l.badge}</span> : null}
+          </>
+        )}
+      </Link>
+    </SideHint>
   );
 }
 
 const ADMIN_LINK: NavLink = { href: "/admin", label: "Painel de controle", icon: ShieldCheck };
 
 /** Seção só para o administrador (nada é renderizado para os demais, nem durante o carregamento da sessão). */
-function AdminNav({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function AdminNav({ pathname, onNavigate, collapsed }: { pathname: string; onNavigate?: () => void; collapsed?: boolean }) {
   const { user } = useSession();
   if (user?.role !== "ADMIN") return null;
   return (
     <nav className="flex flex-col gap-0.5 px-2" aria-label="Administração">
-      <span className="px-3 pb-0.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">Administração</span>
-      <SideLink l={ADMIN_LINK} pathname={pathname} onClick={onNavigate} />
+      <SectionLabel collapsed={collapsed}>Administração</SectionLabel>
+      <SideLink l={ADMIN_LINK} pathname={pathname} onClick={onNavigate} collapsed={collapsed} />
     </nav>
   );
 }
 
-function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+/**
+ * Conteúdo da barra lateral (design system → navigation.sidebar): logo no topo, seções com rótulo pequeno em caixa-alta,
+ * item ativo com fundo azul discreto e indicador ciano de 2 px, plano atual e conta no pé. `collapsed` (só no desktop)
+ * deixa apenas os ícones, com o nome na dica e para leitores de tela; `onToggleCollapsed` mostra o botão de recolher.
+ */
+function SidebarContent({ pathname, onNavigate, collapsed, onToggleCollapsed }: { pathname: string; onNavigate?: () => void; collapsed?: boolean; onToggleCollapsed?: () => void }) {
   const { selection } = useActiveSelection();
   const inAdvanced = ADVANCED_NAV.some((l) => isActive(pathname, l));
   const [advancedOpen, setAdvancedOpen] = useLocalStorage<boolean>("cs-nav-advanced", false);
   const open = advancedOpen || inAdvanced;
   const advanced = ADVANCED_NAV.map((l) => (l.href === "/charts" ? { ...l, href: `/charts/${selection.symbol}?tf=${selection.timeframe}&exchange=${selection.exchange}&instrument=${selection.instrument}` } : l));
+  const ToggleIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
+  const toggleLabel = collapsed ? "Expandir menu lateral" : "Recolher menu lateral";
   return (
-    <div className="flex h-full flex-col gap-3 py-3">
-      <div className="px-4 pb-1">
-        <BrandMark />
+    <div className="flex min-h-full flex-col gap-3 pb-3">
+      <div className={cn("flex h-14 shrink-0 items-center border-b border-border", collapsed ? "justify-center px-2" : "px-4")}>
+        <BrandLink symbolOnly={collapsed} />
       </div>
       <nav className="flex flex-col gap-0.5 px-2" aria-label="Ferramentas">
         {PRIMARY_NAV.filter((l) => l.category === "Início").map((l) => (
-          <SideLink key={l.href} l={l} pathname={pathname} onClick={onNavigate} />
+          <SideLink key={l.href} l={l} pathname={pathname} onClick={onNavigate} collapsed={collapsed} />
         ))}
         {TOOL_CATEGORIES.map((c) => {
           const items = PRIMARY_NAV.filter((l) => l.category === c.key);
           if (!items.length) return null;
           return (
             <div key={c.key} className="mt-2 flex flex-col gap-0.5">
-              <span className="px-3 pb-0.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">{c.label}</span>
+              <SectionLabel collapsed={collapsed}>{c.label}</SectionLabel>
               {items.map((l) => (
-                <SideLink key={l.href} l={l} pathname={pathname} onClick={onNavigate} />
+                <SideLink key={l.href} l={l} pathname={pathname} onClick={onNavigate} collapsed={collapsed} />
               ))}
             </div>
           );
         })}
       </nav>
       <div className="px-2">
-        <button
-          onClick={() => setAdvancedOpen(!open)}
-          aria-expanded={open}
-          className="flex h-8 w-full items-center gap-2 rounded-md px-3 text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          Avançado
-          <ChevronDown className={cn("ml-auto h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
-        </button>
+        <SideHint show={collapsed} text={open ? "Avançado (recolher)" : "Avançado"}>
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen(!open)}
+            aria-expanded={open}
+            className={cn("flex h-8 w-full items-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-[rgba(148,163,184,.08)] hover:text-foreground", collapsed ? "justify-center gap-0.5 px-0" : "gap-2 px-3 text-[10.5px] font-semibold uppercase tracking-[0.12em]")}
+          >
+            {collapsed ? <SlidersHorizontal className="h-[18px] w-[18px] stroke-[1.75]" aria-hidden /> : null}
+            <span className={collapsed ? "sr-only" : undefined}>Avançado</span>
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", !collapsed && "ml-auto", open && "rotate-180")} aria-hidden />
+          </button>
+        </SideHint>
         {open ? (
           <nav className="mt-0.5 flex flex-col gap-0.5" aria-label="Ferramentas avançadas">
             {advanced.map((l) => (
-              <SideLink key={l.label} l={l} pathname={pathname} onClick={onNavigate} />
+              <SideLink key={l.label} l={l} pathname={pathname} onClick={onNavigate} collapsed={collapsed} />
             ))}
           </nav>
         ) : null}
       </div>
-      <AdminNav pathname={pathname} onNavigate={onNavigate} />
+      <AdminNav pathname={pathname} onNavigate={onNavigate} collapsed={collapsed} />
       <div className="mt-auto flex flex-col gap-3">
-        <TrialCard />
+        <PlanCard collapsed={collapsed} />
         <nav className="flex flex-col gap-0.5 px-2" aria-label="Conta">
           {FOOT_NAV.map((l) => (
-            <SideLink key={l.label} l={l} pathname={pathname} onClick={onNavigate} />
+            <SideLink key={l.label} l={l} pathname={pathname} onClick={onNavigate} collapsed={collapsed} />
           ))}
         </nav>
+        {onToggleCollapsed ? (
+          <div className="border-t border-border px-2 pt-2">
+            <SideHint show={collapsed} text="Expandir menu">
+              <button
+                type="button"
+                onClick={onToggleCollapsed}
+                aria-label={toggleLabel}
+                aria-expanded={!collapsed}
+                aria-controls="barra-lateral"
+                className={cn("flex h-9 w-full items-center rounded-md text-[13px] text-muted-foreground transition-colors duration-150 hover:bg-[rgba(148,163,184,.08)] hover:text-foreground", collapsed ? "justify-center" : "gap-3 px-3")}
+              >
+                <ToggleIcon className="h-[18px] w-[18px] shrink-0 stroke-[1.75]" aria-hidden />
+                {collapsed ? null : <span>Recolher menu</span>}
+              </button>
+            </SideHint>
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-const STRIP = ["BTC", "ETH", "SOL"];
+/** Resumo BTC/ETH no centro da barra superior (design system → dashboard.recommended_structure.top_bar). */
+const STRIP = ["BTC", "ETH"];
 
 /** Cotações no topo (só em telas xl): montada apenas quando visível; oculta pelo usuário, fica só o botão. */
 function TickerStrip({ hidden, onToggle }: { hidden: boolean; onToggle: () => void }) {
@@ -464,7 +573,7 @@ function UserMenu() {
         <DropdownMenuLabel className="flex flex-col gap-0.5">
           <span className="truncate text-sm font-semibold">{user.name}</span>
           <span className="truncate text-xs font-normal text-muted-foreground">{user.email}</span>
-          <span className="mt-1 w-fit rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">{tier ? TIER_LABEL[tier] : "Conta"}</span>
+          {tier ? <PlanBadge plan={tier} className="mt-1.5" /> : null}
         </DropdownMenuLabel>
         <DropdownMenuItem onSelect={() => router.push("/preferencias")}>Preferências</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => router.push("/planos")}>Planos e pagamento</DropdownMenuItem>
@@ -498,7 +607,7 @@ function SalesShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center gap-3 px-4">
-          <BrandMark />
+          <BrandLink />
           <nav className="ml-6 hidden items-center gap-5 text-[13.5px] text-muted-foreground md:flex" aria-label="Seções">
             <a href="#ferramentas" className="inline-flex min-h-6 items-center hover:text-foreground">
               Ferramentas
@@ -583,12 +692,13 @@ function AnalystLauncher() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
-  const { user } = useSession();
+  const { user, tier } = useSession();
   const [menu, setMenu] = React.useState(false);
   const [search, setSearch] = React.useState(false);
   const [searchLoaded, setSearchLoaded] = React.useState(false);
   const [hideTickers, setHideTickers] = useLocalStorage<boolean>("cs-hide-tickers", false);
   const wide = useMediaQuery("(min-width: 1280px)");
+  const [collapsed, setCollapsed] = useLocalStorage<boolean>("cs-sidebar-collapsed", false);
   const trial = useTrialState();
   const trialStrip = trial?.kind === "trial" ? trial : null;
   const openSearch = React.useCallback(() => {
@@ -609,29 +719,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <RouteProgress />
-      <aside className="sticky top-0 hidden h-screen w-[210px] shrink-0 overflow-y-auto border-r border-border bg-card lg:block">
-        <SidebarContent pathname={pathname} />
+      <aside
+        id="barra-lateral"
+        className={cn("sticky top-0 hidden h-screen shrink-0 overflow-y-auto overflow-x-hidden border-r border-border bg-card transition-[width] duration-200 ease-[cubic-bezier(.4,0,.2,1)] motion-reduce:transition-none lg:block", collapsed ? "w-[72px]" : "w-[248px]")}
+        data-collapsed={collapsed ? "" : undefined}
+      >
+        <SidebarContent pathname={pathname} collapsed={collapsed} onToggleCollapsed={() => setCollapsed(!collapsed)} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/90 px-3 backdrop-blur sm:px-4">
+        {/* barra superior (DS → top_bar): busca à esquerda, BTC/ETH no centro, notificações + plano + conta à direita; sticky z-20 */}
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-background px-3 sm:px-4">
           <button className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted lg:hidden" onClick={() => setMenu(true)} aria-label="Abrir menu">
             <Menu className="h-5 w-5" />
           </button>
-          <span className="lg:hidden">
-            <BrandMark compact />
-          </span>
+          <BrandLink symbolOnly size={28} className="lg:hidden" />
           <button
             onClick={openSearch}
             onPointerEnter={() => void loadSearch()}
             onFocus={() => void loadSearch()}
-            className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 text-left text-sm text-muted-foreground hover:border-primary/40 md:max-w-sm"
+            className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-card px-3 text-left text-[13px] text-muted-foreground transition-colors duration-150 hover:border-primary/40 hover:text-foreground md:max-w-sm"
             aria-label="Buscar ativo, ferramenta ou indicador (Ctrl+K)"
           >
             <Search className="h-4 w-4 shrink-0" />
             <span className="truncate">Buscar ativo, ferramenta ou indicador…</span>
             <kbd className="ml-auto hidden rounded border border-border px-1.5 text-[10px] sm:inline">⌘ K</kbd>
           </button>
-          {wide ? <TickerStrip hidden={hideTickers} onToggle={() => setHideTickers(!hideTickers)} /> : null}
+          {wide ? (
+            <div className="flex min-w-0 flex-1 justify-center">
+              <TickerStrip hidden={hideTickers} onToggle={() => setHideTickers(!hideTickers)} />
+            </div>
+          ) : null}
           <div className="ml-auto flex items-center gap-1.5">
             <MarketDataStatus />
             <AnalystLauncher />
@@ -639,6 +756,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button onClick={toggle} className="grid h-9 w-9 place-items-center rounded-md hover:bg-muted max-[359px]:hidden" aria-label="Alternar tema">
               {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </button>
+            {tier ? (
+              <span className="hidden items-center md:inline-flex">
+                <span className="sr-only">Plano atual: </span>
+                <PlanBadge plan={tier} />
+              </span>
+            ) : null}
             <UserMenu />
           </div>
         </header>
@@ -676,7 +799,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           const active = isActive(pathname, l);
           return (
             <Link key={l.href} href={l.href} prefetch={prefetchFor(l.href, !!user)} className={cn("flex h-14 flex-col items-center justify-center gap-0.5 text-[11px]", active ? "text-primary" : "text-muted-foreground")}>
-              <l.icon className="h-5 w-5" />
+              <l.icon className="h-5 w-5 stroke-[1.75]" aria-hidden />
               {l.label}
             </Link>
           );

@@ -37,6 +37,7 @@ import {
   formatPrice,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Change, changeArrow } from "@/components/market/change";
 
 interface Payload {
   global: (GlobalData & { stale: boolean; source: string }) | null;
@@ -93,7 +94,7 @@ export function PanoramaView() {
               value={g ? formatCompact(g.total_market_cap.usd ?? null) : "—"}
               sub={
                 g
-                  ? `${formatPct(g.market_cap_change_percentage_24h_usd)} 24h`
+                  ? `${changeArrow(g.market_cap_change_percentage_24h_usd)} ${formatPct(g.market_cap_change_percentage_24h_usd)} 24h`.trim()
                   : "CoinGecko indisponível"
               }
               tone={
@@ -215,27 +216,13 @@ export function PanoramaView() {
                       <TableCell className="text-right tabular">
                         {t ? formatPrice(t.price, currency, rate) : "—"}
                       </TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-right tabular",
-                          (t?.changePct24h ?? 0) > 0 && "text-success",
-                          (t?.changePct24h ?? 0) < 0 && "text-danger",
-                        )}
-                      >
-                        {formatPct(t?.changePct24h)}
+                      <TableCell className="text-right">
+                        <Change value={t?.changePct24h} />
                       </TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-right tabular",
-                          (m.price_change_percentage_7d_in_currency ?? 0) > 0 &&
-                            "text-success",
-                          (m.price_change_percentage_7d_in_currency ?? 0) < 0 &&
-                            "text-danger",
-                        )}
-                      >
-                        {formatPct(
-                          m.price_change_percentage_7d_in_currency ?? null,
-                        )}
+                      <TableCell className="text-right">
+                        <Change
+                          value={m.price_change_percentage_7d_in_currency ?? null}
+                        />
                       </TableCell>
                       <TableCell className="text-right tabular text-muted-foreground">
                         {m.market_cap ? formatCompact(m.market_cap) : "—"}
@@ -505,16 +492,10 @@ function ExecutiveReport() {
                           ? formatCompact(x.openInterestUsd)
                           : `${x.openInterest.toFixed(0)} ${x.symbol}`}
                         {x.openInterestChange24hPct !== null ? (
-                          <span
-                            className={cn(
-                              "ml-1",
-                              x.openInterestChange24hPct >= 0
-                                ? "text-success"
-                                : "text-danger",
-                            )}
-                          >
-                            {formatPct(x.openInterestChange24hPct)}
-                          </span>
+                          <Change
+                            value={x.openInterestChange24hPct}
+                            className="ml-1"
+                          />
                         ) : null}
                       </dd>
                       <dt className="text-muted-foreground">Contas long</dt>
@@ -638,14 +619,7 @@ function Row({ symbol, pct }: { symbol: string; pct: number }) {
       className="flex min-h-9 items-center justify-between rounded px-2 py-1 hover:bg-muted"
     >
       <span className="font-semibold">{symbol}</span>
-      <span
-        className={cn(
-          "tabular",
-          pct > 0 ? "text-success" : pct < 0 ? "text-danger" : "",
-        )}
-      >
-        {formatPct(pct)}
-      </span>
+      <Change value={pct} />
     </Link>
   );
 }

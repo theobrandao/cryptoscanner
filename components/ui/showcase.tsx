@@ -17,16 +17,16 @@ import { cn } from "@/lib/utils";
  * selos e marcadores, pílulas de seleção, números em destaque, faixa de cotações e gráficos simples.
  */
 
-export function Eyebrow({ children, tone = "primary" }: { children: React.ReactNode; tone?: "primary" | "warning" | "success" }) {
-  const tones = { primary: "border-primary/40 bg-primary/10 text-primary", warning: "border-warning/40 bg-warning/10 text-warning", success: "border-success/40 bg-success/10 text-success" };
+export function Eyebrow({ children, tone = "primary" }: { children: React.ReactNode; tone?: "primary" | "info" | "warning" | "success" }) {
+  const tones = { primary: "border-primary/40 bg-primary/10 text-primary-text", info: "border-info/40 bg-info/10 text-info-text", warning: "border-warning/40 bg-warning/10 text-warning", success: "border-success/40 bg-success/10 text-success" };
   return <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]", tones[tone])}>{children}</span>;
 }
 
-export function SectionHeading({ eyebrow, title, accent, subtitle, align = "center", tone }: { eyebrow?: string; title: string; accent?: string; subtitle?: React.ReactNode; align?: "center" | "left"; tone?: "primary" | "warning" | "success" }) {
+export function SectionHeading({ eyebrow, title, accent, subtitle, align = "center", tone }: { eyebrow?: string; title: string; accent?: string; subtitle?: React.ReactNode; align?: "center" | "left"; tone?: "primary" | "info" | "warning" | "success" }) {
   return (
     <div className={cn("flex flex-col gap-3", align === "center" ? "items-center text-center" : "items-start")}>
       {eyebrow ? <Eyebrow tone={tone}>{eyebrow}</Eyebrow> : null}
-      <h2 className="text-balance text-2xl font-extrabold leading-tight tracking-tight sm:text-4xl">
+      <h2 className="text-balance text-2xl font-bold leading-tight tracking-[-0.025em] sm:text-4xl">
         {title} {accent ? <span className="text-gradient">{accent}</span> : null}
       </h2>
       {subtitle ? <p className={cn("max-w-2xl text-[14.5px] leading-relaxed text-muted-foreground", align === "center" && "mx-auto")}>{subtitle}</p> : null}
@@ -43,12 +43,12 @@ export function ToolCard({ tool, href, cta = "Abrir", compact, showCategory }: {
   const { user } = useSession();
   const target = href ?? tool.href;
   return (
-    <Link href={target} prefetch={prefetchFor(target, !!user)} className="card-glow group flex h-full flex-col gap-3 rounded-2xl border border-border p-4 transition-colors hover:border-primary/50 sm:p-5">
+    <Link href={target} prefetch={prefetchFor(target, !!user)} className="card-glow group flex h-full flex-col gap-3 rounded-lg border border-border p-4 transition-[border-color,transform] duration-200 ease-standard hover:-translate-y-px hover:border-border-hover motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-5">
       <div className="flex items-start justify-between gap-2">
         <span className={cn("icon-tile grid shrink-0 place-items-center rounded-xl", compact ? "h-9 w-9" : "h-11 w-11")}>
           <ToolIconView icon={tool.icon} className={compact ? "h-4.5 w-4.5" : "h-5 w-5"} />
         </span>
-        {tool.badge ? <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10.5px] font-semibold text-warning">{tool.badge}</span> : null}
+        {tool.badge ? <span className="rounded-full border border-info/30 bg-info/10 px-2 py-0.5 text-[10.5px] font-semibold text-info-text">{tool.badge}</span> : null}
       </div>
       <div>
         {showCategory ? <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-primary">{tool.category}</div> : null}
@@ -72,9 +72,9 @@ export function ToolCard({ tool, href, cta = "Abrir", compact, showCategory }: {
 /** Número em destaque com rótulo. */
 export function StatTile({ label, value, sub, tone, className }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: "up" | "down" | "accent"; className?: string }) {
   return (
-    <div className={cn("rounded-2xl border border-border bg-card px-4 py-3", className)}>
+    <div className={cn("rounded-lg border border-border bg-card px-4 py-3", className)}>
       <div className="text-[11.5px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={cn("tabular mt-1 text-2xl font-extrabold leading-tight tracking-tight", tone === "up" && "text-success", tone === "down" && "text-danger", tone === "accent" && "text-gradient")}>{value}</div>
+      <div className={cn("tabular mt-1 text-2xl font-bold leading-tight tracking-[-0.025em]", tone === "up" && "text-success", tone === "down" && "text-danger", tone === "accent" && "text-primary-text")}>{value}</div>
       {sub ? <div className="tabular mt-0.5 text-[12px] text-muted-foreground">{sub}</div> : null}
     </div>
   );

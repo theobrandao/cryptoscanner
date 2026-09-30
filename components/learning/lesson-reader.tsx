@@ -131,7 +131,7 @@ export function LessonDoneBadge({ slug, quizLength }: { slug: string; quizLength
   const saved = progress[slug];
   if (!saved?.done) return null;
   return (
-    <span className="inline-flex items-center gap-1 text-success">
+    <span className="inline-flex items-center gap-1 text-primary">
       <Check className="h-3.5 w-3.5" aria-hidden /> concluída ({saved.score}/{quizLength})
     </span>
   );
@@ -210,8 +210,8 @@ export function LessonQuiz({ slug, stepKey, quiz, next, practice }: { slug: stri
                       }}
                       className={cn(
                         "flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors aria-disabled:cursor-default",
-                        state === "ok" && "border-success bg-success/10",
-                        state === "bad" && "border-danger bg-danger/10",
+                        state === "ok" && "border-info bg-info/10",
+                        state === "bad" && "border-warning bg-warning/10",
                         state === "off" && "border-border opacity-60",
                         state === "" && "border-border hover:border-primary/50 hover:bg-muted",
                       )}
@@ -219,12 +219,12 @@ export function LessonQuiz({ slug, stepKey, quiz, next, practice }: { slug: stri
                       <span className="flex w-4 shrink-0 justify-center text-center">
                         {state === "ok" ? (
                           <>
-                            <Check className="h-4 w-4 text-success" aria-hidden />
+                            <Check className="h-4 w-4 text-info" aria-hidden />
                             <span className="sr-only">(correta)</span>
                           </>
                         ) : state === "bad" ? (
                           <>
-                            <X className="h-4 w-4 text-danger" aria-hidden />
+                            <X className="h-4 w-4 text-warning" aria-hidden />
                             <span className="sr-only">(incorreta)</span>
                           </>
                         ) : (
@@ -238,7 +238,7 @@ export function LessonQuiz({ slug, stepKey, quiz, next, practice }: { slug: stri
               </div>
               <div role="status">
                 {answered ? (
-                  <p className={cn("mt-2 text-xs", answers[i] === q.answer ? "text-success" : "text-danger")}>
+                  <p className={cn("mt-2 text-xs", answers[i] === q.answer ? "text-info" : "text-warning")}>
                     {answers[i] === q.answer ? "Correto. " : "Não é essa. "}
                     <span className="text-muted-foreground">{q.why}</span>
                   </p>
@@ -260,11 +260,11 @@ export function LessonQuiz({ slug, stepKey, quiz, next, practice }: { slug: stri
           Corrigir e concluir aula
         </Button>
       ) : (
-        <div className="mt-4 rounded-lg border border-success/40 bg-success/10 p-4">
+        <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
           <div className="flex flex-wrap items-center gap-2">
-            {score === quiz.length ? <Trophy className="h-6 w-6 text-success" aria-hidden /> : <CircleCheck className="h-6 w-6 text-success" aria-hidden />}
+            {score === quiz.length ? <Trophy className="h-6 w-6 text-primary" aria-hidden /> : <CircleCheck className="h-6 w-6 text-primary" aria-hidden />}
             <span className="font-semibold">Aula concluída</span>
-            <Badge variant={score === quiz.length ? "success" : "warning"}>
+            <Badge variant={score === quiz.length ? "default" : "warning"}>
               {score}/{quiz.length} corretas
             </Badge>
           </div>

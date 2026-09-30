@@ -291,7 +291,7 @@ export function ScannerView() {
               <Puzzle className="h-4 w-4" aria-hidden /> Padrões Técnicos{" "}
               {scan ? (
                 <Badge
-                  variant={patternsFound ? "success" : "muted"}
+                  variant={patternsFound ? "default" : "muted"}
                   className="ml-1 px-1.5 py-0 text-[10px]"
                 >
                   {patternsFound}

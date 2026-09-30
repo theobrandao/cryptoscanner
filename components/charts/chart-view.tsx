@@ -19,7 +19,7 @@ import {
 } from "@/components/charts/candlestick-chart";
 import { detectTrendLines } from "@/lib/indicators/trendlines";
 import { ProviderBanner } from "@/components/scanner/provider-banner";
-import { Badge, DirectionBadge } from "@/components/ui/badge";
+import { DirectionBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, Skeleton, Stat } from "@/components/ui/misc";
@@ -44,6 +44,8 @@ import {
 } from "@/lib/format";
 import { TIMEFRAME_LABEL, parseTimeframe } from "@/lib/timeframes";
 import { cn } from "@/lib/utils";
+import { Change } from "@/components/market/change";
+import { ConfidenceBar } from "@/components/scanner/confidence-bar";
 import { TIMEFRAMES, type Candle, type Timeframe } from "@/types/market";
 
 interface CandlesPayload {
@@ -147,7 +149,7 @@ export function ChartView() {
           levels.push({
             price: l.price,
             label: `S ${l.touches}×`,
-            color: "#22c55e",
+            color: "#10B981",
             style: "dashed",
           }),
         );
@@ -157,7 +159,7 @@ export function ChartView() {
           levels.push({
             price: l.price,
             label: `R ${l.touches}×`,
-            color: "#f43f5e",
+            color: "#EF4444",
             style: "dashed",
           }),
         );
@@ -169,7 +171,7 @@ export function ChartView() {
           levels.push({
             price: l.price,
             label: `Fib ${(l.ratio * 100).toFixed(1)}%`,
-            color: "#a78bfa",
+            color: "#8B5CF6",
             style: "dotted",
           }),
         );
@@ -180,21 +182,21 @@ export function ChartView() {
         levels.push({
           price: p.target,
           label: `Alvo ${p.label}`,
-          color: "#22d3ee",
+          color: "#22D3EE",
           style: "solid",
         });
       if (p.stop)
         levels.push({
           price: p.stop,
           label: "Stop",
-          color: "#f59e0b",
+          color: "#F59E0B",
           style: "solid",
         });
       p.levels.forEach((l) =>
         levels.push({
           price: l.price,
           label: l.role,
-          color: "#94a3b8",
+          color: "#94A3B8",
           style: "dotted",
         }),
       );
@@ -213,10 +215,10 @@ export function ChartView() {
                 : "belowBar",
             color:
               p.direction === "bullish"
-                ? "#22c55e"
+                ? "#10B981"
                 : p.direction === "bearish"
-                  ? "#f43f5e"
-                  : "#94a3b8",
+                  ? "#EF4444"
+                  : "#94A3B8",
             shape: "circle",
             text: pt.role,
           });
@@ -234,7 +236,7 @@ export function ChartView() {
       trendLines.map((l) => ({
         from: { time: l.from.time, price: l.from.price },
         to: { time: l.to.time, price: l.to.price },
-        color: l.kind === "LTA" ? "#22c55e" : "#f43f5e",
+        color: l.kind === "LTA" ? "#10B981" : "#EF4444",
         label: `${l.kind}${l.broken ? " rompida" : ""} (${l.touches} toques)`,
         dashed: l.broken,
       })),
@@ -351,18 +353,11 @@ export function ChartView() {
                     <span className="text-xl font-semibold tabular">
                       {formatPrice(live.price, currency, rate)}
                     </span>
-                    <span
-                      className={cn(
-                        "text-sm tabular",
-                        live.changePct24h > 0
-                          ? "text-success"
-                          : live.changePct24h < 0
-                            ? "text-danger"
-                            : "",
-                      )}
-                    >
-                      {formatPct(live.changePct24h)} 24h
-                    </span>
+                    <Change
+                      value={live.changePct24h}
+                      suffix=" 24h"
+                      className="text-sm"
+                    />
                     <span className="text-xs text-muted-foreground tabular">
                       M {formatPrice(live.high24h, currency, rate)} · m{" "}
                       {formatPrice(live.low24h, currency, rate)}
@@ -510,7 +505,7 @@ export function ChartView() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="mb-1 text-xs uppercase tracking-wide text-danger">
-                      Resistências
+                      <span aria-hidden>▼ </span>Resistências
                     </div>
                     {snap.resistances.length ? (
                       snap.resistances.map((l) => (
@@ -525,12 +520,12 @@ export function ChartView() {
                         </div>
                       ))
                     ) : (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-muted-foreground">Nenhuma resistência detectada na janela.</span>
                     )}
                   </div>
                   <div>
                     <div className="mb-1 text-xs uppercase tracking-wide text-success">
-                      Suportes
+                      <span aria-hidden>▲ </span>Suportes
                     </div>
                     {snap.supports.length ? (
                       snap.supports.map((l) => (
@@ -545,7 +540,7 @@ export function ChartView() {
                         </div>
                       ))
                     ) : (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-muted-foreground">Nenhum suporte detectado na janela.</span>
                     )}
                   </div>
                 </div>
@@ -561,7 +556,8 @@ export function ChartView() {
               {patterns.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Nenhum padrão acima de 60 de confiança em{" "}
-                  {TIMEFRAME_LABEL[timeframe]}.
+                  {TIMEFRAME_LABEL[timeframe]}. Experimente outro timeframe
+                  ou outro ativo.
                 </p>
               ) : (
                 patterns.map((p) => (
@@ -583,7 +579,7 @@ export function ChartView() {
                       <span className="font-semibold">{p.label}</span>
                       <span className="flex items-center gap-1">
                         <DirectionBadge direction={p.direction} />
-                        <Badge variant="muted">{p.confidence}</Badge>
+                        <ConfidenceBar value={p.confidence} />
                       </span>
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">

@@ -77,7 +77,8 @@ export const withOverlayDefaults = (o: Partial<Overlays> | null | undefined): Ov
 /** Painéis inferiores ativos (RSI, MACD, ATR) — usado para calcular a altura do gráfico. */
 export const lowerPanes = (o: Overlays) => Number(o.rsi) + Number(o.macd) + Number(o.atr);
 
-const COLORS = { up: "#16c784", down: "#ea3943", info: "#3aa0ff", warning: "#f5a524", muted: "#8193a8", e9: "#a78bfa", e21: "#f59e0b", e50: "#fb7185", e100: "#38bdf8", e200: "#e6edf5", bb: "#3aa0ff", vwap: "#22d3ee" };
+/* design system → charts: candle alta #10B981 / baixa #EF4444 (pavio na mesma cor); indicadores em no máximo 5 cores (ciano, azul, violeta, amarelo, cinza) */
+const COLORS = { up: "#10B981", down: "#EF4444", info: "#38BDF8", warning: "#F59E0B", muted: "#94A3B8", e9: "#22D3EE", e21: "#1687FF", e50: "#8B5CF6", e100: "#F59E0B", e200: "#94A3B8", bb: "#94A3B8", vwap: "#22D3EE" };
 const tone = (c: string) => (c === "success" ? COLORS.up : c === "danger" ? COLORS.down : c === "warning" ? COLORS.warning : c === "info" ? COLORS.info : COLORS.muted);
 const T = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp;
 const nz = (v: number | undefined) => (v != null && Number.isFinite(v) ? v : null);
@@ -118,8 +119,9 @@ class ZonesPrimitive implements ISeriesPrimitive<Time> {
                 const h = Math.max(2, Math.abs(y2 - y1));
                 const w = mediaSize.width - x;
                 const c = tone(z.color);
-                context.fillStyle = `${c}22`;
-                context.strokeStyle = `${c}88`;
+                // zona discreta: preenchimento leve (≈8%) + contorno; não pintar grandes áreas do gráfico
+                context.fillStyle = `${c}14`;
+                context.strokeStyle = `${c}66`;
                 context.lineWidth = 1;
                 context.fillRect(x, top, w, h);
                 context.strokeRect(x + 0.5, top + 0.5, w - 1, h - 1);
@@ -179,7 +181,7 @@ export function TerminalChart({
     const el = ref.current;
     if (!el || candles.length === 0) return;
     const dark = theme === "dark";
-    const grid = dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.05)";
+    const grid = dark ? "rgba(148,163,184,0.06)" : "rgba(100,116,139,0.10)";
     const chart: IChartApi = createChart(el, {
       height,
       autoSize: true,
@@ -240,19 +242,19 @@ export function TerminalChart({
     if (overlays.volume) {
       const vol = chart.addSeries(HistogramSeries, { priceFormat: { type: "volume" }, priceScaleId: "vol", lastValueVisible: false, priceLineVisible: false }, 0);
       vol.priceScale().applyOptions({ scaleMargins: { top: 0.84, bottom: 0 } });
-      vol.setData(candles.map((c) => ({ time: T(c.openTime), value: c.volume, color: c.close >= c.open ? "rgba(22,199,132,0.35)" : "rgba(234,57,67,0.35)" })));
+      vol.setData(candles.map((c) => ({ time: T(c.openTime), value: c.volume, color: c.close >= c.open ? "rgba(16,185,129,0.35)" : "rgba(239,68,68,0.35)" })));
     }
     let pane = 1;
     if (overlays.rsi) {
-      const r = line(rsi(closes, 14), "#a78bfa", 1, pane, LineStyle.Solid, "RSI 14");
+      const r = line(rsi(closes, 14), "#8B5CF6", 1, pane, LineStyle.Solid, "RSI 14");
       r.applyOptions({ autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }) });
-      for (const lvl of [30, 70]) r.createPriceLine({ price: lvl, color: "rgba(129,147,168,0.45)", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+      for (const lvl of [30, 70]) r.createPriceLine({ price: lvl, color: "rgba(148,163,184,0.45)", lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
       pane++;
     }
     if (overlays.macd) {
       const m = macd(closes);
       const h = chart.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, pane);
-      h.setData(candles.flatMap((c, i) => (nz(m.histogram[i]) != null ? [{ time: T(c.openTime), value: m.histogram[i] as number, color: (m.histogram[i] as number) >= 0 ? "rgba(22,199,132,0.6)" : "rgba(234,57,67,0.6)" }] : [])));
+      h.setData(candles.flatMap((c, i) => (nz(m.histogram[i]) != null ? [{ time: T(c.openTime), value: m.histogram[i] as number, color: (m.histogram[i] as number) >= 0 ? "rgba(16,185,129,0.6)" : "rgba(239,68,68,0.6)" }] : [])));
       line(m.macd, COLORS.info, 1, pane, LineStyle.Solid, "MACD");
       line(m.signal, COLORS.warning, 1, pane, LineStyle.Solid, "Signal");
       pane++;

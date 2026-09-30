@@ -5,7 +5,7 @@ import Link from "next/link";
 import { TRIAL_DAYS } from "@/lib/entitlements";
 import useSWR from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Bell, ChevronDown, Layers, Maximize2, Minimize2, PanelRightClose, PanelRightOpen, RefreshCw, Star, Check } from "lucide-react";
+import { Bell, ChevronDown, Layers, Maximize2, Minimize2, PanelRightClose, PanelRightOpen, RefreshCw, Star, Check, Lock } from "lucide-react";
 import { TerminalChart, lowerPanes, withOverlayDefaults, type ChartLabel, type ChartLine, type ChartSegmentLine, type ChartZone, type Legend, type Overlays } from "@/components/terminal/terminal-chart";
 import { ConfluencePanel, countdown, DerivativesPanel, HistoricalPanel, LiquidityPanel, Panel, REGIME_TONE, SetupPanel, StructurePanel, Unavailable } from "@/components/terminal/panels";
 import { MarketOverviewPanel, RiskPanel, ScannerPanel, WatchlistPanel } from "@/components/terminal/bottom-panels";
@@ -21,6 +21,8 @@ import { formatCompact, formatDateTime, formatNumber, formatPct, formatPrice, ti
 import { TIMEFRAME_LABEL } from "@/lib/timeframes";
 import { INSTRUMENT_LABEL, INSTRUMENTS, VENUE_LABEL, VENUES } from "@/lib/venues";
 import { cn } from "@/lib/utils";
+import { ELITE_BORDER } from "@/components/account/plan-tier";
+import { Change } from "@/components/market/change";
 import { apiFetch, ApiClientError, postJson } from "@/lib/client-api";
 import type { MarketContext } from "@/services/market-context-service";
 import type { SetupRow } from "@/services/market-overview-service";
@@ -46,7 +48,7 @@ const OVERLAY_LABEL: Record<keyof Overlays, string> = {
 };
 
 const STATUS_CHIP: Record<string, string> = {
-  LIVE: "bg-success/15 text-success",
+  LIVE: "bg-info/15 text-info-text",
   FALLBACK: "bg-info/15 text-info",
   DEGRADED: "bg-warning/15 text-warning",
   DELAYED: "bg-warning/15 text-warning",
@@ -59,7 +61,7 @@ function Segmented<T extends string>({ items, value, onChange, label, render }: 
   return (
     <div className="flex rounded-md border border-border p-0.5 text-[12px]" role="radiogroup" aria-label={label}>
       {items.map((i) => (
-        <button key={i} role="radio" aria-checked={i === value} onClick={() => onChange(i)} className={cn("h-7 rounded px-2.5", i === value ? "bg-primary/15 font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
+        <button key={i} role="radio" aria-checked={i === value} onClick={() => onChange(i)} className={cn("cursor-pointer h-7 rounded px-2.5", i === value ? "bg-primary/15 font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
           {render(i)}
         </button>
       ))}
@@ -116,7 +118,7 @@ function AssetHeader({ ctx, sel, onChange, live }: { ctx: MarketContext; sel: Ma
         </div>
         <div title={provenance}>
           <div className="tabular text-2xl font-bold leading-tight">{px(price)}</div>
-          <div className={cn("tabular text-[13px]", (change ?? 0) >= 0 ? "text-success" : "text-danger")}>{change != null ? formatPct(change) : "—"} 24h</div>
+          <Change value={change} suffix=" 24h" className="block text-[13px]" />
         </div>
         <dl className="grid grid-cols-3 gap-x-6 gap-y-1 text-[12px] sm:flex sm:flex-wrap">
           <Stat k="Máxima 24h" v={px(t?.high24h)} />
@@ -141,12 +143,12 @@ function AssetHeader({ ctx, sel, onChange, live }: { ctx: MarketContext; sel: Ma
             </span>
           ) : null}
           {user ? (
-            <button onClick={() => void monitor()} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-[12px] text-muted-foreground hover:text-foreground" title="Monitorar este setup no servidor">
+            <button onClick={() => void monitor()} className="cursor-pointer inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-[12px] text-muted-foreground hover:text-foreground" title="Monitorar este setup no servidor">
               <Bell className="h-3.5 w-3.5" /> Monitorar
             </button>
           ) : null}
           {user ? (
-            <button onClick={() => void addToWatchlist()} className="grid h-8 w-8 place-items-center rounded-md border border-border text-muted-foreground hover:text-warning" aria-label="Adicionar aos favoritos" title="Adicionar aos favoritos">
+            <button onClick={() => void addToWatchlist()} className="cursor-pointer grid h-8 w-8 place-items-center rounded-md border border-border text-muted-foreground hover:text-warning" aria-label="Adicionar aos favoritos" title="Adicionar aos favoritos">
               <Star className="h-4 w-4" />
             </button>
           ) : null}
@@ -166,7 +168,12 @@ function Stat({ k, v, sub, up }: { k: string; v: string; sub?: string; up?: bool
     <div>
       <dt className="text-[10.5px] text-muted-foreground">{k}</dt>
       <dd className="tabular font-semibold">
-        {v} {sub ? <span className={cn("text-[11px] font-normal", up ? "text-success" : "text-danger")}>{sub}</span> : null}
+        {v}{" "}
+        {sub ? (
+          <span className={cn("text-[11px] font-normal", up ? "text-success" : "text-danger")}>
+            <span aria-hidden>{up ? "▲" : "▼"}</span> {sub}
+          </span>
+        ) : null}
       </dd>
     </div>
   );
@@ -258,21 +265,32 @@ function ChartCard({
     else void ref.current?.requestFullscreen?.();
   };
   const base = focus || fs ? 640 : 520;
+  const { tier } = useSession();
   const height = base + lowerPanes(overlays) * 90;
   return (
     <section ref={ref} className={cn("min-w-0 rounded-lg border border-border bg-card", fs && "overflow-auto")}>
       <div className="flex flex-wrap items-center gap-1 border-b border-border px-2 py-1.5">
         <div className="flex flex-wrap gap-0.5" role="tablist" aria-label="Timeframe">
-          {TERMINAL_TFS.map((t) => (
-            <button key={t} role="tab" aria-selected={t === tf} onClick={() => onTf(t)} className={cn("h-7 rounded px-2.5 text-[12px] font-medium", t === tf ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
-              {TIMEFRAME_LABEL[t]}
-            </button>
-          ))}
+          {TERMINAL_TFS.map((t) => {
+            // timeframe fora do plano: cadeado e ida para os planos (1H/30M/15M e menores são do ELITE)
+            const locked = Boolean(tier) && !allowsTimeframe(tier!, t, "analysis");
+            return locked ? (
+              <Link key={t} href="/planos" role="tab" aria-selected={false} title="Disponível no plano ELITE" className="inline-flex h-7 cursor-pointer items-center gap-1 rounded px-2.5 text-[12px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
+                {TIMEFRAME_LABEL[t]}
+                <Lock className="h-3 w-3" aria-hidden />
+                <span className="sr-only">(plano ELITE)</span>
+              </Link>
+            ) : (
+              <button key={t} role="tab" aria-selected={t === tf} onClick={() => onTf(t)} className={cn("cursor-pointer h-7 rounded px-2.5 text-[12px] font-medium", t === tf ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                {TIMEFRAME_LABEL[t]}
+              </button>
+            );
+          })}
         </div>
         <span className="mx-1 hidden h-5 w-px bg-border sm:block" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="inline-flex h-7 items-center gap-1.5 rounded px-2 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground">
+            <button className="cursor-pointer inline-flex h-7 items-center gap-1.5 rounded px-2 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground">
               <Layers className="h-3.5 w-3.5" /> Indicadores <ChevronDown className="h-3 w-3" />
             </button>
           </DropdownMenuTrigger>
@@ -295,16 +313,16 @@ function ChartCard({
           <Bell className="h-3.5 w-3.5" /> Alerta
         </Link>
         <div className="ml-auto flex items-center gap-0.5">
-          <button onClick={onFocus} className={cn("hidden h-7 items-center gap-1 rounded px-2 text-[12px] hover:bg-muted xl:inline-flex", focus ? "text-foreground" : "text-muted-foreground")} aria-pressed={focus} title="Foco no gráfico">
+          <button onClick={onFocus} className={cn("cursor-pointer hidden h-7 items-center gap-1 rounded px-2 text-[12px] hover:bg-muted xl:inline-flex", focus ? "text-foreground" : "text-muted-foreground")} aria-pressed={focus} title="Foco no gráfico">
             Foco
           </button>
-          <button onClick={onToggleAnalysis} className="hidden h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground xl:grid" aria-label={analysisOpen ? "Recolher análise" : "Expandir análise"} title={analysisOpen ? "Recolher análise" : "Expandir análise"}>
+          <button onClick={onToggleAnalysis} className="cursor-pointer hidden h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground xl:grid" aria-label={analysisOpen ? "Recolher análise" : "Expandir análise"} title={analysisOpen ? "Recolher análise" : "Expandir análise"}>
             {analysisOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
           </button>
-          <button onClick={toggleFs} className="grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={fs ? "Sair da tela cheia" : "Tela cheia"} title="Tela cheia">
+          <button onClick={toggleFs} className="cursor-pointer grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={fs ? "Sair da tela cheia" : "Tela cheia"} title="Tela cheia">
             {fs ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </button>
-          <button onClick={onRefresh} className="grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Atualizar">
+          <button onClick={onRefresh} className="cursor-pointer grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Atualizar">
             <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
           </button>
         </div>
@@ -316,17 +334,20 @@ function ChartCard({
         {legend ? (
           <span className="tabular text-muted-foreground">
             A <span className="text-foreground">{px(legend.o)}</span> Máx <span className="text-foreground">{px(legend.h)}</span> Mín <span className="text-foreground">{px(legend.l)}</span> F{" "}
-            <span className="text-foreground">{px(legend.c)}</span> <span className={legend.chg >= 0 ? "text-success" : "text-danger"}>{legend.chg >= 0 ? "+" : ""}{formatNumber(legend.chg, 2)}</span>
+            <span className="text-foreground">{px(legend.c)}</span> <span className={legend.chg >= 0 ? "text-success" : "text-danger"}>
+              <span aria-hidden>{legend.chg >= 0 ? "▲" : "▼"}</span> {legend.chg >= 0 ? "+" : ""}
+              {formatNumber(legend.chg, 2)}
+            </span>
           </span>
         ) : null}
       </div>
       {overlays.ema ? (
         <div className="flex flex-wrap gap-x-3 px-3 text-[11px] tabular">
-          <span style={{ color: "#a78bfa" }}>EMA 9 {px(tech.ema.e9)}</span>
-          <span style={{ color: "#f59e0b" }}>EMA 21 {px(tech.ema.e21)}</span>
-          <span style={{ color: "#fb7185" }}>EMA 50 {px(tech.ema.e50)}</span>
-          <span style={{ color: "#38bdf8" }}>EMA 100 {px(tech.ema.e100)}</span>
-          <span className="text-foreground">EMA 200 {px(tech.ema.e200)}</span>
+          <span style={{ color: "#22D3EE" }}>EMA 9 {px(tech.ema.e9)}</span>
+          <span style={{ color: "#1687FF" }}>EMA 21 {px(tech.ema.e21)}</span>
+          <span style={{ color: "#8B5CF6" }}>EMA 50 {px(tech.ema.e50)}</span>
+          <span style={{ color: "#F59E0B" }}>EMA 100 {px(tech.ema.e100)}</span>
+          <span style={{ color: "#94A3B8" }}>EMA 200 {px(tech.ema.e200)}</span>
           {tech.vwap != null && overlays.vwap ? <span style={{ color: "#22d3ee" }}>VWAP {px(tech.vwap)}</span> : null}
         </div>
       ) : null}
@@ -352,7 +373,7 @@ function RightColumn({ ctx, overlays, setOverlays, onViewChart, onSwitchPerp }: 
     <div className="@container flex min-w-0 flex-col gap-3">
       <div className="grid grid-cols-3 rounded-lg border border-border bg-card p-1" role="tablist">
         {RIGHT_TABS.map((t) => (
-          <button key={t} role="tab" aria-selected={t === tab} onClick={() => setTab(t)} className={cn("h-8 rounded-md text-[12.5px]", t === tab ? "bg-primary/15 font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
+          <button key={t} role="tab" aria-selected={t === tab} onClick={() => setTab(t)} className={cn("cursor-pointer h-8 rounded-md text-[12.5px]", t === tab ? "bg-primary/15 font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
             {RIGHT_LABEL[t]}
           </button>
         ))}
@@ -434,10 +455,10 @@ function AccessOrError({ error, sel, onReset, onUseBase }: { error: unknown; sel
         <h1 className="text-xl font-bold">Timeframe {TIMEFRAME_LABEL[sel.timeframe]} é do plano ELITE</h1>
         <p className="mt-2 text-sm text-muted-foreground">No seu plano a análise completa funciona em 4H, 1D e 1W.</p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <button onClick={onUseBase} className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">
+          <button onClick={onUseBase} className="cursor-pointer inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">
             Ver em 4H
           </button>
-          <Link href="/planos" className="inline-flex h-10 items-center rounded-md border border-border px-5 text-sm">
+          <Link href="/planos" className={cn("inline-flex h-10 items-center rounded-md border px-5 text-sm hover:bg-muted", ELITE_BORDER)}>
             Conhecer o ELITE
           </Link>
         </div>
@@ -448,7 +469,7 @@ function AccessOrError({ error, sel, onReset, onUseBase }: { error: unknown; sel
       <Unavailable>
         DADOS INDISPONÍVEIS — {sel.symbol}/USDT {VENUE_LABEL[sel.exchange]} {INSTRUMENT_LABEL[sel.instrument]} {TIMEFRAME_LABEL[sel.timeframe]}: {error instanceof Error ? error.message.replace(/\.$/, "") : "nenhuma fonte respondeu"}.
       </Unavailable>
-      <button onClick={onReset} className="h-8 self-start rounded-md border border-border px-3 text-[12px] hover:bg-muted">
+      <button onClick={onReset} className="cursor-pointer h-8 self-start rounded-md border border-border px-3 text-[12px] hover:bg-muted">
         Voltar para Binance Spot
       </button>
     </div>

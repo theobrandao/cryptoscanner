@@ -14,7 +14,9 @@ import type { ScannerRow } from "@/agents/scanner-agent";
 import type { VolumeAnomaly } from "@/lib/scanner/volume";
 import { Badge, DirectionBadge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { EmptyState, Progress } from "@/components/ui/misc";
+import { EmptyState } from "@/components/ui/misc";
+import { Change } from "@/components/market/change";
+import { ConfidenceBar } from "@/components/scanner/confidence-bar";
 import { Hint } from "@/components/ui/tooltip";
 import { ASSETS, GLYPH_FONT_CLASS } from "@/lib/assets";
 import {
@@ -81,10 +83,10 @@ export function Sparkline({
 /** Classificação do estágio do padrão pela confiança e pelo rompimento descrito na detecção. */
 export function patternStatus(p: { confidence: number; summary: string }): {
   label: string;
-  variant: "success" | "warning" | "muted";
+  variant: "info" | "warning" | "muted";
 } {
   if (/rompid[ao]/i.test(p.summary) || p.confidence >= 80)
-    return { label: "Confirmado", variant: "success" };
+    return { label: "Confirmado", variant: "info" };
   if (p.confidence >= 68) return { label: "Em formação", variant: "warning" };
   return { label: "Alerta inicial", variant: "muted" };
 }
@@ -219,25 +221,15 @@ export function PatternResults({
                 className="mt-2"
               />
               <div className="mt-2">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span>Confiança (aderência geométrica)</span>
-                  <span className="flex items-center gap-2">
-                    <Badge variant={status.variant}>{status.label}</Badge>
-                    <span className="font-semibold text-foreground tabular">
-                      {p.confidence}%
-                    </span>
-                  </span>
+                  <Badge variant={status.variant}>{status.label}</Badge>
                 </div>
-                <Progress
+                <ConfidenceBar
                   value={p.confidence}
-                  tone={
-                    p.confidence >= 75
-                      ? "success"
-                      : p.confidence >= 60
-                        ? "primary"
-                        : "warning"
-                  }
-                  className="mt-1"
+                  label="Confiança (aderência geométrica)"
+                  className="mt-1.5 flex w-full"
+                  barClassName="w-auto flex-1"
                 />
               </div>
               <HitRateLine stat={statsByKey.get(p.key)} timeframe={statsTf} />
@@ -336,8 +328,9 @@ export function VolumeAlerts({
         <span
           className={cn(
             "h-2 w-2 rounded-full",
-            loading ? "bg-warning live-dot" : "bg-success live-dot",
+            loading ? "bg-warning live-dot" : "bg-info",
           )}
+          aria-hidden
         />
         Monitorando volume em tempo real — candles de {tfText} em {assets}{" "}
         ativos; gatilho: aumento de volume ≥ 100% sobre a média das 20 barras
@@ -393,15 +386,14 @@ export function VolumeAlerts({
                     <div className="text-lg font-bold tabular text-warning">
                       +{a.increasePct.toFixed(0)}%
                     </div>
-                    <div
+                    <Change
+                      value={a.priceChangePct}
                       className={cn(
-                        "text-xs tabular",
+                        "block text-xs",
                         a.direction === "up" && "text-success",
                         a.direction === "down" && "text-danger",
                       )}
-                    >
-                      {formatPct(a.priceChangePct)}
-                    </div>
+                    />
                   </div>
                 </CardContent>
               </Card>

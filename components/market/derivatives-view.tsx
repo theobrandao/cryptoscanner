@@ -4,9 +4,10 @@ import useSWR from "swr";
 import Link from "next/link";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
 import { Alert, Skeleton } from "@/components/ui/misc";
-import { formatCompact, formatPct, formatPrice, timeAgo } from "@/lib/format";
+import { formatCompact, formatPrice, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { DerivativesDetailSection } from "@/components/market/derivatives-detail";
+import { Change } from "@/components/market/change";
 
 interface Row {
   symbol: string;
@@ -57,7 +58,9 @@ export function DerivativesView() {
                   </td>
                   <td className="tabular px-3 py-2 text-right">{formatPrice(r.markPrice)}</td>
                   <td className="tabular px-3 py-2 text-right">{r.openInterestUsd != null ? formatCompact(r.openInterestUsd) : "—"}</td>
-                  <td className={cn("tabular px-3 py-2 text-right", (r.openInterestChange24hPct ?? 0) >= 0 ? "text-success" : "text-danger")}>{r.openInterestChange24hPct != null ? formatPct(r.openInterestChange24hPct, 1) : "—"}</td>
+                  <td className="px-3 py-2 text-right">
+                    <Change value={r.openInterestChange24hPct} decimals={1} />
+                  </td>
                   <td className={cn("tabular px-3 py-2 text-right", r.fundingRate > 0.0005 ? "text-warning" : "")}>{(r.fundingRate * 100).toFixed(4)}%</td>
                   <td className="tabular px-3 py-2 text-right">{r.longShortRatio?.toFixed(2) ?? "—"}</td>
                   <td className="tabular px-3 py-2 text-right">{r.takerBuySellRatio?.toFixed(2) ?? "—"}</td>

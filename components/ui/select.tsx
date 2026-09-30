@@ -13,7 +13,7 @@ export function SelectTrigger({ className, children, ...props }: React.Component
   return (
     <SelectPrimitive.Trigger
       className={cn(
-        "flex h-10 sm:h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
+        "flex h-10 w-full items-center justify-between gap-2 rounded-md border border-input bg-input-background px-3 py-2 text-sm transition-[border-color,box-shadow] duration-150 ease-standard hover:border-border-hover focus:outline-none focus-visible:border-accent focus-visible:ring-3 focus-visible:ring-accent/20 data-[state=open]:border-accent disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none cursor-pointer [&>span]:truncate",
         className,
       )}
       {...props}
@@ -32,7 +32,7 @@ export function SelectContent({ className, children, position = "popper", ...pro
       <SelectPrimitive.Content
         position={position}
         className={cn(
-          "relative z-50 max-h-80 min-w-[8rem] overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-lg",
+          "relative z-(--z-popover) max-h-80 min-w-[8rem] overflow-hidden rounded-md border border-border bg-elevated text-card-foreground shadow-(--card-shadow)",
           position === "popper" && "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1 w-[var(--radix-select-trigger-width)]",
           className,
         )}
@@ -48,7 +48,7 @@ export function SelectItem({ className, children, ...props }: React.ComponentPro
   return (
     <SelectPrimitive.Item
       className={cn(
-        "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[highlighted]:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[highlighted]:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}
       {...props}

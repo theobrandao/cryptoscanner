@@ -12,10 +12,10 @@ export function ValidatedModels({ models }: { models: LandingData["validated"] }
       {models.map((m) => {
         const k = m.validation.metrics;
         return (
-          <article key={m.name} className="card-glow flex min-w-0 flex-col gap-4 rounded-2xl border border-border p-4 sm:p-5">
+          <article key={m.name} className="flex min-w-0 flex-col gap-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-[16px] font-bold sm:text-[17px]">{m.name}</h3>
-              <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">{m.validation.label}</span>
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">{m.validation.label}</span>
             </div>
             <p className="text-[13px] text-muted-foreground">{m.description}</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

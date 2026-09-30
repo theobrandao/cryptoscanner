@@ -5,7 +5,8 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { Bot, Brain, ImagePlus, Save, Upload, X } from "lucide-react";
+import { ImagePlus, Save, Sparkles, Upload, X } from "lucide-react";
+import { ConfidenceBar } from "@/components/scanner/confidence-bar";
 import type { ChartImageAnalysis } from "@/services/chart-image-service";
 import { Badge, DirectionBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
-import { Alert, Progress } from "@/components/ui/misc";
+import { Alert } from "@/components/ui/misc";
 import { useSession } from "@/hooks/use-session";
 import { useToast } from "@/components/providers/toast-provider";
 import { ApiClientError, apiFetch } from "@/lib/client-api";
@@ -124,7 +125,7 @@ export function ChartAnalysis() {
     <Card id="analise-ia">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-primary" /> Análise de Gráfico por IA
+          <Sparkles className="h-4 w-4 text-primary" aria-hidden /> Análise de Gráfico por IA
         </CardTitle>
         <CardDescription>
           Envie a captura de um gráfico e receba uma leitura técnica
@@ -290,7 +291,7 @@ export function ChartAnalysis() {
               <AnalysisResult result={result} />
             ) : (
               <div className="flex h-full min-h-[220px] flex-col items-center justify-center rounded-lg border border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-                <Brain className="h-8 w-8" aria-hidden />
+                <ImagePlus className="h-6 w-6" aria-hidden />
                 <div className="mt-2">
                   O resultado aparece aqui: Confiança, Pontos Operacionais
                   (Entrada, Alvo, Stop Loss), Risco/Retorno (Potencial, Risco,
@@ -341,10 +342,10 @@ export function AnalysisResult({ result }: { result: ChartImageAnalysis }) {
         <Badge
           variant={
             result.readability === "good"
-              ? "success"
+              ? "info"
               : result.readability === "partial"
-                ? "warning"
-                : "danger"
+                ? "muted"
+                : "warning"
           }
         >
           legibilidade{" "}
@@ -356,16 +357,11 @@ export function AnalysisResult({ result }: { result: ChartImageAnalysis }) {
         </Badge>
       </div>
       <div>
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>Confiança</span>
-          <span className="font-semibold text-foreground">
-            {result.confidence}% confiança
-          </span>
-        </div>
-        <Progress
+        <div className="text-xs text-muted-foreground">Confiança</div>
+        <ConfidenceBar
           value={result.confidence}
-          className="mt-1"
-          tone={result.confidence >= 70 ? "success" : "warning"}
+          className="mt-1 flex w-full"
+          barClassName="w-auto flex-1"
         />
       </div>
       <div>

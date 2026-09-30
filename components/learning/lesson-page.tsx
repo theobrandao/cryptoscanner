@@ -10,7 +10,7 @@ import { LessonArt } from "./lesson-art";
 import { hasLab, stepHeadingId } from "./lesson-lab-meta";
 import { LessonDoneBadge, LessonLab, LessonQuiz, LessonStepper } from "./lesson-reader";
 
-const LEVEL_VARIANT: Record<LessonLevel, "success" | "default" | "accent"> = { iniciante: "success", intermediario: "default", avancado: "accent" };
+const LEVEL_VARIANT: Record<LessonLevel, "outline" | "default" | "accent"> = { iniciante: "outline", intermediario: "default", avancado: "accent" };
 
 /**
  * Página de uma aula da Jornada (componente de servidor): partes, pontos-chave e perguntas vão prontos no HTML;

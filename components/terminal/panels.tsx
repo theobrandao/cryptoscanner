@@ -3,7 +3,8 @@
 import * as React from "react";
 import { ChevronDown, ChevronRight, CircleDot, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatCompact, formatDateTime, formatPct, formatPrice, timeAgo } from "@/lib/format";
+import { Change } from "@/components/market/change";
+import { formatCompact, formatDateTime, formatPrice, timeAgo } from "@/lib/format";
 import type { MarketContext } from "@/services/market-context-service";
 import { candlesAgo, directionPt, PHASE_PT, POOL_KIND_PT, pt, REGIME_PT, SCORE_LABEL_PT, SETUP_STATE_PT } from "@/lib/display-labels";
 
@@ -107,7 +108,7 @@ export function LiquidityPanel({ ctx, onViewChart }: { ctx: MarketContext; onVie
       <MetricRow label="Resistência mais próxima" value={ctx.levels.nearestResistance ? px(ctx.levels.nearestResistance.price) : "—"} hint={ctx.levels.nearestResistance ? `${ctx.levels.nearestResistance.touches} toques · ${ctx.levels.nearestResistance.distanceAtr.toFixed(1)} ATR` : undefined} />
       <MetricRow label="Suporte mais próximo" value={ctx.levels.nearestSupport ? px(ctx.levels.nearestSupport.price) : "—"} hint={ctx.levels.nearestSupport ? `${ctx.levels.nearestSupport.touches} toques · ${ctx.levels.nearestSupport.distanceAtr.toFixed(1)} ATR` : undefined} />
       <MetricRow label="Varredura recente" value={sweep ? `${px(sweep.price)} (${sweep.direction === "bullish" ? "fundo" : "topo"})` : "nenhuma"} tone={sweep ? dirTone(sweep.direction) : "muted"} hint={sweep ? `${pt(POOL_KIND_PT, sweep.kind)} ${candlesAgo(sweep.barsAgo)}` : undefined} />
-      <button onClick={onViewChart} className="mt-2 h-8 w-full rounded-md border border-primary/40 bg-primary/10 text-[12px] font-semibold text-foreground hover:bg-primary/20">
+      <button onClick={onViewChart} className="cursor-pointer mt-2 h-8 w-full rounded-md border border-primary/40 bg-primary/10 text-[12px] font-semibold text-foreground hover:bg-primary/20">
         Ver no gráfico
       </button>
     </Panel>
@@ -117,8 +118,9 @@ export function LiquidityPanel({ ctx, onViewChart }: { ctx: MarketContext; onVie
 /* ------------------------------------------------------------------ Confluence */
 
 const LABEL_STYLE: Record<string, { color: string; chip: string }> = {
-  Exceptional: { color: "var(--success)", chip: "bg-success/15 text-success" },
-  Strong: { color: "var(--success)", chip: "bg-success/15 text-success" },
+  // nota de confluência mede qualidade, não resultado financeiro: tons de marca em vez de verde
+  Exceptional: { color: "var(--primary)", chip: "bg-primary/15 text-primary" },
+  Strong: { color: "var(--primary)", chip: "bg-primary/15 text-primary" },
   Good: { color: "var(--info)", chip: "bg-info/15 text-info" },
   Moderate: { color: "var(--warning)", chip: "bg-warning/15 text-warning" },
   Low: { color: "var(--muted-foreground)", chip: "bg-muted text-muted-foreground" },
@@ -157,7 +159,7 @@ export function ConfluencePanel({ ctx, className }: { ctx: MarketContext; classN
       className={className}
       title="Confluence Score"
       action={
-        <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground" aria-expanded={open}>
+        <button onClick={() => setOpen((v) => !v)} className="cursor-pointer flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground" aria-expanded={open}>
           Por que esta nota {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </button>
       }
@@ -170,7 +172,7 @@ export function ConfluencePanel({ ctx, className }: { ctx: MarketContext; classN
             <dt className="text-muted-foreground">Componentes</dt>
             <dd className="text-right">{c.raw.toFixed(1)}</dd>
             <dt className="text-muted-foreground">Penalidades</dt>
-            <dd className={cn("text-right", c.penaltyTotal < 0 && "text-danger")}>{c.penaltyTotal.toFixed(1)}</dd>
+            <dd className={cn("text-right", c.penaltyTotal < 0 && "text-warning")}>{c.penaltyTotal.toFixed(1)}</dd>
             <dt className="font-semibold">Final</dt>
             <dd className="text-right font-semibold">{c.score}</dd>
           </dl>
@@ -188,7 +190,7 @@ export function ConfluencePanel({ ctx, className }: { ctx: MarketContext; classN
         </div>
       </div>
       {c.verdict === "NO_TRADE" ? (
-        <p className="mt-2 rounded-md border border-danger/30 bg-danger/10 px-2 py-1 text-[11px] text-danger">
+        <p className="mt-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-[11px] text-warning">
           <span className="font-semibold">SEM ENTRADA:</span> {c.noTradeReasons.join(" · ")}
         </p>
       ) : null}
@@ -201,7 +203,7 @@ export function ConfluencePanel({ ctx, className }: { ctx: MarketContext; classN
           ))}
           {c.penalties.length ? (
             c.penalties.map((p) => (
-              <p key={p.label} className="text-danger">
+              <p key={p.label} className="text-warning">
                 {p.points} · {p.label}
               </p>
             ))
@@ -223,7 +225,7 @@ export function ConfluencePanel({ ctx, className }: { ctx: MarketContext; classN
 const STATE_STYLE: Record<string, string> = {
   DETECTED: "bg-muted text-muted-foreground",
   FORMING: "bg-info/15 text-info",
-  READY: "bg-success text-white",
+  READY: "bg-accent/20 text-accent",
   TRIGGERED: "bg-primary text-primary-foreground",
   ACTIVE: "bg-primary/20 text-foreground",
   TARGET_HIT: "bg-success/20 text-success",
@@ -234,7 +236,7 @@ const STATE_STYLE: Record<string, string> = {
 function Check({ ok }: { ok: boolean }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className={cn("h-2 w-2 rounded-full", ok ? "bg-success" : "bg-muted-foreground/50")} />
+      <span aria-hidden className={cn("h-2 w-2 rounded-full", ok ? "bg-info" : "bg-muted-foreground/50")} />
       {ok ? "Sim" : "Não"}
     </span>
   );
@@ -273,7 +275,7 @@ export function SetupPanel({ ctx }: { ctx: MarketContext }) {
           <MetricRow label="Zona de entrada" value={zone(s.entryZone)} hint={`nível-chave: ${s.keyLevel.source}`} />
           <MetricRow label="Invalidação" value={px(s.invalidation.price)} tone="down" hint={s.invalidation.source} />
           <p className="mt-2 text-[11px] text-muted-foreground">{s.stateReason}</p>
-          {noTrade ? <p className="mt-1 text-[11px] font-semibold text-danger">SEM ENTRADA · {c.noTradeReasons.join(" · ")}</p> : null}
+          {noTrade ? <p className="mt-1 text-[11px] font-semibold text-warning">SEM ENTRADA · {c.noTradeReasons.join(" · ")}</p> : null}
         </>
       )}
     </Panel>
@@ -308,7 +310,7 @@ export function DerivativesPanel({ ctx, onSwitchPerp }: { ctx: MarketContext; on
         <>
           <Unavailable>Spot: funding, open interest e liquidações se aplicam a contratos perpétuos.</Unavailable>
           {onSwitchPerp ? (
-            <button onClick={onSwitchPerp} className="mt-2 h-8 w-full rounded-md border border-border text-[12px] font-semibold hover:bg-muted">
+            <button onClick={onSwitchPerp} className="cursor-pointer mt-2 h-8 w-full rounded-md border border-border text-[12px] font-semibold hover:bg-muted">
               Mudar para perpétuo
             </button>
           ) : null}
@@ -317,7 +319,7 @@ export function DerivativesPanel({ ctx, onSwitchPerp }: { ctx: MarketContext; on
         <Unavailable>{ctx.derivativesError ?? "Derivativos indisponíveis."}</Unavailable>
       ) : (
         <>
-          <MetricRow label="Open Interest" value={<>{d.openInterestUsd != null ? formatCompact(d.openInterestUsd) : "—"} {d.openInterestChange24hPct != null ? <span className={d.openInterestChange24hPct >= 0 ? "text-success" : "text-danger"}>{formatPct(d.openInterestChange24hPct, 1)}</span> : null}</>} />
+          <MetricRow label="Open Interest" value={<>{d.openInterestUsd != null ? formatCompact(d.openInterestUsd) : "—"} {d.openInterestChange24hPct != null ? <Change value={d.openInterestChange24hPct} decimals={1} /> : null}</>} />
           <MetricRow
             label="Variação do OI (24h)"
             value={d.openInterestUsd != null && d.openInterestChange24hPct != null ? formatCompact((d.openInterestUsd * d.openInterestChange24hPct) / (100 + d.openInterestChange24hPct)) : "—"}

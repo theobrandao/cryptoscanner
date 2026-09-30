@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Brain, RefreshCw } from "lucide-react";
+import { RefreshCw, Sparkles } from "lucide-react";
 import type { OrchestratorResult } from "@/agents/orchestrator";
 import { Badge, DirectionBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Alert, Progress, Skeleton } from "@/components/ui/misc";
+import { Alert, Skeleton } from "@/components/ui/misc";
 import { Hint } from "@/components/ui/tooltip";
 import { ApiClientError, apiFetch } from "@/lib/client-api";
 import { RISK_LABEL, formatDateTime, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ConfidenceBar } from "@/components/scanner/confidence-bar";
 import type { Timeframe } from "@/types/market";
 
 type Result = OrchestratorResult & { cached: boolean };
@@ -75,7 +76,7 @@ export function AnalysisPanel({
       <CardHeader className="flex-row items-start justify-between gap-2">
         <div>
           <CardTitle className="flex items-center gap-2">
-            <Brain className="h-4 w-4 text-accent" /> Análise consolidada
+            <Sparkles className="h-4 w-4 text-accent" aria-hidden /> Análise consolidada
             (agentes)
           </CardTitle>
           <CardDescription>
@@ -91,7 +92,7 @@ export function AnalysisPanel({
           {result ? (
             <RefreshCw className="h-3.5 w-3.5" />
           ) : (
-            <Brain className="h-3.5 w-3.5" />
+            <Sparkles className="h-3.5 w-3.5" aria-hidden />
           )}{" "}
           {result ? "Reexecutar" : "Analisar"}
         </Button>
@@ -143,29 +144,20 @@ function ResultView({ r }: { r: Result }) {
           </span>
         </Box>
         <Box label="Confiança">
-          <span className="text-lg font-bold tabular">{r.confidence}/100</span>
-          <Progress
+          <ConfidenceBar
             value={r.confidence}
-            className="mt-1"
-            tone={
-              r.confidence >= 60
-                ? "success"
-                : r.confidence >= 35
-                  ? "warning"
-                  : "danger"
-            }
+            className="mt-1 flex w-full"
+            barClassName="w-auto flex-1"
           />
         </Box>
         <Box label="Risco">
           <Badge
             variant={
               r.riskLevel === "low"
-                ? "success"
-                : r.riskLevel === "medium"
-                  ? "warning"
-                  : r.riskLevel === "unknown"
-                    ? "muted"
-                    : "danger"
+                ? "info"
+                : r.riskLevel === "unknown"
+                  ? "muted"
+                  : "warning"
             }
             className="text-xs"
           >
@@ -222,13 +214,17 @@ function ResultView({ r }: { r: Result }) {
                 <Badge
                   variant={
                     c.severity === "high"
-                      ? "danger"
+                      ? "warning"
                       : c.severity === "medium"
-                        ? "warning"
+                        ? "outline"
                         : "muted"
                   }
                 >
-                  {c.severity}
+                  {c.severity === "high"
+                    ? "alta"
+                    : c.severity === "medium"
+                      ? "média"
+                      : "baixa"}
                 </Badge>
                 <span>{c.description}</span>
               </li>
@@ -283,7 +279,7 @@ function ResultView({ r }: { r: Result }) {
                             : "",
                     )}
                   >
-                    {n.score === null ? "—" : n.score.toFixed(1)}
+                    {n.score === null ? "—" : `${n.score > 0 ? "+" : ""}${n.score.toFixed(1)}`}
                   </span>
                   <a
                     href={n.link}
@@ -325,7 +321,7 @@ function ResultView({ r }: { r: Result }) {
             className={cn(
               "rounded border px-1.5 py-0.5",
               a.status === "ok"
-                ? "border-success/40"
+                ? "border-info/40"
                 : a.status === "fallback"
                   ? "border-warning/40"
                   : "border-danger/40",

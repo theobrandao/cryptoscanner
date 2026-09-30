@@ -234,7 +234,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                 aria-pressed={showPassword}
                 aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 aria-controls="password"
-                className="absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="cursor-pointer absolute inset-y-0 right-0 inline-flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
               </button>
@@ -247,7 +247,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
                   `Falta: ${missing.join(", ")}.`
                 ) : (
                   <>
-                    <Check className="h-3.5 w-3.5 text-success" aria-hidden /> Senha dentro da regra.
+                    <Check className="h-3.5 w-3.5 text-info" aria-hidden /> Senha dentro da regra.
                   </>
                 )}
               </span>
@@ -263,7 +263,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             </div>
           ) : null}
           {mode === "register" ? (
-            <label className="flex min-h-11 items-start gap-2.5 text-xs leading-relaxed text-muted-foreground">
+            <label className="flex min-h-11 cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-muted-foreground">
               <input
                 id="accept-terms"
                 type="checkbox"

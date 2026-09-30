@@ -652,7 +652,7 @@ export function LessonArt({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-lg border border-border card-glow",
+        "relative overflow-hidden rounded-lg border border-border bg-card",
         className,
       )}
       aria-hidden
@@ -677,7 +677,7 @@ export function JourneyHeroArt({
   done: number;
 }) {
   const stops = [
-    { x: 40, y: 140, t: "Iniciante", col: C.up },
+    { x: 40, y: 140, t: "Iniciante", col: C.a },
     { x: 160, y: 80, t: "Intermediário", col: C.p },
     { x: 280, y: 36, t: "Avançado", col: C.w },
   ];
@@ -701,7 +701,7 @@ export function JourneyHeroArt({
       />
       <defs>
         <linearGradient id="jg" x1="0" x2="1">
-          <stop offset="0" stopColor="var(--success)" />
+          <stop offset="0" stopColor="var(--accent)" />
           <stop offset="0.5" stopColor="var(--primary)" />
           <stop offset="1" stopColor="var(--warning)" />
         </linearGradient>

@@ -18,6 +18,7 @@ import { useSession } from "@/hooks/use-session";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { apiFetch } from "@/lib/client-api";
 import { formatDateTime } from "@/lib/format";
+import { ConfidenceBar } from "@/components/scanner/confidence-bar";
 
 export interface HistoryEntry {
   id: string;
@@ -118,12 +119,12 @@ export function ScanHistory({
             <TableHead>Tipo</TableHead>
             <TableHead>Evento</TableHead>
             <TableHead>Direção</TableHead>
-            <TableHead className="text-right">Conf.</TableHead>
+            <TableHead className="text-right">Confiança</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {items.map((h) => (
-            <TableRow key={h.id}>
+            <TableRow key={h.id} className="h-11">
               <TableCell className="text-xs text-muted-foreground">
                 {formatDateTime(h.createdAt)}
               </TableCell>
@@ -146,8 +147,8 @@ export function ScanHistory({
               <TableCell>
                 <DirectionBadge direction={h.direction} />
               </TableCell>
-              <TableCell className="text-right tabular">
-                {h.confidence ?? "—"}
+              <TableCell className="text-right">
+                {h.confidence != null ? <ConfidenceBar value={h.confidence} /> : <span className="text-xs text-muted-foreground">—</span>}
               </TableCell>
             </TableRow>
           ))}

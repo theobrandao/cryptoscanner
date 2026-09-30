@@ -31,7 +31,7 @@ type Filter = "todas" | LessonLevel;
 /** Endereço da aula (igual a lessonPath em lib/content/lessons.ts; repetido para não levar o texto das aulas ao navegador). */
 const lessonPath = (slug: string) => `/jornada/${slug}`;
 
-const LEVEL_VARIANT: Record<LessonLevel, "success" | "default" | "accent"> = { iniciante: "success", intermediario: "default", avancado: "accent" };
+const LEVEL_VARIANT: Record<LessonLevel, "outline" | "default" | "accent"> = { iniciante: "outline", intermediario: "default", avancado: "accent" };
 
 /**
  * Jornada Trader: lista das 12 aulas (aberta, sem login). Cada aula tem página própria em /jornada/[slug].
@@ -53,7 +53,7 @@ export function JourneyView({ lessons, levelLabels }: { lessons: LessonCardData[
         <CardContent className="grid items-center gap-4 p-5 md:grid-cols-[1fr_320px]">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="success">Grátis · sem cadastro</Badge>
+              <Badge variant="default">Grátis · sem cadastro</Badge>
               <span className="text-xs text-muted-foreground">
                 {total} aulas · {totalMin} min no total
               </span>
@@ -71,7 +71,7 @@ export function JourneyView({ lessons, levelLabels }: { lessons: LessonCardData[
                   {done}/{total} aulas · {pct}%
                 </span>
               </div>
-              <Progress value={pct} tone={pct === 100 ? "success" : "primary"} className="mt-1" label="Seu progresso na Jornada" valueText={`${done} de ${total} aulas`} />
+              <Progress value={pct} tone="primary" className="mt-1" label="Seu progresso na Jornada" valueText={`${done} de ${total} aulas`} />
               <p className="mt-1 text-xs text-muted-foreground">
                 {loggedIn ? (
                   "Salvo na sua conta."
@@ -92,7 +92,7 @@ export function JourneyView({ lessons, levelLabels }: { lessons: LessonCardData[
                   {done ? "Continuar" : "Começar"}: aula {nextUp.order} <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
               ) : (
-                <Badge variant="success" className="px-3 py-1.5 text-sm">
+                <Badge variant="default" className="px-3 py-1.5 text-sm">
                   <Check className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden /> Trilha concluída
                 </Badge>
               )}
@@ -136,12 +136,12 @@ export function JourneyView({ lessons, levelLabels }: { lessons: LessonCardData[
             const isNext = nextUp?.slug === l.slug;
             return (
               <Link key={l.slug} href={lessonPath(l.slug)} className="group block rounded-lg text-left">
-                <Card className={cn("h-full overflow-hidden transition-[transform,border-color,box-shadow] group-hover:-translate-y-0.5 group-hover:border-primary/50 group-hover:shadow-lg motion-reduce:transition-none motion-reduce:group-hover:translate-y-0", p?.done && "border-success/50", isNext && !p?.done && "ring-1 ring-primary/40")}>
+                <Card className={cn("h-full overflow-hidden transition-[transform,border-color] group-hover:-translate-y-px group-hover:border-primary/50 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0", p?.done && "border-primary/30", isNext && !p?.done && "ring-1 ring-primary/40")}>
                   <div className="relative">
                     <LessonArt slug={l.slug} compact className="aspect-[16/9] rounded-none border-0 border-b" />
                     <span className="absolute left-2 top-2 rounded-md bg-background/85 px-2 py-0.5 text-xs font-semibold backdrop-blur">Aula {l.order}</span>
                     {p?.done ? (
-                      <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-background/85 px-2 py-0.5 text-xs font-semibold text-success backdrop-blur">
+                      <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-background/85 px-2 py-0.5 text-xs font-semibold text-primary backdrop-blur">
                         <Check className="h-3 w-3" aria-hidden /> {p.score}/{l.quizLength}
                         <span className="sr-only"> corretas</span>
                       </span>
@@ -161,7 +161,7 @@ export function JourneyView({ lessons, levelLabels }: { lessons: LessonCardData[
                     </div>
                     <h3 className="mt-2 font-semibold leading-snug">{l.title}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">{l.summary}</p>
-                    <div className="mt-3 text-xs font-medium">{p?.done ? <span className="text-success">Concluída · revisar</span> : <span className="text-primary">{isNext ? "Próxima da trilha →" : "Abrir aula →"}</span>}</div>
+                    <div className="mt-3 text-xs font-medium">{p?.done ? <span className="inline-flex items-center gap-1 text-muted-foreground"><Check className="h-3 w-3" aria-hidden /> Concluída · revisar</span> : <span className="text-primary">{isNext ? "Próxima da trilha →" : "Abrir aula →"}</span>}</div>
                   </CardContent>
                 </Card>
               </Link>
@@ -171,7 +171,7 @@ export function JourneyView({ lessons, levelLabels }: { lessons: LessonCardData[
       </section>
 
       {!loggedIn ? (
-        <Card className="mt-6 card-glow">
+        <Card className="mt-6">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
             <div>
               <div className="font-semibold">Pratique o que aprendeu com dados reais</div>

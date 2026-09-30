@@ -232,7 +232,7 @@ function WizardBody({
               i === step
                 ? "border-primary bg-primary/15 text-primary"
                 : i < step
-                  ? "border-success/40 text-success"
+                  ? "border-info/40 text-info"
                   : "border-border text-muted-foreground",
             )}
           >

@@ -1,7 +1,8 @@
 import { PageShell } from "@/components/layout/page-shell";
 import { Skeleton } from "@/components/ui/misc";
+import { BrandLoader } from "@/components/brand/brand-loader";
 
-/** Esqueleto do Terminal: título com ícone, seletor de ativo e timeframes, abas e a área da análise. */
+/** Terminal carregando: cabeçalho, seletores e abas no formato final; a área da análise mostra a marca com varredura sutil. */
 export default function TerminalLoading() {
   return (
     <div className="min-h-[100svh]" aria-busy="true">
@@ -24,7 +25,9 @@ export default function TerminalLoading() {
             <Skeleton key={i} className="h-9 w-24" />
           ))}
         </div>
-        <Skeleton className="mt-4 h-[480px] w-full" />
+        <div className="mt-4 grid h-[480px] w-full place-items-center rounded-xl border border-border bg-card">
+          <BrandLoader size={44} label="Carregando o Terminal…" />
+        </div>
       </PageShell>
     </div>
   );

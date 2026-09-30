@@ -46,7 +46,7 @@ export function CancelDialog({ plan, provider, currentPeriodEnd, onCancelled }: 
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="h-9 rounded-md border border-border px-3 text-xs hover:bg-muted sm:ml-auto">
+      <button type="button" onClick={() => setOpen(true)} className="cursor-pointer h-9 rounded-md border border-border px-3 text-xs hover:bg-muted sm:ml-auto">
         Cancelar renovação
       </button>
       <Dialog open={open} onOpenChange={setOpen}>

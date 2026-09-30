@@ -13,6 +13,7 @@ import { ASSET_CATEGORIES } from "@/lib/asset-categories";
 import { liquidationPrice, positionSize } from "@/lib/engines/risk";
 import { formatCompact, formatPct, formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Change } from "@/components/market/change";
 import type { MarketContext } from "@/services/market-context-service";
 import type { MarketOverview, SetupRow } from "@/services/market-overview-service";
 import type { Timeframe } from "@/types/market";
@@ -25,7 +26,7 @@ function Tabs<T extends string>({ items, value, onChange, className, labels }: {
   return (
     <div className={cn("flex gap-1 overflow-x-auto", className)} role="tablist">
       {items.map((i) => (
-        <button key={i} role="tab" aria-selected={i === value} onClick={() => onChange(i)} className={cn("h-7 shrink-0 rounded px-2.5 text-[11.5px]", i === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+        <button key={i} role="tab" aria-selected={i === value} onClick={() => onChange(i)} className={cn("cursor-pointer h-7 shrink-0 rounded px-2.5 text-[11.5px]", i === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
           {labels?.[i] ?? i}
         </button>
       ))}
@@ -84,7 +85,7 @@ export function WatchlistPanel({ selected, trendBySymbol, onSelect }: { selected
                     </span>
                   </td>
                   <td className="tabular px-2 py-1.5 text-right">{px(t?.price)}</td>
-                  <td className={cn("tabular px-2 py-1.5 text-right", t && t.changePct24h >= 0 ? "text-success" : "text-danger")}>{t ? formatPct(t.changePct24h) : "—"}</td>
+                  <td className="px-2 py-1.5 text-right">{t ? <Change value={t.changePct24h} /> : <span className="text-muted-foreground">—</span>}</td>
                   <td className="tabular hidden px-2 py-1.5 text-right text-muted-foreground sm:table-cell">{t ? formatCompact(t.quoteVolume24h, "") : "—"}</td>
                   <td className={cn("px-3 py-1.5 text-right text-[11px]", trend === "bullish" ? "text-success" : trend === "bearish" ? "text-danger" : "text-muted-foreground")} title="Estrutura externa no timeframe atual">
                     {trend === "bullish" ? "▲ Alta" : trend === "bearish" ? "▼ Baixa" : trend ? "Lateral" : "…"}
@@ -160,7 +161,9 @@ export function MarketOverviewPanel() {
                 <td className="px-3 py-1.5 text-muted-foreground">{i + 1}</td>
                 <td className="px-2 py-1.5 font-medium">{r.symbol}</td>
                 <td className="tabular px-2 py-1.5 text-right">{px(r.price)}</td>
-                <td className={cn("tabular px-2 py-1.5 text-right", (r.changePct24h ?? 0) >= 0 ? "text-success" : "text-danger")}>{r.changePct24h != null ? formatPct(r.changePct24h) : "—"}</td>
+                <td className="px-2 py-1.5 text-right">
+                  <Change value={r.changePct24h} />
+                </td>
                 <td className="tabular px-3 py-1.5 text-right text-muted-foreground">{formatCompact(tab === "Market Cap" ? r.marketCap : r.volume24h, "$")}</td>
               </tr>
             ))}
@@ -178,7 +181,12 @@ function Tile({ label, value, sub, up, title }: { label: string; value: string; 
     <div className="min-w-0 rounded-md border border-border p-2" title={title}>
       <div className="truncate text-[10.5px] text-muted-foreground">{label}</div>
       <div className="tabular truncate text-[17px] font-bold">{value}</div>
-      {sub ? <div className={cn("tabular text-[11px]", up == null ? "text-muted-foreground" : up ? "text-success" : "text-danger")}>{sub}</div> : null}
+      {sub ? (
+        <div className={cn("tabular text-[11px]", up == null ? "text-muted-foreground" : up ? "text-success" : "text-danger")}>
+          {up == null ? null : <span aria-hidden>{up ? "▲ " : "▼ "}</span>}
+          {sub}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -187,7 +195,8 @@ function Tile({ label, value, sub, up, title }: { label: string; value: string; 
 
 /** Faixas do Confluence Score (iguais às do motor): Low < 40 ≤ Moderate < 60 ≤ Good < 75 ≤ Strong < 90 ≤ Exceptional. */
 export function scoreTone(score: number) {
-  return score >= 75 ? "bg-success/20 text-success" : score >= 60 ? "bg-info/20 text-info" : score >= 40 ? "bg-muted text-foreground" : "bg-muted text-muted-foreground";
+  // nota de qualidade (não é resultado financeiro): tons de marca, não verde/vermelho
+  return score >= 75 ? "bg-primary/20 text-primary" : score >= 60 ? "bg-info/15 text-info" : score >= 40 ? "bg-muted text-foreground" : "bg-muted text-muted-foreground";
 }
 
 export function ScannerPanel({ tf, selected, onSelect }: { tf: Timeframe; selected: string; onSelect: (symbol: string) => void }) {
@@ -269,7 +278,7 @@ export function RiskPanel({ ctx }: { ctx: MarketContext }) {
       action={
         <div className="flex rounded-md border border-border p-0.5 text-[11.5px]" role="tablist" aria-label="Lado">
           {(["long", "short"] as const).map((x) => (
-            <button key={x} role="tab" aria-selected={side === x} onClick={() => setSide(x)} className={cn("h-6 rounded px-3", side === x ? (x === "long" ? "bg-success/25 text-success" : "bg-danger/25 text-danger") : "text-muted-foreground")}>
+            <button key={x} role="tab" aria-selected={side === x} onClick={() => setSide(x)} className={cn("cursor-pointer h-6 rounded px-3", side === x ? (x === "long" ? "bg-success/25 text-success" : "bg-danger/25 text-danger") : "text-muted-foreground")}>
               {x === "long" ? "Compra" : "Venda"}
             </button>
           ))}
