@@ -41,7 +41,7 @@ Edite `.env.local`/`.env` (ver `.env.example`, todos comentados). Principais:
 | `MARKET_PROVIDERS` | Ordem de fallback: `binance,kraken`. A Binance tenta `BINANCE_REST_URL` e depois `BINANCE_REST_FALLBACK_URLS` (`data-api.binance.vision`, sem bloqueio regional); a Kraken só entra se ambas falharem |
 | `COINGECKO_API_KEY` | Opcional; câmbio BRL, market cap e dados globais |
 | `LLM_PROVIDER`, `ANTHROPIC_API_KEY`, `LLM_MODEL` | `none` (padrão, 100 % determinístico) ou `anthropic` para narrativa, reclassificação de manchetes e análise de imagem |
-| `TELEGRAM_BOT_TOKEN` | Bot próprio para alertas dos agentes (o usuário informa o Chat ID) |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` | Bot próprio para alertas dos agentes. O usuário conecta com um clique (deep link `t.me/<bot>?start=<código>`, confirmado via `getUpdates`; o bot **não** pode ter webhook) ou informa o Chat ID manualmente. `TELEGRAM_BOT_USERNAME` padrão: `CryptoScannerAlertasBot` |
 | `WORKER_CYCLE_SECONDS`, `AGENT_ALERT_COOLDOWN_MINUTES` | Ciclo do worker (300) e cooldown (30) |
 | `ALLOW_SELF_PLAN_CHANGE` | `true` permite ao usuário trocar o próprio plano em `/planos` (ambiente de teste; não há cobrança) |
 | `RATE_LIMIT_*` | Limites por minuto (público, autenticação, LLM) |

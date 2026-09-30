@@ -472,7 +472,7 @@ function NewSentinelCard({
             </Select>
             {notification !== "log" && !telegramConnected ? (
               <p className="text-xs text-warning">
-                Informe seu Chat ID em{" "}
+                Conecte o Telegram em{" "}
                 <Link href="/preferencias" className="underline">
                   Preferências
                 </Link>{" "}

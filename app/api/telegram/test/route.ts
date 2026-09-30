@@ -30,7 +30,7 @@ export const POST = withApi(async (req) => {
   if (!db?.telegramChatId)
     throw new ApiError(
       400,
-      "Informe seu Chat ID em Preferências",
+      "Conecte o Telegram antes de enviar o teste",
       "missing_chat_id",
     );
   const res = await sendTelegramMessage(

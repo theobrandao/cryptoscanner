@@ -891,6 +891,45 @@ await test("Telegram", "POST /api/telegram/test (sem token no servidor → 503)"
   return r.res.status === 200 ? "mensagem enviada" : `${r.res.status} ${r.json?.error?.code} (esperado sem TELEGRAM_BOT_TOKEN)`;
 });
 
+await test("Telegram", "POST /api/telegram/link anônimo → 401", async () => {
+  const r = await call("POST", "/api/telegram/link", { auth: false, body: {} });
+  expectStatus(r, 401, "unauthorized");
+  return "401";
+});
+
+await test("Telegram", "POST /api/telegram/link (deep link com código; 503 sem token)", async () => {
+  const r = await call("POST", "/api/telegram/link", { body: {} });
+  expect([200, 503].includes(r.res.status), `HTTP ${r.res.status}: ${(r.text ?? "").slice(0, 160)}`);
+  if (r.res.status === 503) {
+    expect(r.json?.ok === false && r.json?.error?.code === "telegram_unavailable" && typeof r.json.error.message === "string", "503 sem envelope de erro esperado");
+    return "503 telegram_unavailable (sem TELEGRAM_BOT_TOKEN)";
+  }
+  const { url, expiresInSec } = r.json.data;
+  expect(/^https:\/\/t\.me\/[A-Za-z0-9_]{5,64}\?start=[A-Za-z0-9_-]{16,64}$/.test(url), `url inválida: ${url}`);
+  expect(expiresInSec === 900, `expiresInSec=${expiresInSec}`);
+  return url.replace(/start=.*/, "start=…");
+});
+
+await test("Telegram", "POST /api/telegram/link/check → { connected } ou 503/502", async () => {
+  const r = await call("POST", "/api/telegram/link/check", { body: {} });
+  expect([200, 502, 503].includes(r.res.status), `HTTP ${r.res.status}: ${(r.text ?? "").slice(0, 160)}`);
+  if (r.res.status === 200) expect(typeof r.json.data.connected === "boolean", "connected ausente");
+  return r.res.status === 200 ? `connected=${r.json.data.connected}` : `${r.res.status} ${r.json?.error?.code}`;
+});
+
+await test("Telegram", "DELETE /api/telegram/link desconecta (chat ID → null) e restaura o manual", async () => {
+  const r = await call("DELETE", "/api/telegram/link");
+  expectStatus(r, 200);
+  expect(r.json.data.connected === false, "connected deveria ser false");
+  const g = await call("GET", "/api/preferences");
+  expect(g.json.data.telegramChatId === null, `chat id não foi removido: ${g.json.data.telegramChatId}`);
+  const me = await call("GET", "/api/auth/me");
+  expect(me.json.data.telegramConnected === false, "auth/me ainda indica conectado");
+  const back = await call("PATCH", "/api/preferences", { body: { telegramChatId: "123456789" } });
+  expectStatus(back, 200);
+  return "desconectado e Chat ID manual restaurado";
+});
+
 // ------------------------------------------------------------------ watchlist
 await test("Carteira", "POST /api/watchlist BTC qty 0.5 avg 50000", async () => {
   const r = await call("POST", "/api/watchlist", { body: { symbol: "BTC", quantity: 0.5, avgPrice: 50000, note: "posição teste" } });

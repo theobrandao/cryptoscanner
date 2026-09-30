@@ -33,6 +33,14 @@ const schema = z.object({
   LLM_MODEL: z.string().default("claude-sonnet-4-5"),
   LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).default(30000),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  /** @username do bot (sem @), usado no deep link t.me/<bot>?start=<código> da conexão automática. */
+  TELEGRAM_BOT_USERNAME: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/^@/, ""))
+    .pipe(z.string().regex(/^[A-Za-z0-9_]{5,64}$/))
+    .catch("CryptoScannerAlertasBot")
+    .default("CryptoScannerAlertasBot"),
   WORKER_CYCLE_SECONDS: z.coerce.number().int().min(30).default(300),
   AGENT_ALERT_COOLDOWN_MINUTES: z.coerce.number().int().min(1).default(30),
   WORKER_ENABLE_BINANCE_WS: z

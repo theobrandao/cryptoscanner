@@ -16,7 +16,6 @@ import {
   Play,
   Plus,
   Radar,
-  Send,
   Shield,
   Square,
   Trash2,
@@ -27,6 +26,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
+import { TelegramCard } from "@/components/account/telegram-connect";
 import {
   AgentWizard,
   CATEGORY_ICON,
@@ -55,7 +55,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input, Label } from "@/components/ui/input";
 import { Alert, EmptyState, Skeleton } from "@/components/ui/misc";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSession } from "@/hooks/use-session";
@@ -197,7 +196,6 @@ export function AgentsView() {
     user,
     telegramConnected,
     loading: sessionLoading,
-    refresh: refreshSession,
   } = useSession();
   const plan = PLANS[user?.plan ?? "FREE"];
   const { toast } = useToast();
@@ -535,11 +533,7 @@ export function AgentsView() {
             </CardContent>
           </Card>
 
-          <TelegramCard
-            connected={telegramConnected}
-            planAllows={plan.telegramAlerts}
-            onChanged={() => void refreshSession()}
-          />
+          <TelegramCard planAllows={plan.telegramAlerts} />
         </div>
       </div>
 
@@ -938,150 +932,6 @@ function SystemAgents() {
             <p className="mt-1 text-muted-foreground">{a.desc}</p>
           </div>
         ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-function TelegramCard({
-  connected,
-  planAllows,
-  onChanged,
-}: {
-  connected: boolean;
-  planAllows: boolean;
-  onChanged: () => void;
-}) {
-  const { data: info } = useSWR<{
-    configured: boolean;
-    botUsername: string | null;
-  }>("/api/telegram/test");
-  const { toast } = useToast();
-  const [chatId, setChatId] = React.useState("");
-  const [busy, setBusy] = React.useState<"save" | "test" | null>(null);
-  const save = async () => {
-    setBusy("save");
-    try {
-      await postJson("/api/preferences", { telegramChatId: chatId }, "PATCH");
-      toast({ title: "Chat ID salvo", variant: "success" });
-      onChanged();
-    } catch (err) {
-      toast({
-        title: "Falha ao salvar",
-        description: err instanceof ApiClientError ? err.message : String(err),
-        variant: "danger",
-      });
-    } finally {
-      setBusy(null);
-    }
-  };
-  const test = async () => {
-    setBusy("test");
-    try {
-      await postJson("/api/telegram/test", {});
-      toast({ title: "Mensagem de teste enviada", variant: "success" });
-    } catch (err) {
-      toast({
-        title: "Telegram falhou",
-        description: err instanceof ApiClientError ? err.message : String(err),
-        variant: "danger",
-      });
-    } finally {
-      setBusy(null);
-    }
-  };
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Send className="h-4 w-4 text-primary" aria-hidden /> Alertas no
-          Telegram{" "}
-          {connected ? (
-            <Badge variant="success">conectado</Badge>
-          ) : (
-            <Badge variant="muted">não conectado</Badge>
-          )}
-        </CardTitle>
-        <CardDescription>
-          Receba sinais de compra/venda diretamente no Telegram, sem precisar
-          abrir o site.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 text-sm">
-        {!planAllows ? (
-          <Alert variant="info">
-            Alertas no Telegram estão disponíveis nos planos PRO e ELITE.
-          </Alert>
-        ) : null}
-        {info && !info.configured ? (
-          <Alert variant="warning">
-            O envio pelo Telegram está temporariamente indisponível. Os alertas
-            continuam chegando no painel e por push.
-          </Alert>
-        ) : null}
-        <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
-          <li>
-            {info?.botUsername ? (
-              <>
-                Abra{" "}
-                <a
-                  className="text-primary hover:underline"
-                  href={`https://t.me/${info.botUsername}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  @{info.botUsername}
-                </a>{" "}
-                e toque em <strong>Iniciar</strong>.
-              </>
-            ) : (
-              <>
-                Abra o bot do servidor no Telegram e toque em{" "}
-                <strong>Iniciar</strong>.
-              </>
-            )}
-          </li>
-          <li>
-            Descubra seu Chat ID com{" "}
-            <a
-              className="text-primary hover:underline"
-              href="https://t.me/userinfobot"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              @userinfobot
-            </a>{" "}
-            e cole abaixo.
-          </li>
-          <li>Envie uma mensagem de teste para confirmar.</li>
-        </ol>
-        <div className="flex flex-col gap-1">
-          <Label>Chat ID</Label>
-          <div className="flex gap-2">
-            <Input
-              value={chatId}
-              onChange={(e) => setChatId(e.target.value.replace(/[^\d-]/g, ""))}
-              placeholder="123456789"
-              inputMode="numeric"
-            />
-            <Button
-              variant="secondary"
-              onClick={() => void save()}
-              loading={busy === "save"}
-              disabled={!chatId}
-            >
-              Salvar
-            </Button>
-          </div>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => void test()}
-          loading={busy === "test"}
-          disabled={!connected || !info?.configured}
-        >
-          <Send className="h-4 w-4" /> Enviar mensagem de teste
-        </Button>
       </CardContent>
     </Card>
   );

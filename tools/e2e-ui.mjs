@@ -275,7 +275,7 @@ await step("Registro pela interface", async () => {
   return `logado como ${me}`;
 });
 
-await step("Início (logado): mercado agora, sinais ativos do modelo validado, ferramentas; menu com uma ferramenta por finalidade", async () => {
+await step("Início (logado): saudação, seu painel, mercado agora, sinais ativos do modelo validado; menu com uma ferramenta por finalidade", async () => {
   await goto("/");
   await page.waitForFunction(() => /Sinais ativos — rompimento testado/i.test(document.body.innerText) && /posições abertas/i.test(document.body.innerText), null, { timeout: 120_000 });
   const nav = await page.locator("nav[aria-label='Ferramentas']").first().innerText();
@@ -286,6 +286,8 @@ await step("Início (logado): mercado agora, sinais ativos do modelo validado, f
   expect(adv === 0, "grupo Avançado deveria começar recolhido");
   await page.getByRole("button", { name: "Avançado" }).first().click();
   await page.locator("nav[aria-label='Ferramentas avançadas']").first().waitFor({ timeout: 5_000 });
+  expect((await page.locator("section[aria-label='Seu painel']").count()) === 1, "início sem a seção Seu painel");
+  expect(/^(Bom dia|Boa tarde|Boa noite)/.test(await page.locator("h1").first().innerText()), "início sem saudação por horário");
   const cards = await page.locator("section[aria-label='Sinais ativos'] a[href^='/graficos']").count();
   return `${cards} cartões de sinais · ${await shot("inicio-logado")}`;
 });
@@ -375,13 +377,21 @@ await step("Simulador logado: salvar e listar", async () => {
 await step("Preferências: alterar tema/moeda/timeframe e Chat ID", async () => {
   await goto("/preferencias");
   await page.waitForTimeout(1000);
-  const chat = page.locator("input[placeholder='123456789']").first();
-  if (await chat.count()) await chat.fill("123456789");
-  const save = page.getByRole("button", { name: /Salvar/i }).first();
+  const save = page.getByRole("button", { name: /^Salvar$/i }).first();
   if (await save.count()) await save.click();
+  await page.waitForTimeout(1000);
+  // Conexão com um clique é o fluxo principal; o Chat ID manual fica recolhido em <details>.
+  const hasOneClick = await page.getByRole("button", { name: /Conectar Telegram|Desconectar/i }).count();
+  const manual = page.locator("summary", { hasText: /Conectar manualmente/i }).first();
+  if (await manual.count()) {
+    await manual.click();
+    const chat = page.locator("input[placeholder='123456789']").first();
+    await chat.fill("123456789");
+    await page.getByRole("button", { name: /Salvar Chat ID/i }).first().click();
+  }
   await page.waitForTimeout(1500);
   const pref = await page.evaluate(async () => (await (await fetch("/api/preferences")).json()).data);
-  return `chatId=${pref.telegramChatId ?? "—"} · ${await shot("preferencias")}`;
+  return `chatId=${pref.telegramChatId ?? "—"} · um clique ${hasOneClick ? "visível" : "indisponível (sem token)"} · ${await shot("preferencias")}`;
 });
 
 await step("Planos: trocar para PLATINUM libera 15M no scanner; voltar para PRO", async () => {

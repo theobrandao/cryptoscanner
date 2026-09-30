@@ -535,8 +535,8 @@ function WizardBody({
             </div>
             {draft.notification !== "log" && !telegramConnected ? (
               <Alert variant="warning">
-                Conecte o Telegram (Chat ID) na seção “Alertas no Telegram” para
-                receber as mensagens.
+                Conecte o Telegram na seção “Alertas no Telegram” (botão
+                “Conectar Telegram”) para receber as mensagens.
               </Alert>
             ) : null}
           </div>

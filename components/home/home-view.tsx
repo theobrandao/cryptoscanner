@@ -9,11 +9,11 @@ import { AccessGate } from "@/components/account/access-gate";
 import { Landing, type LandingData } from "@/components/marketing/landing";
 import { MarketStrip, MoversCard, NewsCard } from "@/components/market/market-now";
 import { Alert } from "@/components/ui/misc";
-import { Eyebrow, PillGroup, StatTile, TickerMarquee, ToolsGrid } from "@/components/ui/showcase";
+import { Eyebrow, PillGroup, StatTile, TickerMarquee } from "@/components/ui/showcase";
+import { Greeting, MyPanel, QuickActions } from "@/components/home/my-panel";
 import { useSession } from "@/hooks/use-session";
 import { ASSETS } from "@/lib/assets";
 import { formatDateTime, formatPrice, timeAgo } from "@/lib/format";
-import { MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 import type { ActiveSignal, SignalsBoard } from "@/services/signals-service";
 
@@ -196,31 +196,15 @@ function Signals() {
   );
 }
 
-function ToolsByCategory() {
-  return (
-    <section aria-label="Ferramentas" className="flex flex-col gap-5">
-      <div>
-        <Eyebrow>Ferramentas</Eyebrow>
-        <h2 className="mt-2 text-xl font-extrabold tracking-tight sm:text-2xl">
-          Uma ferramenta para <span className="text-gradient">cada tarefa</span>
-        </h2>
-      </div>
-      <ToolsGrid tools={MAIN_TOOLS.filter((t) => t.href !== "/")} categories={TOOL_CATEGORIES} compact />
-    </section>
-  );
-}
-
 export function HomeView() {
-  const { user } = useSession();
-  const first = user?.name?.split(/\s+/)[0];
   return (
     <div className="flex flex-col">
       <TickerMarquee />
       <PageShell className="flex flex-col gap-8">
-        <header className="flex flex-col gap-2">
-          <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{first ? `Olá, ${first}` : "Início"}</h1>
-          <p className="text-[14px] text-muted-foreground">Mercado agora, sinais do modelo testado e as ferramentas, cada uma com uma função.</p>
-        </header>
+        <div className="flex flex-col gap-5">
+          <Greeting />
+          <MyPanel />
+        </div>
         <MarketStrip />
         <AccessGate feature="Sinais do modelo testado">
           <Signals />
@@ -229,7 +213,7 @@ export function HomeView() {
           <MoversCard />
           <NewsCard />
         </div>
-        <ToolsByCategory />
+        <QuickActions />
       </PageShell>
     </div>
   );

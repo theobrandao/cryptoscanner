@@ -27,6 +27,7 @@ import { useTheme } from "@/components/providers/theme-provider";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useToast } from "@/components/providers/toast-provider";
 import { PushCard } from "@/components/account/push-card";
+import { TelegramCard } from "@/components/account/telegram-connect";
 import { ApiClientError, postJson } from "@/lib/client-api";
 import { PLANS } from "@/lib/plans";
 
@@ -89,6 +90,11 @@ export function PreferencesView() {
               await Promise.all([mutate(), refresh()]);
             }}
           />
+          <TelegramCard
+            className="max-w-2xl"
+            planAllows={PLANS[user.plan]?.telegramAlerts ?? false}
+            onChanged={() => void mutate()}
+          />
           <PushCard />
         </div>
       )}
@@ -114,7 +120,6 @@ function PreferencesForm({
     currency: data.preference.currency,
     defaultTimeframe: data.preference.defaultTimeframe,
     autoRefreshSec: String(data.preference.autoRefreshSec),
-    telegramChatId: data.telegramChatId ?? "",
   });
   const [busy, setBusy] = React.useState(false);
   const save = async () => {
@@ -127,7 +132,6 @@ function PreferencesForm({
           currency: form.currency,
           defaultTimeframe: form.defaultTimeframe,
           autoRefreshSec: Number(form.autoRefreshSec),
-          telegramChatId: form.telegramChatId || null,
           theme,
         },
         "PATCH",
@@ -150,8 +154,7 @@ function PreferencesForm({
       <CardHeader>
         <CardTitle>Conta e interface</CardTitle>
         <CardDescription>
-          Moeda de exibição, timeframe padrão e Chat ID do Telegram para
-          alertas.
+          Nome, tema, moeda de exibição e timeframe padrão.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -218,20 +221,6 @@ function PreferencesForm({
             onChange={(e) =>
               setForm({ ...form, autoRefreshSec: e.target.value })
             }
-          />
-        </div>
-        <div className="flex flex-col gap-1 sm:col-span-2">
-          <Label>Telegram Chat ID</Label>
-          <Input
-            inputMode="numeric"
-            value={form.telegramChatId}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                telegramChatId: e.target.value.replace(/[^\d-]/g, ""),
-              })
-            }
-            placeholder="123456789"
           />
         </div>
         <Button
