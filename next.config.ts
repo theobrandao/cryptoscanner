@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   // Saída autocontida para a imagem Docker (ver Dockerfile).
   output: "standalone",
   poweredByHeader: false,
+  // CSS no próprio HTML: tira a requisição que bloqueia a primeira pintura (visitante novo vindo de anúncio)
+  experimental: { inlineCss: true },
   async headers() {
     return [
       {

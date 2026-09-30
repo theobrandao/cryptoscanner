@@ -172,7 +172,9 @@ export function PlanCards({ data, trial }: { data: Prices | undefined; trial: nu
                   Começar {trial} dias grátis
                 </Link>
               ) : null}
-              {buy ? (
+              {!data ? (
+                <div className="skeleton h-12 rounded-xl" aria-hidden="true" />
+              ) : buy ? (
                 <a href={buy} rel="noopener" data-testid={`buy-${p}`} onClick={(e) => (e.currentTarget.href = withAffiliateParams(buy))} className={cn("flex h-12 items-center justify-center rounded-xl text-sm font-semibold", p === "ELITE" ? "bg-primary text-primary-foreground hover:brightness-110" : "border border-border hover:border-primary/50")}>
                   Assinar {p} agora
                 </a>

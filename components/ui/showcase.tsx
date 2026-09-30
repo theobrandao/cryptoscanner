@@ -126,13 +126,14 @@ export function LineChart({ values, compare, height = 120, className, tone, area
 export function TickerMarquee() {
   const { data } = useTickers();
   const list = (data?.tickers ?? []).filter((t) => ASSETS.some((a) => a.symbol === t.symbol)).slice(0, 20);
-  if (!list.length) return null;
+  // altura reservada desde o primeiro render: a faixa não empurra a página quando as cotações chegam
+  if (!list.length) return <div className="h-[37px] border-b border-border bg-card/60" aria-hidden="true" />;
   const row = (key: string) => (
-    <div key={key} className="flex shrink-0 items-center" aria-hidden={key === "b"}>
+    <div key={key} className="flex shrink-0 items-center" aria-hidden={key === "b"} inert={key === "b"}>
       {list.map((t) => {
         const a = ASSETS.find((x) => x.symbol === t.symbol);
         return (
-          <Link key={`${key}${t.symbol}`} href={`/graficos?symbol=${t.symbol}`} className="flex items-center gap-2 border-r border-border px-5 py-2 text-[12.5px]">
+          <Link key={`${key}${t.symbol}`} href={`/graficos?symbol=${t.symbol}`} className="flex h-9 items-center gap-2 border-r border-border px-5 text-[12.5px]">
             <span className="text-muted-foreground">{a?.glyph}</span>
             <span className="font-semibold">{t.symbol}</span>
             <span className="tabular">{formatPrice(t.price)}</span>

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { Landing } from "@/components/marketing/landing";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 import { HomeEntry } from "@/components/home/home-view";
 import { buildLandingData } from "@/lib/marketing/landing-data";
 
@@ -24,5 +27,9 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     redirect(`/charts/${symbol}${q.size ? `?${q.toString()}` : ""}`);
   }
   const landing = buildLandingData();
+  // visitante sem sessão recebe a página de venda já renderizada no servidor (sem esperar /api/auth/me)
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const session = token ? await verifySessionToken(token).catch(() => null) : null;
+  if (!session) return <Landing content={landing} />;
   return <HomeEntry landing={landing} />;
 }

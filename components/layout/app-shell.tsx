@@ -500,16 +500,16 @@ function SalesShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center gap-3 px-4">
           <BrandMark />
           <nav className="ml-6 hidden items-center gap-5 text-[13.5px] text-muted-foreground md:flex" aria-label="Seções">
-            <a href="#ferramentas" className="hover:text-foreground">
+            <a href="#ferramentas" className="inline-flex min-h-6 items-center hover:text-foreground">
               Ferramentas
             </a>
-            <a href="#modelo" className="hover:text-foreground">
+            <a href="#modelo" className="inline-flex min-h-6 items-center hover:text-foreground">
               Modelo
             </a>
-            <a href="#planos" className="hover:text-foreground">
+            <a href="#planos" className="inline-flex min-h-6 items-center hover:text-foreground">
               Planos
             </a>
-            <a href="#faq" className="hover:text-foreground">
+            <a href="#faq" className="inline-flex min-h-6 items-center hover:text-foreground">
               Dúvidas
             </a>
           </nav>
@@ -528,19 +528,19 @@ function SalesShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-2">
           <span>© CryptoScanner</span>
           <nav className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Documentos legais">
-            <Link href="/termos" className="hover:text-foreground">
+            <Link href="/termos" className="inline-flex min-h-6 items-center hover:text-foreground">
               Termos
             </Link>
-            <Link href="/privacidade" className="hover:text-foreground">
+            <Link href="/privacidade" className="inline-flex min-h-6 items-center hover:text-foreground">
               Privacidade
             </Link>
-            <Link href="/reembolso" className="hover:text-foreground">
+            <Link href="/reembolso" className="inline-flex min-h-6 items-center hover:text-foreground">
               Cancelamento e reembolso
             </Link>
-            <Link href="/suporte" className="hover:text-foreground">
+            <Link href="/suporte" className="inline-flex min-h-6 items-center hover:text-foreground">
               Suporte
             </Link>
-            <Link href="/login?next=/" className="hover:text-foreground">
+            <Link href="/login?next=/" className="inline-flex min-h-6 items-center hover:text-foreground">
               Entrar
             </Link>
           </nav>
@@ -610,16 +610,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Conteúdo técnico e educacional, não é recomendação de investimento. Dados: Binance, Bybit, OKX, Kraken, CoinGecko, CoinPaprika, BCB (PTAX), alternative.me. Confluence Score mede qualidade de confluência, não probabilidade.
           </span>
           <nav className="flex gap-3" aria-label="Documentos legais">
-            <Link href="/termos" className="hover:text-foreground">
+            <Link href="/termos" className="inline-flex min-h-6 items-center hover:text-foreground">
               Termos
             </Link>
-            <Link href="/privacidade" className="hover:text-foreground">
+            <Link href="/privacidade" className="inline-flex min-h-6 items-center hover:text-foreground">
               Privacidade
             </Link>
-            <Link href="/reembolso" className="hover:text-foreground">
+            <Link href="/reembolso" className="inline-flex min-h-6 items-center hover:text-foreground">
               Cancelamento e reembolso
             </Link>
-            <Link href="/planos" className="hover:text-foreground">
+            <Link href="/planos" className="inline-flex min-h-6 items-center hover:text-foreground">
               Planos
             </Link>
           </nav>
