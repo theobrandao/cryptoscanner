@@ -7,8 +7,8 @@ import { themeInitScript } from "@/components/providers/theme-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { SITE_URL } from "@/lib/site";
 
-/** Inter servida pelo próprio site (sem requisição ao Google no carregamento, com fonte de reserva ajustada). */
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "swap", variable: "--font-inter" });
+/** Inter servida pelo próprio site (pré-carregada; "optional" evita troca de fonte depois da pintura, que empurrava o layout). */
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], display: "optional", variable: "--font-inter" });
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

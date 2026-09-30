@@ -30,10 +30,10 @@ export function MarketStrip() {
   const ethDom = g?.market_cap_percentage.eth;
   return (
     <section aria-label="Métricas do mercado" className="grid grid-cols-2 gap-2 md:grid-cols-4">
-      <StatTile label="Capitalização total" value={g ? formatCompact(g.total_market_cap.usd) : "—"} sub={chg != null ? <span className={chg >= 0 ? "text-success" : "text-danger"}>{formatPct(chg)} em 24h</span> : undefined} />
+      <StatTile label="Capitalização total" value={g ? formatCompact(g.total_market_cap.usd) : "—"} sub={chg != null ? <span className={chg >= 0 ? "text-success" : "text-danger"}>{formatPct(chg)} em 24h</span> : "\u00a0"} />
       <StatTile label="Volume 24h" value={g ? formatCompact(g.total_volume.usd) : "—"} sub="todas as corretoras" />
-      <StatTile label="Dominância" value={btcDom != null ? `${btcDom.toFixed(1)}%` : "—"} sub={ethDom != null ? `BTC · ETH ${ethDom.toFixed(1)}%` : undefined} />
-      <StatTile label="Medo & Ganância" value={fg ? fg.value : "—"} sub={fg?.classificationPt} tone={fg ? (fg.value >= 55 ? "up" : fg.value <= 45 ? "down" : undefined) : undefined} />
+      <StatTile label="Dominância" value={btcDom != null ? `${btcDom.toFixed(1)}%` : "—"} sub={ethDom != null ? `BTC · ETH ${ethDom.toFixed(1)}%` : "\u00a0"} />
+      <StatTile label="Medo & Ganância" value={fg ? fg.value : "—"} sub={fg?.classificationPt ?? "\u00a0"} tone={fg ? (fg.value >= 55 ? "up" : fg.value <= 45 ? "down" : undefined) : undefined} />
     </section>
   );
 }
@@ -108,7 +108,7 @@ export function MoversCard({ limit = 8 }: { limit?: number }) {
             </li>
           );
         })}
-        {!rows.length ? <li className="skeleton m-3 h-40 rounded-md" aria-busy="true" /> : null}
+        {!rows.length ? <li className="skeleton m-3 rounded-md" style={{ height: limit * 47 - 24 }} aria-busy="true" /> : null}
       </ul>
       <div className="flex items-center justify-between border-t border-border px-4 py-2 text-[11.5px] text-muted-foreground">
         <span>Preços ao vivo · volume em USDT</span>
@@ -150,7 +150,7 @@ export function NewsCard({ limit = 6 }: { limit?: number }) {
             </div>
           </li>
         ))}
-        {!n ? <li className="skeleton m-3 h-40 rounded-md" aria-busy="true" /> : null}
+        {!n ? <li className="skeleton m-3 rounded-md" style={{ height: limit * 62 - 24 }} aria-busy="true" /> : null}
       </ul>
       <div className="border-t border-border px-4 py-2 text-right text-[11.5px]">
         <Link href="/panorama" className="inline-flex min-h-9 items-center font-semibold text-primary hover:underline">
