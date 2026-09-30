@@ -1,0 +1,4 @@
+<!-- Event snippet for Assinatura conversion page -->
+<script>
+  gtag('event', 'conversion', {'send_to': 'AW-18485599082/zgaICOS2oYwdEOq2z-5E'});
+</script>
