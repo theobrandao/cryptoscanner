@@ -3,6 +3,8 @@
  * Números de limite vêm de lib/entitlements (fonte única).
  */
 import { ENTITLEMENTS, TRIAL_DAYS } from "@/lib/entitlements";
+/** Limites de scanner/agentes do ELITE vêm da camada legada (chave interna PLATINUM). */
+import { PLANS } from "@/lib/plans";
 
 export type PaidPlan = "PRO" | "ELITE";
 export type BillingProvider = "mercadopago" | "kiwify";
@@ -26,10 +28,15 @@ export const PLAN_FEATURES: Record<PaidPlan, string[]> = {
     `${Math.round(elite.historyDays / 365)} anos de histórico no backtest`,
     `${elite.maxMonitors} monitores, ${elite.maxAlerts} alertas e ${elite.maxStrategies} estratégias`,
     `Análise por IA: ${elite.aiQueriesPerDay} consultas/dia`,
+    "Scanner também em 1H, 30M e 15M",
+    `Até ${PLANS.PLATINUM.maxAgents} agentes e ${PLANS.PLATINUM.maxSentinels} Sentinelas`,
   ],
 };
 
-export const PROVIDER_LABEL: Record<BillingProvider, string> = { mercadopago: "Mercado Pago", kiwify: "Kiwify" };
+export const PROVIDER_LABEL: Record<BillingProvider, string> = {
+  mercadopago: "Mercado Pago",
+  kiwify: "Kiwify",
+};
 
 /** Nota de rodapé de cobrança, cancelamento e arrependimento. */
 export function billingNote(provider: BillingProvider): string {

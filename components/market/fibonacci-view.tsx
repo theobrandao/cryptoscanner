@@ -1,16 +1,36 @@
 "use client";
 
 import * as React from "react";
+import { Ruler } from "lucide-react";
 import useSWR from "swr";
 import type { FibResult } from "@/lib/fibonacci";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Alert, Skeleton } from "@/components/ui/misc";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ASSETS } from "@/lib/assets";
 import { fibonacciLevels } from "@/lib/fibonacci";
@@ -32,7 +52,9 @@ export function FibonacciView() {
   const [symbol, setSymbol] = React.useState("BTC");
   const [timeframe, setTimeframe] = React.useState("1d");
   const [lookback, setLookback] = React.useState("60");
-  const { data, isLoading, error } = useSWR<AutoPayload>(`/api/fibonacci?symbol=${symbol}&timeframe=${timeframe}&lookback=${lookback}`);
+  const { data, isLoading, error } = useSWR<AutoPayload>(
+    `/api/fibonacci?symbol=${symbol}&timeframe=${timeframe}&lookback=${lookback}`,
+  );
   const [high, setHigh] = React.useState("100000");
   const [low, setLow] = React.useState("60000");
   const [direction, setDirection] = React.useState<"up" | "down">("up");
@@ -46,7 +68,7 @@ export function FibonacciView() {
   return (
     <PageShell>
       <PageTitle
-        icon="📐"
+        icon={<Ruler className="h-5 w-5" />}
         title="Fibonacci"
         description="Retrações (23,6 % a 78,6 %) e extensões (127,2 % a 261,8 %) calculadas automaticamente a partir do último swing do ativo, ou manualmente a partir de máxima e mínima."
       />
@@ -59,7 +81,10 @@ export function FibonacciView() {
           <Card>
             <CardHeader>
               <CardTitle>Níveis automáticos</CardTitle>
-              <CardDescription>Máxima e mínima das últimas N barras definem o swing; a direção é dada pela ordem em que ocorreram.</CardDescription>
+              <CardDescription>
+                Máxima e mínima das últimas N barras definem o swing; a direção
+                é dada pela ordem em que ocorreram.
+              </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <div className="grid gap-2 sm:grid-cols-3">
@@ -110,7 +135,9 @@ export function FibonacciView() {
                 </div>
               </div>
               {error ? (
-                <Alert variant="danger">Erro ao carregar dados. Tente novamente em instantes.</Alert>
+                <Alert variant="danger">
+                  Erro ao carregar dados. Tente novamente em instantes.
+                </Alert>
               ) : isLoading && !data ? (
                 <Skeleton className="h-64" />
               ) : data?.result ? (
@@ -120,7 +147,9 @@ export function FibonacciView() {
                   meta={`${data.symbol} ${TIMEFRAME_LABEL[data.timeframe as keyof typeof TIMEFRAME_LABEL] ?? data.timeframe} · fonte ${data.source}${data.stale ? " (defasado)" : ""}`}
                 />
               ) : (
-                <Alert variant="warning">Não foi possível determinar um swing válido.</Alert>
+                <Alert variant="warning">
+                  Não foi possível determinar um swing válido.
+                </Alert>
               )}
             </CardContent>
           </Card>
@@ -129,31 +158,53 @@ export function FibonacciView() {
           <Card>
             <CardHeader>
               <CardTitle>Calculadora</CardTitle>
-              <CardDescription>Informe a máxima, a mínima e a direção do movimento.</CardDescription>
+              <CardDescription>
+                Informe a máxima, a mínima e a direção do movimento.
+              </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <div className="grid gap-2 sm:grid-cols-3">
                 <div className="flex flex-col gap-1">
                   <Label>Máxima</Label>
-                  <Input inputMode="decimal" value={high} onChange={(e) => setHigh(e.target.value)} />
+                  <Input
+                    inputMode="decimal"
+                    value={high}
+                    onChange={(e) => setHigh(e.target.value)}
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label>Mínima</Label>
-                  <Input inputMode="decimal" value={low} onChange={(e) => setLow(e.target.value)} />
+                  <Input
+                    inputMode="decimal"
+                    value={low}
+                    onChange={(e) => setLow(e.target.value)}
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label>Direção do movimento</Label>
                   <div className="flex gap-1">
-                    <Button variant={direction === "up" ? "default" : "outline"} onClick={() => setDirection("up")}>
+                    <Button
+                      variant={direction === "up" ? "default" : "outline"}
+                      onClick={() => setDirection("up")}
+                    >
                       ▲ Alta (mín → máx)
                     </Button>
-                    <Button variant={direction === "down" ? "default" : "outline"} onClick={() => setDirection("down")}>
+                    <Button
+                      variant={direction === "down" ? "default" : "outline"}
+                      onClick={() => setDirection("down")}
+                    >
                       ▼ Baixa (máx → mín)
                     </Button>
                   </div>
                 </div>
               </div>
-              {manual ? <FibTable result={manual} price={null} meta="cálculo manual" /> : <Alert variant="warning">A máxima deve ser maior que a mínima e ambas positivas.</Alert>}
+              {manual ? (
+                <FibTable result={manual} price={null} meta="cálculo manual" />
+              ) : (
+                <Alert variant="warning">
+                  A máxima deve ser maior que a mínima e ambas positivas.
+                </Alert>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -162,14 +213,32 @@ export function FibonacciView() {
   );
 }
 
-function FibTable({ result, price, meta }: { result: FibResult; price: number | null; meta: string }) {
-  const nearest = price ? result.levels.reduce((best, l) => (Math.abs(l.price - price) < Math.abs(best.price - price) ? l : best), result.levels[0]!) : null;
+function FibTable({
+  result,
+  price,
+  meta,
+}: {
+  result: FibResult;
+  price: number | null;
+  meta: string;
+}) {
+  const nearest = price
+    ? result.levels.reduce(
+        (best, l) =>
+          Math.abs(l.price - price) < Math.abs(best.price - price) ? l : best,
+        result.levels[0]!,
+      )
+    : null;
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-        <Badge variant={result.direction === "up" ? "success" : "danger"}>{result.direction === "up" ? "▲ swing de alta" : "▼ swing de baixa"}</Badge>
+        <Badge variant={result.direction === "up" ? "success" : "danger"}>
+          {result.direction === "up" ? "▲ swing de alta" : "▼ swing de baixa"}
+        </Badge>
         <span>
-          máx {formatNumber(result.high, 4)} · mín {formatNumber(result.low, 4)} · amplitude {formatPct(((result.high - result.low) / result.low) * 100)}
+          máx {formatNumber(result.high, 4)} · mín {formatNumber(result.low, 4)}{" "}
+          · amplitude{" "}
+          {formatPct(((result.high - result.low) / result.low) * 100)}
         </span>
         {price ? <span>· preço atual {formatNumber(price, 4)}</span> : null}
         <span>· {meta}</span>
@@ -186,11 +255,22 @@ function FibTable({ result, price, meta }: { result: FibResult; price: number | 
         <TableBody>
           {result.levels.map((l) => {
             const dist = price ? ((l.price - price) / price) * 100 : null;
-            const isNear = nearest && nearest.ratio === l.ratio && nearest.kind === l.kind;
+            const isNear =
+              nearest && nearest.ratio === l.ratio && nearest.kind === l.kind;
             return (
-              <TableRow key={`${l.kind}-${l.ratio}`} className={cn(isNear && "bg-primary/10")}>
-                <TableCell className="text-xs text-muted-foreground">{l.kind === "retracement" ? "Retração" : "Extensão"}</TableCell>
-                <TableCell className={cn("font-semibold", [0.382, 0.5, 0.618].includes(l.ratio) && "text-primary")}>
+              <TableRow
+                key={`${l.kind}-${l.ratio}`}
+                className={cn(isNear && "bg-primary/10")}
+              >
+                <TableCell className="text-xs text-muted-foreground">
+                  {l.kind === "retracement" ? "Retração" : "Extensão"}
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    "font-semibold",
+                    [0.382, 0.5, 0.618].includes(l.ratio) && "text-primary",
+                  )}
+                >
                   {(l.ratio * 100).toFixed(1)}%
                   {isNear ? (
                     <Badge variant="default" className="ml-2">
@@ -198,8 +278,16 @@ function FibTable({ result, price, meta }: { result: FibResult; price: number | 
                     </Badge>
                   ) : null}
                 </TableCell>
-                <TableCell className="text-right tabular">{formatNumber(l.price, 4)}</TableCell>
-                <TableCell className={cn("text-right tabular", dist !== null && dist > 0 && "text-success", dist !== null && dist < 0 && "text-danger")}>
+                <TableCell className="text-right tabular">
+                  {formatNumber(l.price, 4)}
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    "text-right tabular",
+                    dist !== null && dist > 0 && "text-success",
+                    dist !== null && dist < 0 && "text-danger",
+                  )}
+                >
                   {dist !== null ? formatPct(dist) : "—"}
                 </TableCell>
               </TableRow>

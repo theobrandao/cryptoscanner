@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { ADVANCED_TOOLS, MAIN_TOOLS, TOOL_CATEGORIES, type Tool } from "@/lib/tools";
 import { toolIconComponent } from "@/components/layout/tool-icon";
+import { RouteProgress } from "@/components/layout/route-progress";
 import { AiAnalystButton } from "@/components/terminal/ai-analyst";
 import { useActiveSelection } from "@/hooks/use-market-selection";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -34,7 +35,7 @@ import { INSTRUMENT_LABEL, VENUE_LABEL } from "@/lib/venues";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTheme } from "@/components/providers/theme-provider";
-import { useSession } from "@/hooks/use-session";
+import { TIER_LABEL, useSession } from "@/hooks/use-session";
 import { useTickers } from "@/hooks/use-tickers";
 import { ASSETS } from "@/lib/assets";
 import { apiFetch } from "@/lib/client-api";
@@ -378,7 +379,7 @@ function NotificationsBell() {
 }
 
 function UserMenu() {
-  const { user, refresh } = useSession();
+  const { user, tier, refresh } = useSession();
   const router = useRouter();
   if (!user)
     return (
@@ -396,13 +397,15 @@ function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center gap-1 rounded-full" aria-label="Conta">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/20 text-xs font-bold text-foreground">{initials}</span>
+          <span className="icon-tile grid h-9 w-9 place-items-center rounded-full text-xs font-bold ring-2 ring-background">{initials}</span>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>
-          {user.email} · {user.plan}
+        <DropdownMenuLabel className="flex flex-col gap-0.5">
+          <span className="truncate text-sm font-semibold">{user.name}</span>
+          <span className="truncate text-xs font-normal text-muted-foreground">{user.email}</span>
+          <span className="mt-1 w-fit rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">{tier ? TIER_LABEL[tier] : "Conta"}</span>
         </DropdownMenuLabel>
         <DropdownMenuItem onSelect={() => router.push("/preferencias")}>Preferências</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => router.push("/planos")}>Planos e pagamento</DropdownMenuItem>
@@ -573,6 +576,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (SALES_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"))) return <SalesShell>{children}</SalesShell>;
   return (
     <div className="flex min-h-screen">
+      <RouteProgress />
       <aside className="sticky top-0 hidden h-screen w-[210px] shrink-0 overflow-y-auto border-r border-border bg-card lg:block">
         <SidebarContent pathname={pathname} />
       </aside>
@@ -604,7 +608,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <UserMenu />
           </div>
         </header>
-        <main className="min-w-0 flex-1 pb-16 lg:pb-0">{isOpenRoute(pathname) ? children : <AccessGate feature={featureName(pathname)}>{children}</AccessGate>}</main>
+        <main id="conteudo" className="min-w-0 flex-1 pb-16 lg:pb-0">
+          <div key={pathname} className="page-enter">
+            {isOpenRoute(pathname) ? children : <AccessGate feature={featureName(pathname)}>{children}</AccessGate>}
+          </div>
+        </main>
         <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
           <span>
             Conteúdo técnico e educacional, não é recomendação de investimento. Dados: Binance, Bybit, OKX, Kraken, CoinGecko, CoinPaprika, BCB (PTAX), alternative.me. Confluence Score mede qualidade de confluência, não probabilidade.

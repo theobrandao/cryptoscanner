@@ -24,8 +24,20 @@ export const POST = withApi(async (req) => {
   const body = await parseBody(req, bodySchema);
   const tf = parseTimeframe(body.timeframe);
   const user = await requireCoreUser(req);
-  if (!planAllowsTimeframe(user?.plan, tf)) throw new ApiError(403, `Timeframe ${tf.toUpperCase()} disponível apenas no plano PLATINUM`, "plan_required");
-  const res = await runScan({ timeframe: tf, direction: body.direction, symbols: body.symbols, minConfidence: body.minConfidence, includeVolume: body.includeVolume, refresh: body.refresh });
+  if (!planAllowsTimeframe(user?.plan, tf))
+    throw new ApiError(
+      403,
+      `Timeframe ${tf.toUpperCase()} disponível apenas no plano ELITE`,
+      "plan_required",
+    );
+  const res = await runScan({
+    timeframe: tf,
+    direction: body.direction,
+    symbols: body.symbols,
+    minConfidence: body.minConfidence,
+    includeVolume: body.includeVolume,
+    refresh: body.refresh,
+  });
 
   const prisma = getPrisma();
   if (user && prisma && !res.cached) {
@@ -39,7 +51,13 @@ export const POST = withApi(async (req) => {
           title: `${p.label} em ${r.symbol}`,
           direction: p.direction,
           confidence: p.confidence,
-          payload: { key: p.key, price: p.price, target: p.target, stop: p.stop, summary: p.summary },
+          payload: {
+            key: p.key,
+            price: p.price,
+            target: p.target,
+            stop: p.stop,
+            summary: p.summary,
+          },
         })),
       ),
       ...res.volumeAlerts.map((v) => ({
@@ -48,12 +66,26 @@ export const POST = withApi(async (req) => {
         timeframe: v.timeframe,
         kind: "volume",
         title: `Volume +${v.increasePct}% em ${v.symbol} (${v.timeframe.toUpperCase()})`,
-        direction: v.direction === "up" ? "bullish" : v.direction === "down" ? "bearish" : "neutral",
+        direction:
+          v.direction === "up"
+            ? "bullish"
+            : v.direction === "down"
+              ? "bearish"
+              : "neutral",
         confidence: null,
         payload: { ...v },
       })),
     ];
-    if (entries.length) await prisma.scanHistoryEntry.createMany({ data: entries }).catch(() => undefined);
+    if (entries.length)
+      await prisma.scanHistoryEntry
+        .createMany({ data: entries })
+        .catch(() => undefined);
   }
-  return ok(JSON.parse(JSON.stringify(res, (_k, v) => (typeof v === "number" && !Number.isFinite(v) ? null : v))));
+  return ok(
+    JSON.parse(
+      JSON.stringify(res, (_k, v) =>
+        typeof v === "number" && !Number.isFinite(v) ? null : v,
+      ),
+    ),
+  );
 });

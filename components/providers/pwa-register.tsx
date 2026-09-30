@@ -1,15 +1,18 @@
 "use client";
 
 import * as React from "react";
+import { Download } from "lucide-react";
 
 /** Registra o service worker (instalação como app) e expõe o prompt de instalação via evento `cs:installprompt`. */
 export function PwaRegister() {
   React.useEffect(() => {
-    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    if (typeof window === "undefined" || !("serviceWorker" in navigator))
+      return;
     navigator.serviceWorker.register("/sw.js").catch(() => undefined);
     const onPrompt = (e: Event) => {
       e.preventDefault();
-      (window as unknown as { __csInstallPrompt?: Event }).__csInstallPrompt = e;
+      (window as unknown as { __csInstallPrompt?: Event }).__csInstallPrompt =
+        e;
       window.dispatchEvent(new CustomEvent("cs:installprompt"));
     };
     window.addEventListener("beforeinstallprompt", onPrompt);
@@ -22,7 +25,13 @@ export function PwaRegister() {
 export function InstallButton({ className }: { className?: string }) {
   const [available, setAvailable] = React.useState(false);
   React.useEffect(() => {
-    const check = () => setAvailable(Boolean((window as unknown as { __csInstallPrompt?: Event }).__csInstallPrompt));
+    const check = () =>
+      setAvailable(
+        Boolean(
+          (window as unknown as { __csInstallPrompt?: Event })
+            .__csInstallPrompt,
+        ),
+      );
     check();
     window.addEventListener("cs:installprompt", check);
     return () => window.removeEventListener("cs:installprompt", check);
@@ -32,14 +41,20 @@ export function InstallButton({ className }: { className?: string }) {
     <button
       className={className}
       onClick={() => {
-        const ev = (window as unknown as { __csInstallPrompt?: Event & { prompt?: () => Promise<void> } }).__csInstallPrompt;
+        const ev = (
+          window as unknown as {
+            __csInstallPrompt?: Event & { prompt?: () => Promise<void> };
+          }
+        ).__csInstallPrompt;
         void ev?.prompt?.();
-        (window as unknown as { __csInstallPrompt?: Event }).__csInstallPrompt = undefined;
+        (window as unknown as { __csInstallPrompt?: Event }).__csInstallPrompt =
+          undefined;
         setAvailable(false);
       }}
       aria-label="Instalar aplicativo"
     >
-      ⬇️ Instalar app
+      <Download className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden />{" "}
+      Instalar app
     </button>
   );
 }

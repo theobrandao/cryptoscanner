@@ -12,7 +12,9 @@ const patchSchema = z.object({
 });
 
 async function own(userId: string, id: string) {
-  const agent = await requirePrisma().agent.findFirst({ where: { id, userId, kind: "sentinel" } });
+  const agent = await requirePrisma().agent.findFirst({
+    where: { id, userId, kind: "sentinel" },
+  });
   if (!agent) throw new ApiError(404, "Sentinela não encontrado", "not_found");
   return agent;
 }
@@ -31,8 +33,20 @@ export const PATCH = withApi(async (req, ctx) => {
   const { id } = await ctx.params;
   const sentinel = await own(user.id, id ?? "");
   const body = await parseBody(req, patchSchema);
-  if (body.notification && body.notification !== "log" && !PLANS[user.plan].telegramAlerts) throw new ApiError(403, "Alertas no Telegram exigem plano PRO ou PLATINUM", "plan_required");
-  const updated = await requirePrisma().agent.update({ where: { id: sentinel.id }, data: body });
+  if (
+    body.notification &&
+    body.notification !== "log" &&
+    !PLANS[user.plan].telegramAlerts
+  )
+    throw new ApiError(
+      403,
+      "Alertas no Telegram exigem plano PRO ou ELITE",
+      "plan_required",
+    );
+  const updated = await requirePrisma().agent.update({
+    where: { id: sentinel.id },
+    data: body,
+  });
   return ok({ sentinel: updated });
 });
 

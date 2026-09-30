@@ -2,12 +2,32 @@
 
 import * as React from "react";
 import useSWR from "swr";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Bell,
+  Brain,
+  ChartLine,
+  Check,
+  ClipboardList,
+  Lock,
+  RefreshCw,
+  Send,
+  Waves,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import type { AgentBody } from "@/lib/validation/agent";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Alert } from "@/components/ui/misc";
 import { Slider } from "@/components/ui/slider";
@@ -26,9 +46,61 @@ export interface StrategyInfo {
   timeframes: Timeframe[];
 }
 
-export const CATEGORY_LABEL: Record<StrategyInfo["category"], string> = { technical: "📈 Análise Técnica", sentiment: "🧠 Sentimento", cycles: "🔄 Ciclos", hybrid: "⚡ Híbridas" };
+export const CATEGORY_LABEL: Record<StrategyInfo["category"], string> = {
+  technical: "Análise Técnica",
+  sentiment: "Sentimento",
+  cycles: "Ciclos",
+  hybrid: "Híbridas",
+};
+export const CATEGORY_ICON: Record<StrategyInfo["category"], LucideIcon> = {
+  technical: ChartLine,
+  sentiment: Brain,
+  cycles: RefreshCw,
+  hybrid: Zap,
+};
+export const OPERATION_META: Record<
+  "day_trade" | "swing_trade",
+  { icon: LucideIcon; label: string }
+> = {
+  day_trade: { icon: Zap, label: "Day Trade" },
+  swing_trade: { icon: Waves, label: "Swing Trade" },
+};
+export const NOTIFICATION_META: Record<
+  "log" | "telegram" | "both",
+  { icon: LucideIcon; label: string }
+> = {
+  log: { icon: ClipboardList, label: "Log" },
+  telegram: { icon: Send, label: "Telegram" },
+  both: { icon: Bell, label: "Ambos" },
+};
+
+/** Rótulo com ícone lucide alinhado (h-3.5/h-4 conforme o texto). */
+export function IconLabel({
+  icon: Icon,
+  label,
+  className,
+  iconClassName,
+}: {
+  icon: LucideIcon;
+  label: React.ReactNode;
+  className?: string;
+  iconClassName?: string;
+}) {
+  return (
+    <span className={cn("inline-flex items-center gap-1.5", className)}>
+      <Icon className={cn("h-4 w-4 shrink-0", iconClassName)} aria-hidden />
+      {label}
+    </span>
+  );
+}
 const ICONS = ["🤖", "⚡", "🚀", "🐉", "🔥", "💎", "📉"];
-const STEPS = ["Identidade", "Mercado & Timeframe", "Estratégias", "Configurações do Alerta", "Confirmar"];
+const STEPS = [
+  "Identidade",
+  "Mercado & Timeframe",
+  "Estratégias",
+  "Configurações do Alerta",
+  "Confirmar",
+];
 
 export interface AgentDraft extends AgentBody {
   id?: string;
@@ -66,7 +138,13 @@ export function AgentWizard({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         {/* O corpo é montado a cada abertura, então o estado parte sempre de `initial`. */}
-        <WizardBody initial={initial} plan={plan} telegramConnected={telegramConnected} onSaved={onSaved} onOpenChange={onOpenChange} />
+        <WizardBody
+          initial={initial}
+          plan={plan}
+          telegramConnected={telegramConnected}
+          onSaved={onSaved}
+          onOpenChange={onOpenChange}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -89,9 +167,12 @@ function WizardBody({
   const [draft, setDraft] = React.useState<AgentDraft>(initial);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
-  const { data: strategies } = useSWR<{ strategies: StrategyInfo[] }>("/api/agents/strategies");
+  const { data: strategies } = useSWR<{ strategies: StrategyInfo[] }>(
+    "/api/agents/strategies",
+  );
 
-  const update = (patch: Partial<AgentDraft>) => setDraft((d) => ({ ...d, ...patch }));
+  const update = (patch: Partial<AgentDraft>) =>
+    setDraft((d) => ({ ...d, ...patch }));
   const canNext = () => {
     if (step === 0) return draft.name.trim().length >= 2;
     if (step === 1) return draft.symbols.length > 0;
@@ -103,29 +184,41 @@ function WizardBody({
     setSaving(true);
     setError(null);
     try {
-      const body: AgentBody = { ...draft, description: draft.description || null };
+      const body: AgentBody = {
+        ...draft,
+        description: draft.description || null,
+      };
       if (draft.id) await postJson(`/api/agents/${draft.id}`, body, "PATCH");
       else await postJson("/api/agents", body);
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "Falha ao salvar o agente.");
+      setError(
+        err instanceof ApiClientError
+          ? err.message
+          : "Falha ao salvar o agente.",
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  const allowedTfs: Timeframe[] = (["15m", "30m", "1h", "4h", "1d", "1w"] as Timeframe[]).filter((tf) => plan.timeframes.includes(tf));
+  const allowedTfs: Timeframe[] = (
+    ["15m", "30m", "1h", "4h", "1d", "1w"] as Timeframe[]
+  ).filter((tf) => plan.timeframes.includes(tf));
   const grouped = React.useMemo(() => {
     const g = new Map<StrategyInfo["category"], StrategyInfo[]>();
-    for (const s of strategies?.strategies ?? []) g.set(s.category, [...(g.get(s.category) ?? []), s]);
+    for (const s of strategies?.strategies ?? [])
+      g.set(s.category, [...(g.get(s.category) ?? []), s]);
     return g;
   }, [strategies]);
 
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{draft.id ? "Editar agente" : "Novo Agente de IA"}</DialogTitle>
+        <DialogTitle>
+          {draft.id ? "Editar agente" : "Novo Agente de IA"}
+        </DialogTitle>
         <DialogDescription>
           Passo {step + 1} de {STEPS.length} — {STEPS[step]}
         </DialogDescription>
@@ -136,10 +229,18 @@ function WizardBody({
             key={s}
             className={cn(
               "rounded-full border px-2 py-0.5",
-              i === step ? "border-primary bg-primary/15 text-primary" : i < step ? "border-success/40 text-success" : "border-border text-muted-foreground",
+              i === step
+                ? "border-primary bg-primary/15 text-primary"
+                : i < step
+                  ? "border-success/40 text-success"
+                  : "border-border text-muted-foreground",
             )}
           >
-            {i < step ? "✓ " : `${i + 1}. `}
+            {i < step ? (
+              <Check className="mr-1 inline h-3 w-3 align-[-2px]" aria-hidden />
+            ) : (
+              `${i + 1}. `
+            )}
             {s}
           </li>
         ))}
@@ -149,7 +250,13 @@ function WizardBody({
         <div className="grid gap-3">
           <div className="flex flex-col gap-1">
             <Label>Nome do agente</Label>
-            <Input value={draft.name} onChange={(e) => update({ name: e.target.value })} placeholder="Ex.: Sentinela BTC 4H" maxLength={60} autoFocus />
+            <Input
+              value={draft.name}
+              onChange={(e) => update({ name: e.target.value })}
+              placeholder="Ex.: Sentinela BTC 4H"
+              maxLength={60}
+              autoFocus
+            />
           </div>
           <div className="flex flex-col gap-1">
             <Label>Ícone</Label>
@@ -158,7 +265,12 @@ function WizardBody({
                 <button
                   key={ic}
                   onClick={() => update({ icon: ic })}
-                  className={cn("grid h-9 w-9 place-items-center rounded-md border text-lg cursor-pointer", draft.icon === ic ? "border-primary bg-primary/15" : "border-border hover:bg-muted")}
+                  className={cn(
+                    "grid h-9 w-9 place-items-center rounded-md border text-lg cursor-pointer",
+                    draft.icon === ic
+                      ? "border-primary bg-primary/15"
+                      : "border-border hover:bg-muted",
+                  )}
                   aria-pressed={draft.icon === ic}
                 >
                   {ic}
@@ -168,7 +280,12 @@ function WizardBody({
           </div>
           <div className="flex flex-col gap-1">
             <Label>Descrição (opcional)</Label>
-            <Textarea value={draft.description ?? ""} onChange={(e) => update({ description: e.target.value })} placeholder="O que este agente vigia?" maxLength={300} />
+            <Textarea
+              value={draft.description ?? ""}
+              onChange={(e) => update({ description: e.target.value })}
+              placeholder="O que este agente vigia?"
+              maxLength={300}
+            />
           </div>
         </div>
       ) : null}
@@ -181,9 +298,25 @@ function WizardBody({
               {ASSETS.map((a) => {
                 const on = draft.symbols.includes(a.symbol);
                 return (
-                  <label key={a.symbol} className={cn("flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm", on ? "bg-primary/15" : "hover:bg-muted")}>
-                    <Checkbox checked={on} onCheckedChange={(v) => update({ symbols: v ? [...draft.symbols, a.symbol] : draft.symbols.filter((s) => s !== a.symbol) })} />
-                    <span className="text-muted-foreground">{a.glyph}</span> {a.symbol}
+                  <label
+                    key={a.symbol}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm",
+                      on ? "bg-primary/15" : "hover:bg-muted",
+                    )}
+                  >
+                    <Checkbox
+                      checked={on}
+                      onCheckedChange={(v) =>
+                        update({
+                          symbols: v
+                            ? [...draft.symbols, a.symbol]
+                            : draft.symbols.filter((s) => s !== a.symbol),
+                        })
+                      }
+                    />
+                    <span className="text-muted-foreground">{a.glyph}</span>{" "}
+                    {a.symbol}
                   </label>
                 );
               })}
@@ -194,16 +327,42 @@ function WizardBody({
             <div className="grid grid-cols-2 gap-2">
               {(
                 [
-                  ["day_trade", "⚡ Day Trade", "Entradas e saídas intradiárias; timeframes 15M–1H."],
-                  ["swing_trade", "🌊 Swing Trade", "Posições de dias a semanas; timeframes 4H–1W."],
+                  [
+                    "day_trade",
+                    "Entradas e saídas intradiárias; timeframes 15M–1H.",
+                  ],
+                  [
+                    "swing_trade",
+                    "Posições de dias a semanas; timeframes 4H–1W.",
+                  ],
                 ] as const
-              ).map(([k, label, desc]) => (
+              ).map(([k, desc]) => (
                 <button
                   key={k}
-                  onClick={() => update({ operationType: k, timeframe: k === "day_trade" ? (allowedTfs.includes("1h") ? "1h" : "4h") : "4h" })}
-                  className={cn("rounded-md border p-3 text-left cursor-pointer", draft.operationType === k ? "border-primary bg-primary/10" : "border-border hover:bg-muted")}
+                  onClick={() =>
+                    update({
+                      operationType: k,
+                      timeframe:
+                        k === "day_trade"
+                          ? allowedTfs.includes("1h")
+                            ? "1h"
+                            : "4h"
+                          : "4h",
+                    })
+                  }
+                  className={cn(
+                    "rounded-md border p-3 text-left cursor-pointer",
+                    draft.operationType === k
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:bg-muted",
+                  )}
                 >
-                  <div className="font-semibold">{label}</div>
+                  <IconLabel
+                    icon={OPERATION_META[k].icon}
+                    label={OPERATION_META[k].label}
+                    className="font-semibold"
+                    iconClassName="text-primary"
+                  />
                   <div className="text-xs text-muted-foreground">{desc}</div>
                 </button>
               ))}
@@ -212,49 +371,102 @@ function WizardBody({
           <div className="flex flex-col gap-1">
             <Label>Timeframe principal</Label>
             <div className="flex flex-wrap gap-1">
-              {(["15m", "30m", "1h", "4h", "1d", "1w"] as Timeframe[]).map((tf) => {
-                const locked = !allowedTfs.includes(tf);
-                return (
-                  <button
-                    key={tf}
-                    disabled={locked}
-                    onClick={() => update({ timeframe: tf as AgentDraft["timeframe"] })}
-                    className={cn(
-                      "h-9 rounded-md border px-3 text-sm font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
-                      draft.timeframe === tf ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted",
-                    )}
-                  >
-                    {TIMEFRAME_LABEL[tf] === "7D" ? "1W" : TIMEFRAME_LABEL[tf]}
-                    {locked ? " 🔒" : ""}
-                  </button>
-                );
-              })}
+              {(["15m", "30m", "1h", "4h", "1d", "1w"] as Timeframe[]).map(
+                (tf) => {
+                  const locked = !allowedTfs.includes(tf);
+                  return (
+                    <button
+                      key={tf}
+                      disabled={locked}
+                      onClick={() =>
+                        update({ timeframe: tf as AgentDraft["timeframe"] })
+                      }
+                      className={cn(
+                        "h-9 rounded-md border px-3 text-sm font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
+                        draft.timeframe === tf
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border hover:bg-muted",
+                      )}
+                    >
+                      {TIMEFRAME_LABEL[tf] === "7D"
+                        ? "1W"
+                        : TIMEFRAME_LABEL[tf]}
+                      {locked ? (
+                        <Lock
+                          className="ml-1 inline h-3 w-3 align-[-1px]"
+                          aria-label="bloqueado"
+                        />
+                      ) : null}
+                    </button>
+                  );
+                },
+              )}
             </div>
-            {allowedTfs.length < 6 ? <p className="text-xs text-muted-foreground">Timeframes 15M, 30M e 1H exigem o plano PLATINUM.</p> : null}
+            {allowedTfs.length < 6 ? (
+              <p className="text-xs text-muted-foreground">
+                Timeframes 15M, 30M e 1H exigem o plano ELITE.
+              </p>
+            ) : null}
           </div>
         </div>
       ) : null}
 
       {step === 2 ? (
         <div className="grid gap-3">
-          <p className="text-xs text-muted-foreground">Selecione uma ou mais estratégias (regras determinísticas, auditáveis — o motivo de cada sinal aparece no log).</p>
+          <p className="text-xs text-muted-foreground">
+            Selecione uma ou mais estratégias (regras determinísticas,
+            auditáveis — o motivo de cada sinal aparece no log).
+          </p>
           {[...grouped.entries()].map(([cat, list]) => (
             <div key={cat}>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{CATEGORY_LABEL[cat]}</div>
+              <IconLabel
+                icon={CATEGORY_ICON[cat]}
+                label={CATEGORY_LABEL[cat]}
+                className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                iconClassName="h-3.5 w-3.5"
+              />
               <div className="grid gap-1 sm:grid-cols-2">
                 {list.map((s) => {
                   const on = draft.strategies.includes(s.key);
-                  const fits = s.timeframes.length === 0 || s.timeframes.includes(draft.timeframe as Timeframe);
+                  const fits =
+                    s.timeframes.length === 0 ||
+                    s.timeframes.includes(draft.timeframe as Timeframe);
                   return (
                     <label
                       key={s.key}
-                      className={cn("flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm", on ? "border-primary bg-primary/10" : "border-border hover:bg-muted", !fits && "opacity-60")}
+                      className={cn(
+                        "flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm",
+                        on
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:bg-muted",
+                        !fits && "opacity-60",
+                      )}
                     >
-                      <Checkbox className="mt-0.5" checked={on} onCheckedChange={(v) => update({ strategies: v ? [...draft.strategies, s.key] : draft.strategies.filter((k) => k !== s.key) })} />
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={on}
+                        onCheckedChange={(v) =>
+                          update({
+                            strategies: v
+                              ? [...draft.strategies, s.key]
+                              : draft.strategies.filter((k) => k !== s.key),
+                          })
+                        }
+                      />
                       <span>
                         <span className="font-medium">{s.name}</span>
-                        {!fits ? <span className="ml-1 text-[10px] text-warning">(indicada p/ {s.timeframes.map((t) => TIMEFRAME_LABEL[t]).join(", ")})</span> : null}
-                        <span className="block text-xs text-muted-foreground">{s.description}</span>
+                        {!fits ? (
+                          <span className="ml-1 text-[10px] text-warning">
+                            (indicada p/{" "}
+                            {s.timeframes
+                              .map((t) => TIMEFRAME_LABEL[t])
+                              .join(", ")}
+                            )
+                          </span>
+                        ) : null}
+                        <span className="block text-xs text-muted-foreground">
+                          {s.description}
+                        </span>
                       </span>
                     </label>
                   );
@@ -269,21 +481,31 @@ function WizardBody({
         <div className="grid gap-4">
           <div className="flex flex-col gap-2">
             <Label>
-              Confiança mínima: <span className="text-foreground">{draft.minConfidence}%</span>
+              Confiança mínima:{" "}
+              <span className="text-foreground">{draft.minConfidence}%</span>
             </Label>
-            <Slider min={50} max={95} step={5} value={[draft.minConfidence]} onValueChange={([v]) => update({ minConfidence: v ?? 70 })} />
-            <p className="text-xs text-muted-foreground">Só sinais com confiança igual ou superior geram alerta. Cooldown mínimo de 30 minutos entre alertas do mesmo agente.</p>
+            <Slider
+              min={50}
+              max={95}
+              step={5}
+              value={[draft.minConfidence]}
+              onValueChange={([v]) => update({ minConfidence: v ?? 70 })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Só sinais com confiança igual ou superior geram alerta. Cooldown
+              mínimo de 30 minutos entre alertas do mesmo agente.
+            </p>
           </div>
           <div className="flex flex-col gap-1">
             <Label>Tipo de notificação</Label>
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  ["log", "📋 Log", "Apenas no painel"],
-                  ["telegram", "✈️ Telegram", "Mensagem no app"],
-                  ["both", "🔔 Ambos", "Painel + Telegram"],
+                  ["log", "Apenas no painel"],
+                  ["telegram", "Mensagem no app"],
+                  ["both", "Painel + Telegram"],
                 ] as const
-              ).map(([k, label, desc]) => {
+              ).map(([k, desc]) => {
                 const locked = k !== "log" && !plan.telegramAlerts;
                 return (
                   <button
@@ -292,19 +514,31 @@ function WizardBody({
                     onClick={() => update({ notification: k })}
                     className={cn(
                       "rounded-md border p-3 text-left cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
-                      draft.notification === k ? "border-primary bg-primary/10" : "border-border hover:bg-muted",
+                      draft.notification === k
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-muted",
                     )}
                   >
-                    <div className="font-semibold">{label}</div>
+                    <IconLabel
+                      icon={NOTIFICATION_META[k].icon}
+                      label={NOTIFICATION_META[k].label}
+                      className="font-semibold"
+                      iconClassName="text-primary"
+                    />
                     <div className="text-xs text-muted-foreground">
                       {desc}
-                      {locked ? " · PRO/PLATINUM" : ""}
+                      {locked ? " · PRO/ELITE" : ""}
                     </div>
                   </button>
                 );
               })}
             </div>
-            {draft.notification !== "log" && !telegramConnected ? <Alert variant="warning">Conecte o Telegram (Chat ID) na seção “Alertas no Telegram” para receber as mensagens.</Alert> : null}
+            {draft.notification !== "log" && !telegramConnected ? (
+              <Alert variant="warning">
+                Conecte o Telegram (Chat ID) na seção “Alertas no Telegram” para
+                receber as mensagens.
+              </Alert>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -313,8 +547,19 @@ function WizardBody({
         <div className="grid gap-2 text-sm">
           <Row k="Agente" v={`${draft.icon} ${draft.name}`} />
           <Row k="Ativos" v={draft.symbols.join(", ")} />
-          <Row k="Operação" v={draft.operationType === "day_trade" ? "⚡ Day Trade" : "🌊 Swing Trade"} />
-          <Row k="Timeframe" v={TIMEFRAME_LABEL[draft.timeframe as Timeframe]} />
+          <Row
+            k="Operação"
+            v={
+              <IconLabel
+                icon={OPERATION_META[draft.operationType].icon}
+                label={OPERATION_META[draft.operationType].label}
+              />
+            }
+          />
+          <Row
+            k="Timeframe"
+            v={TIMEFRAME_LABEL[draft.timeframe as Timeframe]}
+          />
           <Row
             k="Estratégias"
             v={
@@ -328,15 +573,30 @@ function WizardBody({
             }
           />
           <Row k="Confiança mínima" v={`${draft.minConfidence}%`} />
-          <Row k="Notificação" v={{ log: "📋 Log", telegram: "✈️ Telegram", both: "🔔 Ambos" }[draft.notification]} />
-          <p className="text-xs text-muted-foreground">O agente é verificado pelo servidor a cada 5 minutos, independentemente do navegador estar aberto.</p>
+          <Row
+            k="Notificação"
+            v={
+              <IconLabel
+                icon={NOTIFICATION_META[draft.notification].icon}
+                label={NOTIFICATION_META[draft.notification].label}
+              />
+            }
+          />
+          <p className="text-xs text-muted-foreground">
+            O agente é verificado pelo servidor a cada 5 minutos,
+            independentemente do navegador estar aberto.
+          </p>
         </div>
       ) : null}
 
       {error ? <Alert variant="danger">{error}</Alert> : null}
 
       <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}>
+        <Button
+          variant="ghost"
+          onClick={() => setStep((s) => Math.max(0, s - 1))}
+          disabled={step === 0}
+        >
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Button>
         {step < STEPS.length - 1 ? (
@@ -345,7 +605,8 @@ function WizardBody({
           </Button>
         ) : (
           <Button onClick={() => void save()} loading={saving}>
-            <Check className="h-4 w-4" /> {draft.id ? "Salvar alterações" : "Ativar agente"}
+            <Check className="h-4 w-4" />{" "}
+            {draft.id ? "Salvar alterações" : "Ativar agente"}
           </Button>
         )}
       </div>

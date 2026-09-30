@@ -17,7 +17,7 @@ export interface PlanDefinition {
 }
 
 /**
- * Regras de plano. Valores da referência pública: PLATINUM = análises ilimitadas, timeframes até 15M,
+ * Regras de plano (camada legada). A chave interna PLATINUM é exibida ao usuário como "Elite" (plano ELITE). Valores da referência pública: PLATINUM = análises ilimitadas, timeframes até 15M,
  * até 15 agentes simultâneos, alertas no Telegram; 1H/30M/15M bloqueados fora do PLATINUM.
  * Limites de FREE/PRO não são públicos — os números abaixo são deste projeto.
  */
@@ -30,7 +30,12 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     maxAgents: 2,
     maxSentinels: 1,
     telegramAlerts: false,
-    benefits: ["Scanner em 4H, 1D e 7D", "3 análises de gráfico por IA por dia", "Até 2 agentes + 1 Sentinela", "Alertas no painel"],
+    benefits: [
+      "Scanner em 4H, 1D e 7D",
+      "3 análises de gráfico por IA por dia",
+      "Até 2 agentes + 1 Sentinela",
+      "Alertas no painel",
+    ],
   },
   PRO: {
     key: "PRO",
@@ -40,20 +45,33 @@ export const PLANS: Record<PlanKey, PlanDefinition> = {
     maxAgents: 5,
     maxSentinels: 3,
     telegramAlerts: true,
-    benefits: ["Scanner em 4H, 1D e 7D", "30 análises de gráfico por IA por dia", "Até 5 agentes + 3 Sentinelas", "Alertas no Telegram"],
+    benefits: [
+      "Scanner em 4H, 1D e 7D",
+      "30 análises de gráfico por IA por dia",
+      "Até 5 agentes + 3 Sentinelas",
+      "Alertas no Telegram",
+    ],
   },
   PLATINUM: {
     key: "PLATINUM",
-    name: "Platinum",
+    name: "Elite",
     timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"],
     imageAnalysesPerDay: Number.POSITIVE_INFINITY,
     maxAgents: 15,
     maxSentinels: 10,
     telegramAlerts: true,
-    benefits: ["⚡ Análises ilimitadas de IA", "⏱️ Timeframes até 15M", "🤖 Até 15 agentes + 10 Sentinelas", "🔔 Alertas no Telegram"],
+    benefits: [
+      "Scanner também em 1H, 30M e 15M",
+      "Até 15 agentes + 10 Sentinelas",
+      "Análise de gráfico sem limite diário",
+      "Alertas no Telegram",
+    ],
   },
 };
 
-export function planAllowsTimeframe(plan: PlanKey | null | undefined, tf: Timeframe): boolean {
+export function planAllowsTimeframe(
+  plan: PlanKey | null | undefined,
+  tf: Timeframe,
+): boolean {
   return PLANS[plan ?? "FREE"].timeframes.includes(tf);
 }

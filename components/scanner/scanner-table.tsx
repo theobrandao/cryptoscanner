@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { ArrowDown, ArrowUp, ArrowUpDown, Pause, Play, RefreshCw, Search, Star } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Pause, Play, RefreshCw, Search, Star, SearchX } from "lucide-react";
 import type { ScannerRow } from "@/agents/scanner-agent";
 import { Badge, DirectionBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -263,7 +263,7 @@ export function ScannerTable({
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <EmptyState icon="🔎" title="Nenhum ativo corresponde aos filtros" description="Ajuste a busca ou os filtros de tendência, volume e volatilidade." />
+        <EmptyState icon={<SearchX className="h-8 w-8 text-muted-foreground" />} title="Nenhum ativo corresponde aos filtros" description="Ajuste a busca ou os filtros de tendência, volume e volatilidade." />
       ) : (
         <Table>
           <TableHeader>
@@ -293,7 +293,7 @@ export function ScannerTable({
               <Th k="rsi14" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} className="text-right">
                 RSI
               </Th>
-              <Th k="momentum" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} hint="RSI + histograma MACD + ROC(10)">
+              <Th k="momentum" className="hidden min-[1600px]:table-cell" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} hint="RSI + histograma MACD + ROC(10)">
                 Momentum
               </Th>
               <Th k="signalScore" sortKey={sortKey} sortDir={sortDir} onSort={sortBy} hint="Agregação ponderada dos sinais técnicos">
@@ -340,7 +340,7 @@ export function ScannerTable({
                     </div>
                   </TableCell>
                   <TableCell className={cn("text-right tabular", r.rsi14 >= 70 && "text-danger", r.rsi14 <= 30 && "text-success")}>{Number.isFinite(r.rsi14) ? r.rsi14.toFixed(1) : "—"}</TableCell>
-                  <TableCell>
+                  <TableCell className="hidden min-[1600px]:table-cell">
                     <Badge variant={r.momentum.includes("up") ? "success" : r.momentum.includes("down") ? "danger" : "muted"}>{MOMENTUM_LABEL[r.momentum]}</Badge>
                   </TableCell>
                   <TableCell>
@@ -353,8 +353,8 @@ export function ScannerTable({
                   <TableCell>
                     {top ? (
                       <Hint text={top.summary}>
-                        <span className={cn("text-xs font-medium", top.direction === "bullish" && "text-success", top.direction === "bearish" && "text-danger")}>
-                          {top.label} <span className="text-muted-foreground">({top.confidence})</span>
+                        <span className={cn("inline-flex max-w-[170px] items-baseline gap-1 whitespace-nowrap text-xs font-medium", top.direction === "bullish" && "text-success", top.direction === "bearish" && "text-danger")}>
+                          <span className="truncate">{top.label}</span> <span className="text-muted-foreground">({top.confidence})</span>
                           {r.patterns.length > 1 ? <span className="text-muted-foreground"> +{r.patterns.length - 1}</span> : null}
                         </span>
                       </Hint>

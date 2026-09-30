@@ -340,7 +340,7 @@ await step("Sentinela: criar BTC 4H, varrer agora, ver relatórios, pausar", asy
 
 await step("Scanner: análise de gráfico (upload PNG) em modo determinístico", async () => {
   await goto("/scanner/padroes");
-  await page.waitForFunction(() => /Modo determinístico|Analisar/i.test(document.body.innerText), null, { timeout: 30_000 });
+  await page.waitForFunction(() => /Leitura técnica com dados reais|Analisar/i.test(document.body.innerText), null, { timeout: 30_000 });
   const input = page.locator("input[type='file']").first();
   await input.setInputFiles({ name: "chart.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64") });
   await page.getByPlaceholder("BTC").fill("BTC");
@@ -386,7 +386,7 @@ await step("Preferências: alterar tema/moeda/timeframe e Chat ID", async () => 
 
 await step("Planos: trocar para PLATINUM libera 15M no scanner; voltar para PRO", async () => {
   await goto("/planos");
-  const btn = page.getByRole("button", { name: /Platinum|Assinar|Escolher/i }).first();
+  const btn = page.getByRole("button", { name: /Elite|Platinum|Assinar|Escolher/i }).first();
   const changed = await page.evaluate(async () => (await fetch("/api/plans/change", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan: "PLATINUM" }) })).status);
   if (changed === 403) return "troca de plano bloqueada para não-admin (ALLOW_SELF_PLAN_CHANGE=false) — passo pulado";
   expect(changed === 200, `troca ${changed}`);
@@ -412,7 +412,7 @@ await step("Backtest: tabela 4H/1D com expectativa em R, 1R/2R/3R e IC 95%", asy
 
 await step("Status do sistema: jobs, provedores e integrações", async () => {
   await goto("/status");
-  await page.waitForFunction(() => /Jobs agendados/i.test(document.body.innerText) && /Provedores de mercado/i.test(document.body.innerText), null, { timeout: 30_000 });
+  await page.waitForFunction(() => /Rotinas automáticas/i.test(document.body.innerText) && /Fontes de dados de mercado/i.test(document.body.innerText), null, { timeout: 30_000 });
   const overall = await page.locator("[role='alert'] .font-semibold, [role='status'] .font-semibold").first().innerText().catch(() => "");
   return `${overall || "status exibido"} · ${await shot("status")}`;
 });
@@ -479,16 +479,16 @@ await step("Análise completa BTC/USDT 4H (link antigo /?symbol= redireciona): h
   const shot1 = await shot("dashboard-btc");
   // spot: sem funding/OI no header e painel explica
   await page.getByRole("radio", { name: "Spot" }).click();
-  await page.waitForFunction(() => location.search.includes("instrument=spot") && /Contexto okx:spot:BTC:4h/.test(document.body.innerText) && !/Próximo funding/.test(document.querySelector("h1")?.closest("div.flex.flex-col")?.textContent ?? ""), null, { timeout: 90_000 });
+  await page.waitForFunction(() => location.search.includes("instrument=spot") && !!document.querySelector('[data-context="okx:spot:BTC:4h"]') && !/Próximo funding/.test(document.querySelector("h1")?.closest("div.flex.flex-col")?.textContent ?? ""), null, { timeout: 90_000 });
   // troca de timeframe atualiza todo o contexto
   await page.getByRole("tab", { name: "1D", exact: true }).first().click();
-  await page.waitForFunction(() => location.search.includes("tf=1d") && /Contexto okx:spot:BTC:1d/.test(document.body.innerText), null, { timeout: 90_000 });
+  await page.waitForFunction(() => location.search.includes("tf=1d") && !!document.querySelector('[data-context="okx:spot:BTC:1d"]'), null, { timeout: 90_000 });
   // troca de ativo pela watchlist mantém exchange/instrumento/timeframe
   await page.locator("tr", { hasText: "ETH/USDT" }).first().click();
-  await page.waitForFunction(() => /Contexto okx:spot:ETH:1d/.test(document.body.innerText) && /ETH\/USDT/.test(document.querySelector("h1")?.textContent ?? ""), null, { timeout: 90_000 });
+  await page.waitForFunction(() => !!document.querySelector('[data-context="okx:spot:ETH:1d"]') && /ETH\/USDT/.test(document.querySelector("h1")?.textContent ?? ""), null, { timeout: 90_000 });
   // Charts usa o mesmo workspace
   await goto("/charts/SOL?tf=1h&exchange=binance&instrument=spot");
-  await page.waitForFunction(() => /Contexto binance:spot:SOL:1h/.test(document.body.innerText), null, { timeout: 90_000 });
+  await page.waitForFunction(() => !!document.querySelector('[data-context="binance:spot:SOL:1h"]'), null, { timeout: 90_000 });
   return `${canvases} canvas · OKX perp→spot, 4H→1D, BTC→ETH e /charts/SOL sincronizados · ${shot1}`;
 });
 

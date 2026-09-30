@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Monitor } from "lucide-react";
 import useSWR from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
@@ -58,7 +59,7 @@ export function TerminalView() {
   return (
     <PageShell>
       <PageTitle
-        icon="🖥️"
+        icon={<Monitor className="h-5 w-5" />}
         title="Terminal"
         description="Contexto → estrutura → liquidez → multi-timeframe → risco. Todos os números vêm de candles fechados; nada é gerado por IA."
         actions={

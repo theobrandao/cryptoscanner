@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { CircleDot } from "lucide-react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
@@ -50,7 +51,11 @@ interface Bubble {
 }
 
 /** Faixas de cor da legenda (variação %). */
-const BUCKETS: Array<{ label: string; test: (c: number) => boolean; rgb: string }> = [
+const BUCKETS: Array<{
+  label: string;
+  test: (c: number) => boolean;
+  rgb: string;
+}> = [
   { label: "> +5%", test: (c) => c > 5, rgb: "22,163,74" },
   { label: "+2% a +5%", test: (c) => c > 2 && c <= 5, rgb: "34,197,94" },
   { label: "0% a +2%", test: (c) => c >= 0 && c <= 2, rgb: "74,222,128" },
@@ -71,14 +76,25 @@ const OUR_SYMBOLS = new Set(ASSETS.map((a) => a.symbol));
  * Implementação própria.
  */
 export function BubblesView() {
-  const { data, error, isLoading, mutate } = useSWR<Payload>("/api/market/bubbles", { refreshInterval: 60_000 });
+  const { data, error, isLoading, mutate } = useSWR<Payload>(
+    "/api/market/bubbles",
+    { refreshInterval: 60_000 },
+  );
   const router = useRouter();
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const bubblesRef = React.useRef<Bubble[]>([]);
   const [periodPref, setPeriod] = React.useState<Period>("24h");
   // período só é selecionável quando a fonte atual traz a variação (ex.: CoinPaprika gratuito não tem 30d)
-  const availablePeriods = React.useMemo(() => (data ? PERIODS.filter((p) => data.bubbles.some((b) => b.change[p] != null)) : PERIODS), [data]);
-  const period: Period = availablePeriods.includes(periodPref) ? periodPref : "24h";
+  const availablePeriods = React.useMemo(
+    () =>
+      data
+        ? PERIODS.filter((p) => data.bubbles.some((b) => b.change[p] != null))
+        : PERIODS,
+    [data],
+  );
+  const period: Period = availablePeriods.includes(periodPref)
+    ? periodPref
+    : "24h";
   const [sizeBy, setSizeBy] = React.useState<"volume" | "marketCap">("volume");
   const [hover, setHover] = React.useState<Bubble | null>(null);
 
@@ -88,7 +104,8 @@ export function BubblesView() {
     const canvas = canvasRef.current;
     const W = canvas?.clientWidth ?? 1000;
     const H = canvas?.clientHeight ?? 640;
-    const metric = (b: ApiBubble) => Math.log10(Math.max(sizeBy === "volume" ? b.volume24h : b.marketCap, 1));
+    const metric = (b: ApiBubble) =>
+      Math.log10(Math.max(sizeBy === "volume" ? b.volume24h : b.marketCap, 1));
     const vals = data.bubbles.map(metric);
     const minV = Math.min(...vals);
     const maxV = Math.max(...vals);
@@ -165,7 +182,14 @@ export function BubblesView() {
       for (const b of bs) {
         const rgb = bucketRgb(b.change);
         const intensity = Math.min(1, Math.abs(b.change) / 8);
-        const grad = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.1, b.x, b.y, b.r);
+        const grad = ctx.createRadialGradient(
+          b.x - b.r * 0.3,
+          b.y - b.r * 0.3,
+          b.r * 0.1,
+          b.x,
+          b.y,
+          b.r,
+        );
         grad.addColorStop(0, `rgba(${rgb},${0.18 + intensity * 0.35})`);
         grad.addColorStop(1, `rgba(${rgb},${0.06 + intensity * 0.15})`);
         ctx.beginPath();
@@ -183,7 +207,11 @@ export function BubblesView() {
           if (b.r >= 22) {
             ctx.font = `500 ${Math.max(8, Math.min(16, b.r * 0.3))}px ui-sans-serif, system-ui`;
             ctx.fillStyle = b.change >= 0 ? "#22c55e" : "#f43f5e";
-            ctx.fillText(`${b.change >= 0 ? "+" : ""}${b.change.toFixed(1)}%`, b.x, b.y + b.r * 0.38);
+            ctx.fillText(
+              `${b.change >= 0 ? "+" : ""}${b.change.toFixed(1)}%`,
+              b.x,
+              b.y + b.r * 0.38,
+            );
           }
         }
       }
@@ -197,20 +225,30 @@ export function BubblesView() {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    return bubblesRef.current.find((b) => Math.hypot(b.x - x, b.y - y) <= b.r) ?? null;
+    return (
+      bubblesRef.current.find((b) => Math.hypot(b.x - x, b.y - y) <= b.r) ??
+      null
+    );
   };
 
   const open = (b: Bubble) => {
     if (OUR_SYMBOLS.has(b.symbol)) router.push(`/graficos?symbol=${b.symbol}`);
-    else window.open(`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(`${b.symbol}USDT`)}`, "_blank", "noopener");
+    else
+      window.open(
+        `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(`${b.symbol}USDT`)}`,
+        "_blank",
+        "noopener",
+      );
   };
 
-  const updated = data ? new Date(data.fetchedAt).toLocaleTimeString("pt-BR") : "—";
+  const updated = data
+    ? new Date(data.fetchedAt).toLocaleTimeString("pt-BR")
+    : "—";
 
   return (
     <PageShell>
       <PageTitle
-        icon="🫧"
+        icon={<CircleDot className="h-5 w-5" />}
         title="Mapa de Bolhas"
         description="Os 100 maiores ativos por volume 24h (sem stablecoins e tokens espelho) · tamanho = volume (ou capitalização) · cor = variação do período. Clique para abrir o gráfico (ativos do scanner) ou o TradingView."
         actions={
@@ -221,8 +259,17 @@ export function BubblesView() {
                   key={p}
                   onClick={() => setPeriod(p)}
                   disabled={!availablePeriods.includes(p)}
-                  title={availablePeriods.includes(p) ? undefined : `Variação ${p} indisponível na fonte atual (${data?.source ?? "—"})`}
-                  className={cn("rounded px-2.5 py-1 font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-40", period === p ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                  title={
+                    availablePeriods.includes(p)
+                      ? undefined
+                      : `Variação ${p} indisponível na fonte atual (${data?.source ?? "—"})`
+                  }
+                  className={cn(
+                    "rounded px-2.5 py-1 font-semibold cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
+                    period === p
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted",
+                  )}
                   aria-pressed={period === p}
                 >
                   {p}
@@ -234,7 +281,12 @@ export function BubblesView() {
                 <button
                   key={k}
                   onClick={() => setSizeBy(k)}
-                  className={cn("rounded px-2 py-1 font-semibold cursor-pointer", sizeBy === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                  className={cn(
+                    "rounded px-2 py-1 font-semibold cursor-pointer",
+                    sizeBy === k
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted",
+                  )}
                 >
                   {k === "volume" ? "Tamanho: volume" : "Tamanho: cap."}
                 </button>
@@ -247,24 +299,41 @@ export function BubblesView() {
         }
       />
       <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-        <span className="font-semibold uppercase tracking-wide">Variação {period}:</span>
+        <span className="font-semibold uppercase tracking-wide">
+          Variação {period}:
+        </span>
         {BUCKETS.map((b) => (
           <span key={b.label} className="inline-flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: `rgb(${b.rgb})` }} />
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full"
+              style={{ background: `rgb(${b.rgb})` }}
+            />
             {b.label}
           </span>
         ))}
         <span className="ml-auto">
-          {data ? `${data.count} ativos · atualizado às ${updated}${data.stale ? " · dados com defasagem" : ""}` : ""}
+          {data
+            ? `${data.count} ativos · atualizado às ${updated}${data.stale ? " · dados com defasagem" : ""}`
+            : ""}
         </span>
       </div>
       <Card>
         <CardContent className="relative p-0">
-          {isLoading && !data ? <Skeleton className="h-[640px] w-full" /> : null}
-          {error && !data ? <div className="p-6 text-sm text-danger">Não foi possível carregar o mapa de bolhas (fontes de mercado indisponíveis). Tente novamente em instantes.</div> : null}
+          {isLoading && !data ? (
+            <Skeleton className="h-[640px] w-full" />
+          ) : null}
+          {error && !data ? (
+            <div className="p-6 text-sm text-danger">
+              Não foi possível carregar o mapa de bolhas (fontes de mercado
+              indisponíveis). Tente novamente em instantes.
+            </div>
+          ) : null}
           <canvas
             ref={canvasRef}
-            className={cn("h-[640px] w-full cursor-pointer rounded-lg", !data && "hidden")}
+            className={cn(
+              "h-[640px] w-full cursor-pointer rounded-lg",
+              !data && "hidden",
+            )}
             onMouseMove={(e) => setHover(pick(e))}
             onMouseLeave={() => setHover(null)}
             onClick={(e) => {
@@ -276,18 +345,33 @@ export function BubblesView() {
           {hover ? (
             <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-border bg-card/95 px-3 py-2 text-sm shadow">
               <div className="font-semibold">
-                {hover.symbol} · {hover.name} {hover.rank ? <span className="text-muted-foreground">#{hover.rank}</span> : null}
+                {hover.symbol} · {hover.name}{" "}
+                {hover.rank ? (
+                  <span className="text-muted-foreground">#{hover.rank}</span>
+                ) : null}
               </div>
               <div className="tabular">
-                {formatPrice(hover.price)} · <span className={hover.change >= 0 ? "text-success" : "text-danger"}>{formatPct(hover.change)} ({period})</span>
+                {formatPrice(hover.price)} ·{" "}
+                <span
+                  className={hover.change >= 0 ? "text-success" : "text-danger"}
+                >
+                  {formatPct(hover.change)} ({period})
+                </span>
               </div>
               <div className="tabular text-xs text-muted-foreground">
-                vol 24h {formatCompact(hover.volume)} · cap. {formatCompact(hover.marketCap)}
+                vol 24h {formatCompact(hover.volume)} · cap.{" "}
+                {formatCompact(hover.marketCap)}
               </div>
-              <div className="text-[11px] text-muted-foreground">{OUR_SYMBOLS.has(hover.symbol) ? "Clique para abrir o gráfico" : "Clique para abrir no TradingView"}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {OUR_SYMBOLS.has(hover.symbol)
+                  ? "Clique para abrir o gráfico"
+                  : "Clique para abrir no TradingView"}
+              </div>
             </div>
           ) : null}
-          <div className="absolute bottom-3 right-3 text-[11px] text-muted-foreground">fonte: {data?.source ?? "—"}</div>
+          <div className="absolute bottom-3 right-3 text-[11px] text-muted-foreground">
+            fonte: {data?.source ?? "—"}
+          </div>
         </CardContent>
       </Card>
     </PageShell>

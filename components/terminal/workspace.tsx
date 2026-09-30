@@ -5,7 +5,7 @@ import Link from "next/link";
 import { TRIAL_DAYS } from "@/lib/entitlements";
 import useSWR from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Bell, ChevronDown, Layers, Maximize2, Minimize2, PanelRightClose, PanelRightOpen, RefreshCw, Star } from "lucide-react";
+import { Bell, ChevronDown, Layers, Maximize2, Minimize2, PanelRightClose, PanelRightOpen, RefreshCw, Star, Check } from "lucide-react";
 import { TerminalChart, lowerPanes, withOverlayDefaults, type ChartLabel, type ChartLine, type ChartSegmentLine, type ChartZone, type Legend, type Overlays } from "@/components/terminal/terminal-chart";
 import { ConfluencePanel, countdown, DerivativesPanel, HistoricalPanel, LiquidityPanel, Panel, REGIME_TONE, SetupPanel, StructurePanel, Unavailable } from "@/components/terminal/panels";
 import { MarketOverviewPanel, RiskPanel, ScannerPanel, WatchlistPanel } from "@/components/terminal/bottom-panels";
@@ -285,7 +285,7 @@ function ChartCard({
                   setOverlays({ ...overlays, [k]: !overlays[k] });
                 }}
               >
-                <span className={cn("grid h-4 w-4 place-items-center rounded border text-[10px]", overlays[k] ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{overlays[k] ? "✓" : ""}</span>
+                <span className={cn("grid h-4 w-4 place-items-center rounded border text-[10px]", overlays[k] ? "border-primary bg-primary text-primary-foreground" : "border-border")}>{overlays[k] ? <Check className="h-3 w-3" aria-hidden /> : null}</span>
                 {OVERLAY_LABEL[k]}
               </DropdownMenuItem>
             ))}
@@ -568,8 +568,8 @@ export function TerminalWorkspace({ symbol: routeSymbol, mode = "dashboard" }: {
               <RiskPanel key={key} ctx={consistent} />
             </div>
           ) : null}
-          <p className="text-[10.5px] text-muted-foreground">
-            Contexto {consistent.contextKey} · gerado {timeAgo(consistent.generatedAt)} · atualiza a cada 30 s · observado: preço, candles, volume, OI, funding · derivado: estrutura, liquidez, S/R, indicadores, setup, Confluence Score · histórico: backtest do setup ({consistent.historical?.dataSource ?? "—"}).
+          <p className="text-[10.5px] text-muted-foreground" data-context={consistent.contextKey}>
+            Atualizado {timeAgo(consistent.generatedAt)} · renova a cada 30 s · dados da corretora selecionada (preço, candles, volume, open interest e funding); estrutura, liquidez, níveis, setup e Confluence Score são calculados sobre candles fechados.
           </p>
         </>
       ) : null}

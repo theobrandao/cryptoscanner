@@ -1,9 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Lock, Radar } from "lucide-react";
+import { Globe, Lock, Radar } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Hint } from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -22,7 +28,7 @@ export interface ScannerFilterState {
   minConfidence: number;
 }
 
-/** Ordem observada na referência: 4H, 1D, 7D livres; 1H, 30M, 15M bloqueados fora do PLATINUM. */
+/** Ordem observada na referência: 4H, 1D, 7D livres; 1H, 30M, 15M bloqueados fora do ELITE (chave interna PLATINUM). */
 const TIMEFRAME_ORDER: Timeframe[] = ["4h", "1d", "1w", "1h", "30m", "15m"];
 
 export function ScannerFilters({
@@ -44,7 +50,11 @@ export function ScannerFilters({
     <div className="grid gap-4 rounded-lg border border-border bg-card p-4 lg:grid-cols-[auto_auto_1fr_auto_auto] lg:items-end">
       <div className="flex flex-col gap-1.5">
         <Label>Timeframe</Label>
-        <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Timeframe">
+        <div
+          className="flex flex-wrap gap-1"
+          role="radiogroup"
+          aria-label="Timeframe"
+        >
           {TIMEFRAME_ORDER.map((tf) => {
             const locked = !allowedTimeframes.includes(tf);
             const active = value.timeframe === tf;
@@ -53,10 +63,16 @@ export function ScannerFilters({
                 key={tf}
                 role="radio"
                 aria-checked={active}
-                onClick={() => (locked ? onLockedClick(tf) : onChange({ ...value, timeframe: tf }))}
+                onClick={() =>
+                  locked
+                    ? onLockedClick(tf)
+                    : onChange({ ...value, timeframe: tf })
+                }
                 className={cn(
                   "inline-flex h-9 items-center gap-1 rounded-md border px-3 text-sm font-semibold transition-colors cursor-pointer",
-                  active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted",
+                  active
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background hover:bg-muted",
                   locked && "opacity-70",
                 )}
               >
@@ -65,7 +81,7 @@ export function ScannerFilters({
               </button>
             );
             return locked ? (
-              <Hint key={tf} text="Exclusivo do plano PLATINUM">
+              <Hint key={tf} text="Exclusivo do plano ELITE">
                 {btn}
               </Hint>
             ) : (
@@ -77,7 +93,11 @@ export function ScannerFilters({
 
       <div className="flex flex-col gap-1.5">
         <Label>Tipo de padrão</Label>
-        <div className="flex gap-1" role="radiogroup" aria-label="Tipo de padrão">
+        <div
+          className="flex gap-1"
+          role="radiogroup"
+          aria-label="Tipo de padrão"
+        >
           {(
             [
               ["all", "Todos"],
@@ -92,9 +112,15 @@ export function ScannerFilters({
               onClick={() => onChange({ ...value, direction: d })}
               className={cn(
                 "inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium transition-colors cursor-pointer",
-                value.direction === d ? "border-primary bg-primary/15 text-primary" : "border-border bg-background hover:bg-muted",
-                d === "bullish" && value.direction === d && "border-success bg-success/15 text-success",
-                d === "bearish" && value.direction === d && "border-danger bg-danger/15 text-danger",
+                value.direction === d
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border bg-background hover:bg-muted",
+                d === "bullish" &&
+                  value.direction === d &&
+                  "border-success bg-success/15 text-success",
+                d === "bearish" &&
+                  value.direction === d &&
+                  "border-danger bg-danger/15 text-danger",
               )}
             >
               {label}
@@ -105,12 +131,20 @@ export function ScannerFilters({
 
       <div className="flex flex-col gap-1.5 lg:max-w-xs">
         <Label>Moeda</Label>
-        <Select value={value.symbol} onValueChange={(s) => onChange({ ...value, symbol: s })}>
+        <Select
+          value={value.symbol}
+          onValueChange={(s) => onChange({ ...value, symbol: s })}
+        >
           <SelectTrigger aria-label="Moeda">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">🌐 Todas ({ASSETS.length} ativos)</SelectItem>
+            <SelectItem value="ALL">
+              <span className="inline-flex items-center gap-1.5">
+                <Globe className="h-3.5 w-3.5" aria-hidden /> Todas (
+                {ASSETS.length} ativos)
+              </span>
+            </SelectItem>
             {ASSETS.map((a) => (
               <SelectItem key={a.symbol} value={a.symbol}>
                 {a.glyph} {a.symbol} — {a.name}
@@ -122,12 +156,28 @@ export function ScannerFilters({
 
       <div className="flex w-full flex-col gap-1.5 lg:w-40">
         <Label>
-          Confiança mín. <span className="text-foreground">{value.minConfidence ?? 60}</span>
+          Confiança mín.{" "}
+          <span className="text-foreground">{value.minConfidence ?? 60}</span>
         </Label>
-        <Slider min={55} max={85} step={5} value={[value.minConfidence ?? 60]} onValueChange={([v]) => onChange({ ...value, minConfidence: v ?? 60 })} className="h-9" aria-label="Confiança mínima" />
+        <Slider
+          min={55}
+          max={85}
+          step={5}
+          value={[value.minConfidence ?? 60]}
+          onValueChange={([v]) =>
+            onChange({ ...value, minConfidence: v ?? 60 })
+          }
+          className="h-9"
+          aria-label="Confiança mínima"
+        />
       </div>
 
-      <Button size="lg" onClick={onScan} loading={scanning} className="w-full lg:w-auto">
+      <Button
+        size="lg"
+        onClick={onScan}
+        loading={scanning}
+        className="w-full lg:w-auto"
+      >
         <Radar className="h-4 w-4" /> Escanear Agora
       </Button>
     </div>

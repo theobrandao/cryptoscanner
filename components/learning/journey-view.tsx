@@ -1,6 +1,14 @@
 "use client";
 
 import * as React from "react";
+import {
+  Check,
+  CircleCheck,
+  FlaskConical,
+  Trophy,
+  Wrench,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
 import { PageShell } from "@/components/layout/page-shell";
@@ -174,7 +182,11 @@ export function JourneyView() {
                     </Button>
                   ) : (
                     <Badge variant="success" className="px-3 py-1.5 text-sm">
-                      ✓ Trilha concluída
+                      <Check
+                        className="mr-1 inline h-3.5 w-3.5 align-[-2px]"
+                        aria-hidden
+                      />{" "}
+                      Trilha concluída
                     </Badge>
                   )}
                 </div>
@@ -248,13 +260,15 @@ export function JourneyView() {
                         Aula {l.order}
                       </span>
                       {p?.done ? (
-                        <span className="absolute right-2 top-2 rounded-full bg-success px-2 py-0.5 text-xs font-semibold text-white">
-                          ✓ {p.score}/{l.quiz.length}
+                        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-success px-2 py-0.5 text-xs font-semibold text-white">
+                          <Check className="h-3 w-3" aria-hidden /> {p.score}/
+                          {l.quiz.length}
                         </span>
                       ) : null}
                       {WIDGETS[l.slug] ? (
-                        <span className="absolute bottom-2 right-2 rounded-md bg-background/85 px-2 py-0.5 text-[11px] backdrop-blur">
-                          🧪 interativa
+                        <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-background/85 px-2 py-0.5 text-[11px] backdrop-blur">
+                          <FlaskConical className="h-3 w-3" aria-hidden />{" "}
+                          interativa
                         </span>
                       ) : null}
                     </div>
@@ -375,13 +389,11 @@ function LessonReader({
     }
     const nav = navRef.current;
     if (!nav) return;
-    nav
-      .querySelector('[aria-current="step"]')
-      ?.scrollIntoView({
-        block: "nearest",
-        inline: "center",
-        behavior: "smooth",
-      });
+    nav.querySelector('[aria-current="step"]')?.scrollIntoView({
+      block: "nearest",
+      inline: "center",
+      behavior: "smooth",
+    });
     if (nav.getBoundingClientRect().top < 64)
       window.scrollTo({
         top: window.scrollY + nav.getBoundingClientRect().top - 80,
@@ -429,8 +441,9 @@ function LessonReader({
                 Aula {lesson.order} de {LESSONS.length} · {lesson.minutes} min
               </span>
               {saved?.done ? (
-                <span className="text-success">
-                  ✓ concluída ({saved.score}/{lesson.quiz.length})
+                <span className="inline-flex items-center gap-1 text-success">
+                  <Check className="h-3.5 w-3.5" aria-hidden /> concluída (
+                  {saved.score}/{lesson.quiz.length})
                 </span>
               ) : null}
             </div>
@@ -517,7 +530,10 @@ function LessonReader({
 
             {cur.key === "lab" && widget ? (
               <section>
-                <h2 className="text-lg font-semibold">🧪 {widget.title}</h2>
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
+                  <FlaskConical className="h-4 w-4 text-primary" aria-hidden />{" "}
+                  {widget.title}
+                </h2>
                 <p className="mb-4 text-sm text-muted-foreground">
                   {widget.hint}
                 </p>
@@ -571,12 +587,20 @@ function LessonReader({
                                     "border-border hover:border-primary/50 hover:bg-muted",
                                 )}
                               >
-                                <span className="w-4 shrink-0 text-center">
-                                  {state === "ok"
-                                    ? "✓"
-                                    : state === "bad"
-                                      ? "✗"
-                                      : String.fromCharCode(65 + j)}
+                                <span className="flex w-4 shrink-0 justify-center text-center">
+                                  {state === "ok" ? (
+                                    <Check
+                                      className="h-4 w-4 text-success"
+                                      aria-label="correta"
+                                    />
+                                  ) : state === "bad" ? (
+                                    <X
+                                      className="h-4 w-4 text-danger"
+                                      aria-label="incorreta"
+                                    />
+                                  ) : (
+                                    String.fromCharCode(65 + j)
+                                  )}
                                 </span>
                                 {o}
                               </button>
@@ -618,9 +642,14 @@ function LessonReader({
                 ) : (
                   <div className="mt-4 rounded-lg border border-success/40 bg-success/10 p-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-2xl" aria-hidden>
-                        {score === lesson.quiz.length ? "🏆" : "✅"}
-                      </span>
+                      {score === lesson.quiz.length ? (
+                        <Trophy className="h-6 w-6 text-success" aria-hidden />
+                      ) : (
+                        <CircleCheck
+                          className="h-6 w-6 text-success"
+                          aria-hidden
+                        />
+                      )}
                       <span className="font-semibold">Aula concluída</span>
                       <Badge
                         variant={
@@ -649,9 +678,10 @@ function LessonReader({
                       {lesson.practice ? (
                         <Link
                           href={lesson.practice.href}
-                          className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm hover:bg-muted"
+                          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-muted"
                         >
-                          🛠️ {lesson.practice.label}
+                          <Wrench className="h-4 w-4" aria-hidden />{" "}
+                          {lesson.practice.label}
                         </Link>
                       ) : null}
                     </div>
