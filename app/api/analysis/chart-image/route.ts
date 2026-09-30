@@ -1,6 +1,7 @@
 import { connection } from "next/server";
-import { ApiError, enforceRateLimit, ok, requireUser, withApi } from "@/lib/api";
+import { ApiError, enforceRateLimit, ok, withApi } from "@/lib/api";
 import { ALLOWED_MIME, analyzeChartImage, ChartAnalysisUnavailableError, MAX_IMAGE_BYTES, QuotaExceededError, type AllowedMime } from "@/services/chart-image-service";
+import { requireCoreUser } from "@/services/subscription-service";
 
 /**
  * Análise de gráfico por IA (imagem). multipart/form-data: file (JPG/PNG/WebP ≤ 5 MB), symbol?, timeframe?
@@ -8,7 +9,7 @@ import { ALLOWED_MIME, analyzeChartImage, ChartAnalysisUnavailableError, MAX_IMA
  */
 export const POST = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   await enforceRateLimit(req, "llm", user.id);
   const form = await req.formData().catch(() => {
     throw new ApiError(400, "Envie multipart/form-data com o campo 'file'", "invalid_form");

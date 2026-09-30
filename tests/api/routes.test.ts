@@ -42,6 +42,12 @@ function provider(name: "binance" | "kraken", ok = true): MarketProvider {
   };
 }
 
+/** Sessão com acesso ao produto (sem banco, só ADMIN passa na checagem de plano). */
+async function planHeaders(): Promise<Record<string, string>> {
+  const token = await createSessionToken({ id: "adm", email: "adm@b.c", name: "Adm", plan: "PLATINUM", role: "ADMIN" });
+  return { cookie: `${SESSION_COOKIE}=${token}` };
+}
+
 const json = async (res: Response) => (await res.json()) as { ok: boolean; data?: Record<string, unknown>; error?: { code: string; message: string } };
 
 describe("rotas da API", () => {
@@ -71,10 +77,13 @@ describe("rotas da API", () => {
 
   it("GET /api/market/candles valida parâmetros e retorna indicadores", async () => {
     const { GET } = await import("@/app/api/market/candles/route");
-    const bad = await json(await GET(new Request("http://localhost/api/market/candles?symbol=NOPE"), { params: Promise.resolve({}) }));
+    const anon = await GET(new Request("http://localhost/api/market/candles?symbol=btc"), { params: Promise.resolve({}) });
+    expect(anon.status).toBe(401);
+    const h = await planHeaders();
+    const bad = await json(await GET(new Request("http://localhost/api/market/candles?symbol=NOPE", { headers: h }), { params: Promise.resolve({}) }));
     expect(bad.ok).toBe(false);
     expect(bad.error?.code).toBe("validation");
-    const good = await json(await GET(new Request("http://localhost/api/market/candles?symbol=btc&timeframe=7d&limit=100&indicators=1"), { params: Promise.resolve({}) }));
+    const good = await json(await GET(new Request("http://localhost/api/market/candles?symbol=btc&timeframe=7d&limit=100&indicators=1", { headers: h }), { params: Promise.resolve({}) }));
     expect(good.ok).toBe(true);
     expect(good.data!.timeframe).toBe("1w");
     expect((good.data!.candles as unknown[]).length).toBe(100);
@@ -90,29 +99,32 @@ describe("rotas da API", () => {
     expect((body.data!.tickers as unknown[]).length).toBe(ASSETS.length);
   });
 
-  it("GET /api/scanner/table bloqueia timeframe de alta frequência para visitante", async () => {
+  it("GET /api/scanner/table exige conta com plano (visitante 401, conta sem plano 402)", async () => {
     const { GET } = await import("@/app/api/scanner/table/route");
-    const blocked = await json(await GET(new Request("http://localhost/api/scanner/table?timeframe=1h"), { params: Promise.resolve({}) }));
-    expect(blocked.ok).toBe(false);
-    expect(blocked.error?.code).toBe("plan_required");
-    const ok = await json(await GET(new Request("http://localhost/api/scanner/table?timeframe=4h"), { params: Promise.resolve({}) }));
+    const anon = await GET(new Request("http://localhost/api/scanner/table?timeframe=4h"), { params: Promise.resolve({}) });
+    expect(anon.status).toBe(401);
+    const noPlan = await createSessionToken({ id: "u2", email: "c@d.e", name: "C", plan: "FREE", role: "USER" });
+    const blocked = await GET(new Request("http://localhost/api/scanner/table?timeframe=4h", { headers: { cookie: `${SESSION_COOKIE}=${noPlan}` } }), { params: Promise.resolve({}) });
+    expect(blocked.status).toBe(402);
+    expect((await json(blocked)).error?.code).toBe("subscription_required");
+    const ok = await json(await GET(new Request("http://localhost/api/scanner/table?timeframe=4h", { headers: await planHeaders() }), { params: Promise.resolve({}) }));
     expect(ok.ok).toBe(true);
     expect((ok.data!.rows as unknown[]).length).toBe(ASSETS.length);
   });
 
   it("GET /api/scanner/table libera 1h com sessão PLATINUM", async () => {
     const { GET } = await import("@/app/api/scanner/table/route");
-    const token = await createSessionToken({ id: "u1", email: "a@b.c", name: "A", plan: "PLATINUM", role: "USER" });
-    const res = await GET(new Request("http://localhost/api/scanner/table?timeframe=1h", { headers: { cookie: `${SESSION_COOKIE}=${token}` } }), { params: Promise.resolve({}) });
+    const res = await GET(new Request("http://localhost/api/scanner/table?timeframe=1h", { headers: await planHeaders() }), { params: Promise.resolve({}) });
     expect((await json(res)).ok).toBe(true);
   });
 
   it("POST /api/scanner/run valida o corpo e executa o scan", async () => {
     const { POST } = await import("@/app/api/scanner/run/route");
-    const bad = await json(await POST(new Request("http://localhost/api/scanner/run", { method: "POST", body: "{" }), { params: Promise.resolve({}) }));
+    const h = await planHeaders();
+    const bad = await json(await POST(new Request("http://localhost/api/scanner/run", { method: "POST", body: "{", headers: h }), { params: Promise.resolve({}) }));
     expect(bad.error?.code).toBe("invalid_json");
     const res = await POST(
-      new Request("http://localhost/api/scanner/run", { method: "POST", body: JSON.stringify({ timeframe: "1d", direction: "bullish", symbols: ["BTC", "ETH"], includeVolume: false }) }),
+      new Request("http://localhost/api/scanner/run", { method: "POST", headers: h, body: JSON.stringify({ timeframe: "1d", direction: "bullish", symbols: ["BTC", "ETH"], includeVolume: false }) }),
       { params: Promise.resolve({}) },
     );
     const body = await json(res);
@@ -123,7 +135,7 @@ describe("rotas da API", () => {
 
   it("GET /api/analysis executa o orquestrador (sem LLM, sem banco)", async () => {
     const { GET } = await import("@/app/api/analysis/route");
-    const body = await json(await GET(new Request("http://localhost/api/analysis?symbol=ETH&timeframe=4h&sentiment=0&llm=0"), { params: Promise.resolve({}) }));
+    const body = await json(await GET(new Request("http://localhost/api/analysis?symbol=ETH&timeframe=4h&sentiment=0&llm=0", { headers: await planHeaders() }), { params: Promise.resolve({}) }));
     expect(body.ok).toBe(true);
     expect(body.data!.symbol).toBe("ETH");
     expect(body.data!.llmNarrative).toBeNull();
@@ -147,10 +159,12 @@ describe("rotas da API", () => {
     const { POST } = await import("@/app/api/analysis/chart-image/route");
     const anon = await POST(new Request("http://localhost/api/analysis/chart-image", { method: "POST" }), { params: Promise.resolve({}) });
     expect(anon.status).toBe(401);
-    const token = await createSessionToken({ id: "u1", email: "a@b.c", name: "A", plan: "FREE", role: "USER" });
+    const noPlan = await createSessionToken({ id: "u1", email: "a@b.c", name: "A", plan: "FREE", role: "USER" });
+    const blocked = await POST(new Request("http://localhost/api/analysis/chart-image", { method: "POST", headers: { cookie: `${SESSION_COOKIE}=${noPlan}` } }), { params: Promise.resolve({}) });
+    expect(blocked.status).toBe(402);
     const form = new FormData();
     form.append("file", new File([new Uint8Array([137, 80, 78, 71])], "c.png", { type: "image/png" }));
-    const res = await POST(new Request("http://localhost/api/analysis/chart-image", { method: "POST", body: form, headers: { cookie: `${SESSION_COOKIE}=${token}` } }), {
+    const res = await POST(new Request("http://localhost/api/analysis/chart-image", { method: "POST", body: form, headers: await planHeaders() }), {
       params: Promise.resolve({}),
     });
     expect(res.status).toBe(503);
@@ -159,9 +173,11 @@ describe("rotas da API", () => {
 
   it("GET /api/fibonacci manual e automático", async () => {
     const { GET } = await import("@/app/api/fibonacci/route");
-    const manual = await json(await GET(new Request("http://localhost/api/fibonacci?high=200&low=100&direction=up"), { params: Promise.resolve({}) }));
+    expect((await GET(new Request("http://localhost/api/fibonacci?high=200&low=100&direction=up"), { params: Promise.resolve({}) })).status).toBe(401);
+    const h = await planHeaders();
+    const manual = await json(await GET(new Request("http://localhost/api/fibonacci?high=200&low=100&direction=up", { headers: h }), { params: Promise.resolve({}) }));
     expect(manual.data!.mode).toBe("manual");
-    const auto = await json(await GET(new Request("http://localhost/api/fibonacci?symbol=BTC&timeframe=1d"), { params: Promise.resolve({}) }));
+    const auto = await json(await GET(new Request("http://localhost/api/fibonacci?symbol=BTC&timeframe=1d", { headers: h }), { params: Promise.resolve({}) }));
     expect(auto.data!.mode).toBe("auto");
     expect((auto.data!.result as { levels: unknown[] }).levels.length).toBe(12);
   });

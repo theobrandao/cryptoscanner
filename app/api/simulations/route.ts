@@ -1,13 +1,14 @@
 import { connection } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { requirePrisma } from "@/database/client";
-import { ApiError, ok, parseBody, requireUser, withApi } from "@/lib/api";
+import { ApiError, ok, parseBody, withApi } from "@/lib/api";
 import { runSimulation, simulationInputSchema } from "@/services/simulation-service";
+import { requireCoreUser } from "@/services/subscription-service";
 
 /** Simulações salvas do usuário. */
 export const GET = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const items = await requirePrisma().simulation.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 100 });
   return ok({ items });
 });
@@ -15,7 +16,7 @@ export const GET = withApi(async (req) => {
 /** Executa e salva uma simulação (limite de 100 por usuário). */
 export const POST = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const body = await parseBody(req, simulationInputSchema);
   const prisma = requirePrisma();
   const count = await prisma.simulation.count({ where: { userId: user.id } });

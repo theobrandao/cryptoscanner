@@ -3,11 +3,14 @@
 import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { ArrowRight, BellRing, Check, CircleSlash, ListChecks, ScrollText, ShieldCheck, Smartphone, Target, UserPlus, X } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, BellRing, Bot, Check, CircleSlash, ListChecks, ScrollText, ShieldCheck, Smartphone, Target, UserPlus, X } from "lucide-react";
 import { PlanCards, type LandingData, type Prices } from "@/components/marketing/landing";
 import { fmtR, ValidatedModels } from "@/components/marketing/validated-models";
 import { Eyebrow, LineChart, SectionHeading, StatTile, TickerMarquee, ToolsGrid } from "@/components/ui/showcase";
 import { billingNote } from "@/lib/plans-copy";
+import { captureAffiliateParams } from "@/lib/affiliate-params";
+import { ENTITLEMENTS } from "@/lib/entitlements";
 import { MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +23,12 @@ const BENEFITS = [
   { icon: BellRing, title: "Alertas no lugar de horas de tela", text: "Agentes IA e Sentinela vigiam os ativos 24h no servidor e avisam por push e Telegram quando a condição escolhida aparece." },
   { icon: ScrollText, title: "Regras fixas e auditáveis", text: "O scanner calcula padrões, alvo, stop e taxa de acerto histórica por regra. Cada número mostra a fonte e o horário do dado." },
   { icon: Target, title: "Modelo medido fora da amostra", text: "O modelo de rompimento foi publicado porque o resultado em um período não usado na escolha das regras foi positivo, já com taxa e slippage." },
+  { icon: Bot, title: "Analista IA com os números do app", text: "Pergunte sobre qualquer um dos 30 ativos. A IA consulta as ferramentas do CryptoScanner e só escreve números que vieram delas." },
+];
+
+const SCREENS = [
+  { src: "/marketing/analise-completa.webp", title: "Análise completa", text: "Gráfico com estrutura (BOS, CHoCH), liquidez, zona de entrada, stop e alvos calculados, derivativos e Confluence Score auditável." },
+  { src: "/marketing/scanner-padroes.webp", title: "Scanner de padrões", text: "Os 30 ativos lado a lado: tendência, momento, volume relativo, volatilidade e o padrão gráfico em formação em cada um." },
 ];
 
 const STEPS = [
@@ -64,6 +73,8 @@ export function SalesPage({ content }: { content: LandingData }) {
   const m = main?.validation.metrics;
   const FAQ = faq(trial, kiwify);
   const cta = "/registro?next=/";
+  const t = ENTITLEMENTS.TRIAL;
+  React.useEffect(() => captureAffiliateParams(window.location.search), []);
   return (
     <div className="flex w-full flex-col pb-20 lg:pb-0">
       <TickerMarquee />
@@ -121,11 +132,28 @@ export function SalesPage({ content }: { content: LandingData }) {
           <StatTile label="Operações medidas" value={m?.trades ?? "—"} sub="fora da amostra (4H)" tone="accent" />
         </section>
 
+        {/* POR DENTRO */}
+        <section aria-labelledby="pordentro">
+          <SectionHeading eyebrow="Por dentro" title="Veja o app" accent="funcionando" subtitle="Telas reais do CryptoScanner, capturadas com dados de mercado do momento." />
+          <h2 id="pordentro" className="sr-only">Telas do aplicativo</h2>
+          <div className="mt-8 grid gap-4 lg:grid-cols-2">
+            {SCREENS.map((sc) => (
+              <figure key={sc.src} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card">
+                <Image src={sc.src} alt={`Tela ${sc.title} do CryptoScanner`} width={1280} height={800} sizes="(min-width: 1024px) 600px, 100vw" className="h-auto w-full border-b border-border" />
+                <figcaption className="p-4">
+                  <h3 className="text-[15px] font-bold">{sc.title}</h3>
+                  <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{sc.text}</p>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+
         {/* BENEFÍCIOS */}
         <section aria-labelledby="beneficios">
           <SectionHeading eyebrow="Por que usar" title="Menos tempo na tela," accent="mais critério" subtitle="O trabalho repetitivo de olhar gráfico fica com o servidor. Você recebe o aviso e confere os números." />
           <h2 id="beneficios" className="sr-only">Benefícios</h2>
-          <div className="mt-8 grid gap-3 md:grid-cols-3">
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {BENEFITS.map((b) => (
               <article key={b.title} className="card-glow flex flex-col gap-3 rounded-2xl border border-border p-5">
                 <span className="icon-tile grid h-11 w-11 place-items-center rounded-xl">
@@ -212,7 +240,9 @@ export function SalesPage({ content }: { content: LandingData }) {
               <p className="text-[13px] leading-relaxed text-muted-foreground">Pediu o cancelamento em até 7 dias da compra, recebe o valor integral de volta (art. 49 do Código de Defesa do Consumidor).</p>
             </div>
           </div>
-          <p className="mx-auto mt-3 max-w-4xl text-center text-[12px] leading-relaxed text-muted-foreground">{billingNote(data?.provider ?? "mercadopago")}</p>
+          <p className="mx-auto mt-3 max-w-4xl text-center text-[12px] leading-relaxed text-muted-foreground">
+            No teste grátis: todas as ferramentas do PRO com {t.maxAlerts} alertas, {t.maxMonitors} monitor, {t.maxStrategies} estratégias e {t.aiQueriesPerDay} consultas ao Analista IA por dia. {billingNote(data?.provider ?? "mercadopago")}
+          </p>
         </section>
 
         {/* FAQ */}

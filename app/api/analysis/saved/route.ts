@@ -1,11 +1,12 @@
 import { connection } from "next/server";
 import { requirePrisma } from "@/database/client";
-import { ok, requireUser, withApi } from "@/lib/api";
+import { ok, withApi } from "@/lib/api";
+import { requireCoreUser } from "@/services/subscription-service";
 
 /** Análises de imagem salvas do usuário. */
 export const GET = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const prisma = requirePrisma();
   const items = await prisma.chartAnalysis.findMany({
     where: { userId: user.id },

@@ -5,6 +5,7 @@ import { enforceRateLimit, ok, parseQuery, withApi } from "@/lib/api";
 import { autoFibonacci, fibonacciLevels } from "@/lib/fibonacci";
 import { parseTimeframe } from "@/lib/timeframes";
 import { getCandles } from "@/services/market/market-service";
+import { requireCoreUser } from "@/services/subscription-service";
 
 const querySchema = z.object({
   symbol: symbolSchema.optional(),
@@ -17,6 +18,7 @@ const querySchema = z.object({
 
 /** Níveis de Fibonacci: manual (high/low/direction) ou automáticos pelo swing do ativo. */
 export const GET = withApi(async (req) => {
+  await requireCoreUser(req);
   await connection();
   await enforceRateLimit(req, "public");
   const q = parseQuery(req, querySchema);

@@ -24,7 +24,7 @@ const PRO_TF = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"];
 export const ENTITLEMENTS: Record<Tier, Entitlements> = {
   NONE: { tier: "NONE", core: false, elite: false, timeframes: [], maxAlerts: 0, maxMonitors: 0, maxStrategies: 0, aiQueriesPerDay: 0, historyDays: 0 },
   // trial com limites anti-abuso (menos alertas/monitores que o PRO)
-  TRIAL: { tier: "TRIAL", core: true, elite: false, timeframes: PRO_TF, maxAlerts: 10, maxMonitors: 2, maxStrategies: 3, aiQueriesPerDay: 20, historyDays: 180 },
+  TRIAL: { tier: "TRIAL", core: true, elite: false, timeframes: PRO_TF, maxAlerts: 5, maxMonitors: 1, maxStrategies: 2, aiQueriesPerDay: 10, historyDays: 90 },
   PRO: { tier: "PRO", core: true, elite: false, timeframes: PRO_TF, maxAlerts: 50, maxMonitors: 5, maxStrategies: 10, aiQueriesPerDay: 100, historyDays: 365 },
   ELITE: { tier: "ELITE", core: true, elite: true, timeframes: PRO_TF, maxAlerts: 200, maxMonitors: 20, maxStrategies: 50, aiQueriesPerDay: 500, historyDays: 1095 },
   ADMIN: { tier: "ADMIN", core: true, elite: true, timeframes: PRO_TF, maxAlerts: 1000, maxMonitors: 100, maxStrategies: 500, aiQueriesPerDay: 5000, historyDays: 3650 },

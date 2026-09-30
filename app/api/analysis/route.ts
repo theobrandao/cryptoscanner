@@ -2,9 +2,9 @@ import { connection } from "next/server";
 import { z } from "zod";
 import { symbolSchema } from "@/agents/schemas";
 import { enforceRateLimit, ok, parseQuery, withApi } from "@/lib/api";
-import { getSessionFromRequest } from "@/lib/auth";
 import { parseTimeframe } from "@/lib/timeframes";
 import { analyzeAsset, jsonSafe } from "@/services/analysis-service";
+import { requireCoreUser } from "@/services/subscription-service";
 
 const querySchema = z.object({
   symbol: symbolSchema,
@@ -19,7 +19,7 @@ export const GET = withApi(async (req) => {
   await connection();
   await enforceRateLimit(req, "public");
   const q = parseQuery(req, querySchema);
-  const user = await getSessionFromRequest(req);
+  const user = await requireCoreUser(req);
   // LLM e coleta forçada (custo externo) só para usuário logado, no balde de LLM
   const useLlm = q.llm === "1" && Boolean(user);
   if (useLlm || q.refresh === "1") await enforceRateLimit(req, "llm", user ? `u:${user.id}` : undefined);

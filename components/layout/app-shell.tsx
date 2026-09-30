@@ -41,6 +41,7 @@ import { apiFetch } from "@/lib/client-api";
 import { formatPct, formatPrice } from "@/lib/format";
 import type { VenueStatus } from "@/services/market/venues";
 import { cn } from "@/lib/utils";
+import { AccessGate } from "@/components/account/access-gate";
 
 type NavLink = { href: string; label: string; icon: React.ComponentType<{ className?: string }>; match?: string[]; exact?: boolean; badge?: string; category?: string };
 
@@ -484,6 +485,14 @@ function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
 /** Rotas de venda: sem menu do produto (foco na oferta). */
 const SALES_ROUTES = ["/vendas"];
 
+/** Páginas abertas sem plano: venda, conta, documentos e estado do sistema. Todo o resto exige teste ativo ou plano pago. */
+const OPEN_ROUTES = ["/vendas", "/planos", "/login", "/registro", "/esqueci-senha", "/redefinir-senha", "/termos", "/privacidade", "/reembolso", "/status", "/suporte", "/preferencias", "/admin"];
+const isOpenRoute = (p: string) => p === "/" || OPEN_ROUTES.some((r) => p === r || p.startsWith(r + "/"));
+function featureName(p: string) {
+  const t = [...MAIN_TOOLS, ...ADVANCED_TOOLS].find((x) => p === x.href || p.startsWith(x.href + "/"));
+  return t?.name ?? "Esta ferramenta";
+}
+
 function SalesShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
@@ -595,7 +604,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <UserMenu />
           </div>
         </header>
-        <main className="min-w-0 flex-1 pb-16 lg:pb-0">{children}</main>
+        <main className="min-w-0 flex-1 pb-16 lg:pb-0">{isOpenRoute(pathname) ? children : <AccessGate feature={featureName(pathname)}>{children}</AccessGate>}</main>
         <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
           <span>
             Conteúdo técnico e educacional, não é recomendação de investimento. Dados: Binance, Bybit, OKX, Kraken, CoinGecko, CoinPaprika, BCB (PTAX), alternative.me. Confluence Score mede qualidade de confluência, não probabilidade.

@@ -6,6 +6,7 @@ import { parseTimeframe } from "@/lib/timeframes";
 import { getCandles } from "@/services/market/market-service";
 import { computeSnapshot } from "@/lib/indicators/snapshot";
 import { bollinger, ema, macd, stochRsi } from "@/lib/indicators/core";
+import { requireCoreUser } from "@/services/subscription-service";
 
 const querySchema = z.object({
   symbol: symbolSchema,
@@ -16,6 +17,7 @@ const querySchema = z.object({
 
 /** Candles normalizados + (opcional) séries de indicadores para o gráfico. */
 export const GET = withApi(async (req) => {
+  await requireCoreUser(req);
   await connection();
   await enforceRateLimit(req, "public");
   const q = parseQuery(req, querySchema);

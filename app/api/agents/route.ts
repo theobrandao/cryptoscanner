@@ -1,13 +1,14 @@
 import { connection } from "next/server";
 import { z } from "zod";
 import { requirePrisma } from "@/database/client";
-import { ApiError, ok, parseBody, parseQuery, requireUser, withApi } from "@/lib/api";
+import { ApiError, ok, parseBody, parseQuery, withApi } from "@/lib/api";
 import { PLANS, planAllowsTimeframe } from "@/lib/plans";
 import { agentBodySchema } from "@/lib/validation/agent";
+import { requireCoreUser } from "@/services/subscription-service";
 
 export const GET = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const q = parseQuery(req, z.object({ status: z.enum(["ALL", "ACTIVE", "PAUSED", "STOPPED"]).default("ALL") }));
   const prisma = requirePrisma();
   const items = await prisma.agent.findMany({
@@ -21,7 +22,7 @@ export const GET = withApi(async (req) => {
 
 export const POST = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const body = await parseBody(req, agentBodySchema);
   const plan = PLANS[user.plan];
   if (!planAllowsTimeframe(user.plan, body.timeframe)) throw new ApiError(403, `Timeframe ${body.timeframe.toUpperCase()} disponível apenas no plano PLATINUM`, "plan_required");
@@ -36,7 +37,7 @@ export const POST = withApi(async (req) => {
 /** "Excluir Todos" — irreversível. */
 export const DELETE = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const { count } = await requirePrisma().agent.deleteMany({ where: { userId: user.id, kind: "agent" } });
   return ok({ deleted: count });
 });

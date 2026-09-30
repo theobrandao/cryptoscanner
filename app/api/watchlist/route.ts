@@ -2,9 +2,10 @@ import { connection } from "next/server";
 import { z } from "zod";
 import { symbolSchema } from "@/agents/schemas";
 import { requirePrisma } from "@/database/client";
-import { ApiError, ok, parseBody, requireUser, withApi } from "@/lib/api";
+import { ApiError, ok, parseBody, withApi } from "@/lib/api";
 import { ASSETS } from "@/lib/assets";
 import { getTickers } from "@/services/market/market-service";
+import { requireCoreUser } from "@/services/subscription-service";
 
 async function defaultWatchlist(userId: string) {
   const prisma = requirePrisma();
@@ -16,7 +17,7 @@ async function defaultWatchlist(userId: string) {
 /** Watchlist/carteira do usuário com preços atuais e P&L simulado. */
 export const GET = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const wl = await defaultWatchlist(user.id);
   const { tickers, source, stale } = await getTickers().catch(() => ({ tickers: [], source: "cache" as const, stale: true }));
   const byS = new Map(tickers.map((t) => [t.symbol, t]));
@@ -47,7 +48,7 @@ const addSchema = z.object({ symbol: symbolSchema, quantity: z.number().nonnegat
 
 export const POST = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const body = await parseBody(req, addSchema);
   const prisma = requirePrisma();
   const def = ASSETS.find((a) => a.symbol === body.symbol);

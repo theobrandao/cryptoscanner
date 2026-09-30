@@ -77,6 +77,15 @@ await step("Início (anônimo): página de venda com ferramentas, números fora 
   return await shot("inicio-anonimo");
 });
 
+await step("Ferramentas sem conta mostram o portão de acesso (teste grátis ou entrar)", async () => {
+  await goto("/scanner/padroes");
+  await page.waitForFunction(() => /Testar \d+ dias grátis/.test(document.body.innerText) && /Entrar/.test(document.body.innerText) && !/Escanear Agora/.test(document.body.innerText), null, { timeout: 20_000 });
+  // conta de apoio em teste grátis para percorrer as ferramentas (visitante não usa o produto)
+  const r = await page.request.post(BASE + "/api/auth/register", { data: { name: "E2E Apoio", email: `e2e-pre+${stamp}@cryptoscanner.local`, password: PASSWORD, acceptTerms: true, invite: process.env.INVITE_CODE ?? "" } });
+  expect(r.status() === 201, `conta de apoio: HTTP ${r.status()}`);
+  return "portão exibido · conta de apoio em teste grátis";
+});
+
 await step("Scanner: tabela em tempo real com 30 linhas (inclui ZEC e ALGO) e RSI", async () => {
   await goto("/scanner/padroes");
   await page.waitForSelector("table tbody tr", { timeout: 30_000 });
@@ -197,6 +206,10 @@ await step("Mentor: pergunta com dados reais e SOS mindset", async () => {
   await page.waitForFunction(() => /anti-revenge/.test(document.body.innerText), null, { timeout: 20_000 });
   return `dados reais + protocolo · ${await shot("mentor")}`;
 });
+
+// fim das ferramentas com a conta de apoio: exclui a conta e volta a visitante
+await page.request.delete(BASE + "/api/auth/account", { data: { confirm: "EXCLUIR", password: PASSWORD } }).catch(() => null);
+await context.clearCookies();
 
 await step("Página de vendas /vendas: oferta, modelo, planos com teste só no PRO, garantia, FAQ e CTA fixo no celular", async () => {
   await goto("/vendas");

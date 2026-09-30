@@ -5,11 +5,13 @@ import { ASSETS } from "@/lib/assets";
 import { cached } from "@/lib/cache";
 import { getDerivativesSnapshot, type DerivativesSnapshot } from "@/services/market/providers/binance-futures";
 import { getOkxDerivativesSnapshot } from "@/services/market/providers/okx-derivatives";
+import { requireCoreUser } from "@/services/subscription-service";
 
 const querySchema = z.object({ symbols: z.string().default("BTC,ETH,SOL") });
 
 /** Derivativos (Binance Futures público): funding, open interest, long/short e agressão taker por ativo. */
 export const GET = withApi(async (req) => {
+  await requireCoreUser(req);
   await connection();
   await enforceRateLimit(req, "public");
   const q = parseQuery(req, querySchema);

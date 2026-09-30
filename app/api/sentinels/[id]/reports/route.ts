@@ -1,12 +1,13 @@
 import { connection } from "next/server";
 import { z } from "zod";
 import { requirePrisma } from "@/database/client";
-import { ApiError, ok, parseQuery, requireUser, withApi } from "@/lib/api";
+import { ApiError, ok, parseQuery, withApi } from "@/lib/api";
+import { requireCoreUser } from "@/services/subscription-service";
 
 /** Relatórios de sinal do Sentinela (logs de nível "signal"/"info"/"warn"), mais recentes primeiro. Retenção: 30 dias. */
 export const GET = withApi(async (req, ctx) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const { id } = await ctx.params;
   const q = parseQuery(req, z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) }));
   const prisma = requirePrisma();

@@ -2,11 +2,11 @@ import { connection } from "next/server";
 import { z } from "zod";
 import { symbolSchema } from "@/agents/schemas";
 import { ApiError, enforceRateLimit, ok, parseBody, withApi } from "@/lib/api";
-import { getSessionFromRequest } from "@/lib/auth";
 import { getPrisma } from "@/database/client";
 import { planAllowsTimeframe } from "@/lib/plans";
 import { parseTimeframe } from "@/lib/timeframes";
 import { runScan } from "@/services/scanner-service";
+import { requireCoreUser } from "@/services/subscription-service";
 
 const bodySchema = z.object({
   timeframe: z.string().default("4h"),
@@ -23,7 +23,7 @@ export const POST = withApi(async (req) => {
   await enforceRateLimit(req, "public");
   const body = await parseBody(req, bodySchema);
   const tf = parseTimeframe(body.timeframe);
-  const user = await getSessionFromRequest(req);
+  const user = await requireCoreUser(req);
   if (!planAllowsTimeframe(user?.plan, tf)) throw new ApiError(403, `Timeframe ${tf.toUpperCase()} disponível apenas no plano PLATINUM`, "plan_required");
   const res = await runScan({ timeframe: tf, direction: body.direction, symbols: body.symbols, minConfidence: body.minConfidence, includeVolume: body.includeVolume, refresh: body.refresh });
 

@@ -7,11 +7,13 @@ import { detectVolumeAnomaly, type VolumeAnomaly } from "@/lib/scanner/volume";
 import { getCandles } from "@/services/market/market-service";
 import { createLimiter } from "@/services/market/providers/types";
 import type { Timeframe } from "@/types/market";
+import { requireCoreUser } from "@/services/subscription-service";
 
 const querySchema = z.object({ timeframes: z.string().default("30m,1h"), threshold: z.coerce.number().min(10).max(1000).default(100) });
 
 /** Monitor de volume anômalo (30M e 1H por padrão) nos 30 ativos. */
 export const GET = withApi(async (req) => {
+  await requireCoreUser(req);
   await connection();
   await enforceRateLimit(req, "public");
   const q = parseQuery(req, querySchema);

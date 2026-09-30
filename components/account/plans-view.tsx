@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { trackClient } from "@/lib/analytics-client";
 import { billingNote, PLAN_FEATURES, PROVIDER_LABEL, type BillingProvider } from "@/lib/plans-copy";
 import type { AccessView } from "@/services/subscription-service";
+import { withAffiliateParams } from "@/lib/affiliate-params";
 
 interface SubPayload extends AccessView {
   billing: { provider: BillingProvider; configured: boolean; prices: { PRO: number; ELITE: number }; currency: string };
@@ -48,7 +49,7 @@ export function PlansView() {
     setBusy(plan);
     try {
       const r = await postJson<{ url: string }>("/api/billing/checkout", { plan });
-      window.location.href = r.url;
+      window.location.href = withAffiliateParams(r.url);
     } catch (err) {
       toast({ title: "Não foi possível iniciar o pagamento", description: err instanceof ApiClientError ? err.message : String(err), variant: "danger" });
       setBusy(null);
@@ -129,7 +130,7 @@ export function PlansView() {
                     Começar {trial} dias grátis
                   </Link>
                 ) : directUrl ? (
-                  <a href={directUrl} rel="noopener" className="mt-5 flex h-11 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+                  <a href={directUrl} rel="noopener" onClick={(e) => (e.currentTarget.href = withAffiliateParams(directUrl))} className="mt-5 flex h-11 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
                     Assinar ELITE
                   </a>
                 ) : (

@@ -1,8 +1,9 @@
 import { connection } from "next/server";
 import { z } from "zod";
 import { requirePrisma } from "@/database/client";
-import { ApiError, ok, parseBody, requireUser, withApi } from "@/lib/api";
+import { ApiError, ok, parseBody, withApi } from "@/lib/api";
 import { agentBodySchema } from "@/lib/validation/agent";
+import { requireCoreUser } from "@/services/subscription-service";
 
 const patchSchema = agentBodySchema.partial().extend({ status: z.enum(["ACTIVE", "PAUSED", "STOPPED"]).optional() });
 
@@ -14,7 +15,7 @@ async function own(userId: string, id: string) {
 
 export const GET = withApi(async (req, ctx) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const { id } = await ctx.params;
   const agent = await own(user.id, id ?? "");
   const executions = await requirePrisma().agentExecution.findMany({ where: { agentId: agent.id }, orderBy: { startedAt: "desc" }, take: 10 });
@@ -23,7 +24,7 @@ export const GET = withApi(async (req, ctx) => {
 
 export const PATCH = withApi(async (req, ctx) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const { id } = await ctx.params;
   const agent = await own(user.id, id ?? "");
   const body = await parseBody(req, patchSchema);
@@ -33,7 +34,7 @@ export const PATCH = withApi(async (req, ctx) => {
 
 export const DELETE = withApi(async (req, ctx) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const { id } = await ctx.params;
   const agent = await own(user.id, id ?? "");
   await requirePrisma().agent.delete({ where: { id: agent.id } });

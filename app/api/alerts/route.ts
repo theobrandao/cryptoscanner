@@ -2,11 +2,12 @@ import { connection } from "next/server";
 import { z } from "zod";
 import { symbolSchema } from "@/agents/schemas";
 import { requirePrisma } from "@/database/client";
-import { ApiError, ok, parseBody, requireUser, withApi } from "@/lib/api";
+import { ApiError, ok, parseBody, withApi } from "@/lib/api";
 import { ASSETS } from "@/lib/assets";
 import { PATTERN_KEYS } from "@/lib/patterns/catalog";
 import { PLANS } from "@/lib/plans";
 import { TIMEFRAMES } from "@/types/market";
+import { requireCoreUser } from "@/services/subscription-service";
 
 const createSchema = z
   .object({
@@ -24,14 +25,14 @@ const createSchema = z
 
 export const GET = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const items = await requirePrisma().alert.findMany({ where: { userId: user.id }, include: { asset: { select: { symbol: true, name: true } } }, orderBy: { createdAt: "desc" } });
   return ok({ items });
 });
 
 export const POST = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const body = await parseBody(req, createSchema);
   if (body.channel !== "log" && !PLANS[user.plan].telegramAlerts) throw new ApiError(403, "Alertas no Telegram exigem plano PRO ou PLATINUM", "plan_required");
   const prisma = requirePrisma();

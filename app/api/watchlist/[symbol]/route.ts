@@ -1,7 +1,8 @@
 import { connection } from "next/server";
 import { z } from "zod";
 import { requirePrisma } from "@/database/client";
-import { ApiError, ok, parseBody, requireUser, withApi } from "@/lib/api";
+import { ApiError, ok, parseBody, withApi } from "@/lib/api";
+import { requireCoreUser } from "@/services/subscription-service";
 
 const patchSchema = z.object({ quantity: z.number().nonnegative().nullable().optional(), avgPrice: z.number().nonnegative().nullable().optional(), note: z.string().max(200).nullable().optional() });
 
@@ -14,7 +15,7 @@ async function findItem(userId: string, symbol: string) {
 
 export const PATCH = withApi(async (req, ctx) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const { symbol } = await ctx.params;
   const body = await parseBody(req, patchSchema);
   const item = await findItem(user.id, symbol ?? "");
@@ -24,7 +25,7 @@ export const PATCH = withApi(async (req, ctx) => {
 
 export const DELETE = withApi(async (req, ctx) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const { symbol } = await ctx.params;
   const item = await findItem(user.id, symbol ?? "");
   await requirePrisma().watchlistItem.delete({ where: { id: item.id } });

@@ -25,19 +25,27 @@ const SKIP_RATE_LIMIT = process.env.SKIP_RATE_LIMIT === "1";
 const results = [];
 const state = {};
 let cookie = "";
+/** Sessão de uma conta em teste grátis criada no início: as rotas de ferramenta exigem conta com plano. */
+let preCookie = "";
+let capturePre = false;
 
 function jar(res) {
   const set = res.headers.getSetCookie?.() ?? [];
   for (const c of set) {
     const [pair] = c.split(";");
     const [name, value] = pair.split("=");
-    if (name === "cs_session") cookie = value ? `cs_session=${value}` : "";
+    if (name === "cs_session") {
+      if (capturePre) preCookie = value ? `cs_session=${value}` : "";
+      else cookie = value ? `cs_session=${value}` : "";
+    }
   }
 }
 
 async function call(method, path, { body, form, headers = {}, auth = true, raw = false } = {}) {
   const h = { ...headers };
-  if (auth && cookie) h.cookie = cookie;
+  if (auth === "pre") {
+    if (preCookie) h.cookie = preCookie;
+  } else if (auth && cookie) h.cookie = cookie;
   let payload;
   if (form) payload = form;
   else if (body !== undefined) {
@@ -100,6 +108,15 @@ function expectStatus(r, status, code) {
 const stamp = Date.now();
 const EMAIL = `smoke+${stamp}@cryptoscanner.local`;
 const PASSWORD = "Smoke12345!";
+const PRE_EMAIL = `smoke-pre+${stamp}@cryptoscanner.local`;
+
+// conta em teste grátis para as rotas de ferramenta (visitante e conta sem plano não usam o produto)
+capturePre = true;
+{
+  const r = await call("POST", "/api/auth/register", { auth: false, body: { name: "Smoke Pre", email: PRE_EMAIL, password: PASSWORD, acceptTerms: true, ...(INVITE ? { invite: INVITE } : {}) } });
+  if (r.res.status !== 201) console.error(`conta de apoio não criada (HTTP ${r.res.status}); rotas de ferramenta vão responder 401`);
+}
+capturePre = false;
 
 // ------------------------------------------------------------------ públicas
 await test("Saúde", "GET /api/health", async () => {
@@ -171,7 +188,7 @@ await test("Mercado", "GET /api/market/fx (USD→BRL)", async () => {
 });
 
 await test("Mercado", "GET /api/market/global (CoinGecko)", async () => {
-  const r = await call("GET", "/api/market/global", { auth: false });
+  const r = await call("GET", "/api/market/global", { auth: "pre" });
   expectStatus(r, 200);
   const g = r.json.data.global ?? r.json.data;
   expect(g && (g.total_market_cap || g.totalMarketCap || g.markets), "sem dados globais");
@@ -179,9 +196,9 @@ await test("Mercado", "GET /api/market/global (CoinGecko)", async () => {
 });
 
 await test("Mercado", "GET /api/market/candles BTC 4h limit=100 indicators=1", async () => {
-  const z = await call("GET", "/api/market/candles?symbol=ZEC&timeframe=1d&limit=60", { auth: false });
+  const z = await call("GET", "/api/market/candles?symbol=ZEC&timeframe=1d&limit=60", { auth: "pre" });
   expect(z.res.status === 200 && z.json.data.candles.length === 60, "candles de ZEC indisponíveis");
-  const r = await call("GET", "/api/market/candles?symbol=BTC&timeframe=4h&limit=100&indicators=1", { auth: false });
+  const r = await call("GET", "/api/market/candles?symbol=BTC&timeframe=4h&limit=100&indicators=1", { auth: "pre" });
   expectStatus(r, 200);
   const d = r.json.data;
   expect(d.candles.length === 100, `${d.candles.length} candles`);
@@ -192,20 +209,20 @@ await test("Mercado", "GET /api/market/candles BTC 4h limit=100 indicators=1", a
 });
 
 await test("Mercado", "GET /api/market/candles símbolo inválido → 400", async () => {
-  const r = await call("GET", "/api/market/candles?symbol=NAOEXISTE&timeframe=4h", { auth: false });
+  const r = await call("GET", "/api/market/candles?symbol=NAOEXISTE&timeframe=4h", { auth: "pre" });
   expect(r.res.status === 400 || r.res.status === 404, `HTTP ${r.res.status}`);
   return `HTTP ${r.res.status} ${r.json?.error?.code ?? ""}`;
 });
 
 await test("Mercado", "GET /api/market/candles limit=5 → 400 (validação)", async () => {
-  const r = await call("GET", "/api/market/candles?symbol=BTC&timeframe=4h&limit=5", { auth: false });
+  const r = await call("GET", "/api/market/candles?symbol=BTC&timeframe=4h&limit=5", { auth: "pre" });
   expectStatus(r, 400, "validation");
   return "400 validation";
 });
 
 for (const tf of ["4h", "1d", "1w"]) {
   await test("Scanner", `GET /api/scanner/table?timeframe=${tf}`, async () => {
-    const r = await call("GET", `/api/scanner/table?timeframe=${tf}`, { auth: false });
+    const r = await call("GET", `/api/scanner/table?timeframe=${tf}`, { auth: "pre" });
     expectStatus(r, 200);
     const rows = r.json.data.rows;
     expect(rows.length === state.nAssets, `${rows.length} linhas`);
@@ -216,14 +233,16 @@ for (const tf of ["4h", "1d", "1w"]) {
   });
 }
 
-await test("Scanner", "GET /api/scanner/table?timeframe=1h anônimo → 403 plan_required", async () => {
-  const r = await call("GET", "/api/scanner/table?timeframe=1h", { auth: false });
-  expectStatus(r, 403, "plan_required");
-  return "403 plan_required";
+await test("Scanner", "Ferramentas exigem conta com plano: visitante → 401 (scanner, gráficos, bolhas, Fibonacci, estatística)", async () => {
+  for (const [m, path, body] of [["GET", "/api/scanner/table?timeframe=4h"], ["GET", "/api/market/candles?symbol=BTC&timeframe=4h"], ["GET", "/api/market/bubbles"], ["GET", "/api/fibonacci?high=2&low=1&direction=up"], ["GET", "/api/patterns/stats?timeframe=4h"]]) {
+    const r = await call(m, path, { auth: false, ...(body ? { body } : {}) });
+    expectStatus(r, 401, "unauthorized");
+  }
+  return "5 rotas → 401";
 });
 
 await test("Scanner", "POST /api/scanner/run 1d bullish minConfidence=60", async () => {
-  const r = await call("POST", "/api/scanner/run", { auth: false, body: { timeframe: "1d", direction: "bullish", minConfidence: 60, includeVolume: true } });
+  const r = await call("POST", "/api/scanner/run", { auth: "pre", body: { timeframe: "1d", direction: "bullish", minConfidence: 60, includeVolume: true } });
   expectStatus(r, 200);
   const d = r.json.data;
   const n = d.rows?.length ?? d.results?.length ?? 0;
@@ -231,15 +250,15 @@ await test("Scanner", "POST /api/scanner/run 1d bullish minConfidence=60", async
 });
 
 await test("Scanner", "POST /api/scanner/run symbols=[BTC,ETH] 4h", async () => {
-  const r = await call("POST", "/api/scanner/run", { auth: false, body: { timeframe: "4h", symbols: ["BTC", "ETH"], minConfidence: 50 } });
+  const r = await call("POST", "/api/scanner/run", { auth: "pre", body: { timeframe: "4h", symbols: ["BTC", "ETH"], minConfidence: 50 } });
   expectStatus(r, 200);
   const rows = r.json.data.rows ?? r.json.data.results ?? [];
   expect(rows.length === 2, `${rows.length} linhas`);
   return `2 linhas`;
 });
 
-await test("Scanner", "POST /api/scanner/run timeframe=15m anônimo → 403", async () => {
-  const r = await call("POST", "/api/scanner/run", { auth: false, body: { timeframe: "15m" } });
+await test("Scanner", "POST /api/scanner/run timeframe=15m no teste grátis → 403 (só ELITE)", async () => {
+  const r = await call("POST", "/api/scanner/run", { auth: "pre", body: { timeframe: "15m" } });
   expectStatus(r, 403, "plan_required");
   return "403 plan_required";
 });
@@ -252,7 +271,7 @@ await test("Scanner", "GET /api/scanner/patterns (17 padrões)", async () => {
 });
 
 await test("Scanner", "GET /api/scanner/volume (30m,1h)", async () => {
-  const r = await call("GET", "/api/scanner/volume", { auth: false });
+  const r = await call("GET", "/api/scanner/volume", { auth: "pre" });
   expectStatus(r, 200);
   const d = r.json.data;
   expect(d.assets === state.nAssets, `assets=${d.assets}`);
@@ -261,13 +280,13 @@ await test("Scanner", "GET /api/scanner/volume (30m,1h)", async () => {
 });
 
 await test("Scanner", "GET /api/scanner/volume threshold=5 → 400", async () => {
-  const r = await call("GET", "/api/scanner/volume?threshold=5", { auth: false });
+  const r = await call("GET", "/api/scanner/volume?threshold=5", { auth: "pre" });
   expectStatus(r, 400, "validation");
   return "400";
 });
 
 await test("Fibonacci", "GET /api/fibonacci ETH 1d automático", async () => {
-  const r = await call("GET", "/api/fibonacci?symbol=ETH&timeframe=1d", { auth: false });
+  const r = await call("GET", "/api/fibonacci?symbol=ETH&timeframe=1d", { auth: "pre" });
   expectStatus(r, 200);
   const d = r.json.data;
   expect(d.mode === "auto" && d.result.high > d.result.low, "resultado inválido");
@@ -275,7 +294,7 @@ await test("Fibonacci", "GET /api/fibonacci ETH 1d automático", async () => {
 });
 
 await test("Fibonacci", "GET /api/fibonacci manual high=100 low=50 direction=up", async () => {
-  const r = await call("GET", "/api/fibonacci?symbol=BTC&high=100&low=50&direction=up", { auth: false });
+  const r = await call("GET", "/api/fibonacci?symbol=BTC&high=100&low=50&direction=up", { auth: "pre" });
   expectStatus(r, 200);
   const levels = r.json.data.result.levels ?? r.json.data.result.retracements ?? [];
   const l618 = levels.find((l) => Math.abs(l.ratio - 0.618) < 1e-6);
@@ -285,7 +304,7 @@ await test("Fibonacci", "GET /api/fibonacci manual high=100 low=50 direction=up"
 });
 
 await test("Bubbles", "GET /api/market/bubbles (100 ativos, 4 períodos)", async () => {
-  const r = await call("GET", "/api/market/bubbles", { auth: false });
+  const r = await call("GET", "/api/market/bubbles", { auth: "pre" });
   expectStatus(r, 200);
   const d = r.json.data;
   expect(d.bubbles.length >= 80, `${d.bubbles.length} bolhas`);
@@ -296,7 +315,7 @@ await test("Bubbles", "GET /api/market/bubbles (100 ativos, 4 períodos)", async
 });
 
 await test("Bubbles", "GET /api/market/bubbles?limit=20&currency=BRL", async () => {
-  const r = await call("GET", "/api/market/bubbles?limit=20&currency=BRL", { auth: false });
+  const r = await call("GET", "/api/market/bubbles?limit=20&currency=BRL", { auth: "pre" });
   expectStatus(r, 200);
   expect(r.json.data.bubbles.length === 20, `${r.json.data.bubbles.length}`);
   const btc = r.json.data.bubbles.find((b) => b.symbol === "BTC");
@@ -305,7 +324,7 @@ await test("Bubbles", "GET /api/market/bubbles?limit=20&currency=BRL", async () 
 });
 
 await test("Panorama", "GET /api/market/panorama (resumo executivo)", async () => {
-  const r = await call("GET", "/api/market/panorama", { auth: false });
+  const r = await call("GET", "/api/market/panorama", { auth: "pre" });
   expectStatus(r, 200);
   const d = r.json.data;
   expect(Array.isArray(d.summary) && d.summary.length >= 3, "resumo curto");
@@ -316,7 +335,7 @@ await test("Panorama", "GET /api/market/panorama (resumo executivo)", async () =
 });
 
 await test("Panorama", "GET /api/market/derivatives (Binance Futures público)", async () => {
-  const r = await call("GET", "/api/market/derivatives?symbols=BTC,ETH", { auth: false });
+  const r = await call("GET", "/api/market/derivatives?symbols=BTC,ETH", { auth: "pre" });
   expectStatus(r, 200);
   const d = r.json.data;
   const btc = d.items.find((x) => x.symbol === "BTC");
@@ -326,7 +345,7 @@ await test("Panorama", "GET /api/market/derivatives (Binance Futures público)",
 });
 
 await test("Simulador", "POST /api/simulations/run DCA BTC BRL 12 meses", async () => {
-  const r = await call("POST", "/api/simulations/run", { auth: false, body: { symbol: "BTC", strategy: "dca", currency: "BRL", initialCapital: 1000, monthlyContribution: 500, months: 12, riskProfile: "moderado" } });
+  const r = await call("POST", "/api/simulations/run", { auth: "pre", body: { symbol: "BTC", strategy: "dca", currency: "BRL", initialCapital: 1000, monthlyContribution: 500, months: 12, riskProfile: "moderado" } });
   expectStatus(r, 200);
   const d = r.json.data.result;
   expect(d.contributions >= 12 && d.totalInvested === 1000 + 500 * (d.contributions - 1), `aportes ${d.contributions} investido ${d.totalInvested}`);
@@ -336,7 +355,7 @@ await test("Simulador", "POST /api/simulations/run DCA BTC BRL 12 meses", async 
 });
 
 await test("Simulador", "POST /api/simulations/run aporte único ETH USD 6 meses", async () => {
-  const r = await call("POST", "/api/simulations/run", { auth: false, body: { symbol: "ETH", strategy: "lump_sum", currency: "USD", initialCapital: 5000, months: 6, riskProfile: "arrojado" } });
+  const r = await call("POST", "/api/simulations/run", { auth: "pre", body: { symbol: "ETH", strategy: "lump_sum", currency: "USD", initialCapital: 5000, months: 6, riskProfile: "arrojado" } });
   expectStatus(r, 200);
   const d = r.json.data.result;
   expect(d.contributions === 1 && Math.abs(d.profitPct - d.benchmarkHoldPct) < 0.01, "aporte único 100% deveria igualar HODL");
@@ -344,7 +363,7 @@ await test("Simulador", "POST /api/simulations/run aporte único ETH USD 6 meses
 });
 
 await test("Simulador", "POST /api/simulations/run em EUR (câmbio EURUSDT diário)", async () => {
-  const r = await call("POST", "/api/simulations/run", { auth: false, body: { symbol: "BTC", strategy: "lump_sum", currency: "EUR", initialCapital: 1000, months: 6, riskProfile: "arrojado" } });
+  const r = await call("POST", "/api/simulations/run", { auth: "pre", body: { symbol: "BTC", strategy: "lump_sum", currency: "EUR", initialCapital: 1000, months: 6, riskProfile: "arrojado" } });
   expectStatus(r, 200);
   const d = r.json.data.result;
   expect(d.fx.applied && /EURUSDT/.test(d.fx.source), "câmbio EUR não aplicado");
@@ -353,13 +372,13 @@ await test("Simulador", "POST /api/simulations/run em EUR (câmbio EURUSDT diár
 });
 
 await test("Simulador", "POST /api/simulations/run sem capital → 400", async () => {
-  const r = await call("POST", "/api/simulations/run", { auth: false, body: { symbol: "BTC", strategy: "lump_sum", currency: "USD", initialCapital: 0, months: 6 } });
+  const r = await call("POST", "/api/simulations/run", { auth: "pre", body: { symbol: "BTC", strategy: "lump_sum", currency: "USD", initialCapital: 0, months: 6 } });
   expectStatus(r, 400, "validation");
   return "400";
 });
 
 await test("Análise", "GET /api/analysis BTC 4h (orquestrador)", async () => {
-  const r = await call("GET", "/api/analysis?symbol=BTC&timeframe=4h", { auth: false });
+  const r = await call("GET", "/api/analysis?symbol=BTC&timeframe=4h", { auth: "pre" });
   expectStatus(r, 200);
   const d = r.json.data;
   expect(["bullish", "bearish", "neutral"].includes(d.verdict), `verdict=${d.verdict}`);
@@ -368,7 +387,7 @@ await test("Análise", "GET /api/analysis BTC 4h (orquestrador)", async () => {
 });
 
 await test("Análise", "GET /api/analysis sentiment=0 llm=0 SOL 1d", async () => {
-  const r = await call("GET", "/api/analysis?symbol=SOL&timeframe=1d&sentiment=0&llm=0", { auth: false });
+  const r = await call("GET", "/api/analysis?symbol=SOL&timeframe=1d&sentiment=0&llm=0", { auth: "pre" });
   expectStatus(r, 200);
   return `verdict ${r.json.data.verdict}`;
 });
@@ -435,7 +454,7 @@ if (CRON_SECRET) {
 await test("Mentor", "POST /api/mentor — ativo, SOS, padrão, conceito, fora da base", async () => {
   const out = [];
   for (const [q, re] of [["Como está o SOL em 4h?", /Solana \(SOL\) em 4H: preço US\$/], ["Tomei stop agora, e agora?", /anti-revenge/], ["O que é fundo duplo?", /Fundo Duplo/], ["Como calcular o tamanho da posição?", /Tamanho da posição/], ["qual a capital da frança", /Não encontrei/]]) {
-    const r = await call("POST", "/api/mentor", { auth: false, body: { message: q } });
+    const r = await callAuth("POST", "/api/mentor", { auth: "pre", body: { message: q } });
     expectStatus(r, 200);
     expect(re.test(r.json.data.answer), `resposta inesperada para "${q}": ${r.json.data.answer.slice(0, 80)}`);
     out.push(r.json.data.mode);
@@ -457,7 +476,7 @@ await test("Estatística", "POST /api/cron/backtest (segredo errado → 401; cor
 await test("Estatística", "GET /api/patterns/stats 4h e 1d (taxa, IC 95%, ao vivo)", async () => {
   const out = [];
   for (const tf of ["4h", "1d"]) {
-    const r = await call("GET", `/api/patterns/stats?timeframe=${tf}`, { auth: false });
+    const r = await call("GET", `/api/patterns/stats?timeframe=${tf}`, { auth: "pre" });
     expectStatus(r, 200);
     const d = r.json.data;
     expect(d.rows.length >= 5 && d.assets >= 20, `${tf}: ${d.rows.length} padrões / ${d.assets} ativos`);
@@ -467,7 +486,7 @@ await test("Estatística", "GET /api/patterns/stats 4h e 1d (taxa, IC 95%, ao vi
     }
     out.push(`${tf}: ${d.totalTrades} op./${d.rows.length} padrões`);
   }
-  const inv = await call("GET", "/api/patterns/stats?timeframe=15m", { auth: false });
+  const inv = await call("GET", "/api/patterns/stats?timeframe=15m", { auth: "pre" });
   expectStatus(inv, 400);
   return out.join(" · ") + " · 15m → 400";
 });
@@ -482,7 +501,7 @@ await test("Operação", "GET /api/status (banco, provedores, jobs)", async () =
 });
 
 await test("Engines", "GET /api/engine/ETH?timeframe=4h (estrutura, liquidez, MTF; candle fechado)", async () => {
-  const r = await call("GET", "/api/engine/ETH?timeframe=4h", { auth: false });
+  const r = await call("GET", "/api/engine/ETH?timeframe=4h", { auth: "pre" });
   expectStatus(r, 200);
   const d = r.json.data;
   const ext = d.structure.external;
@@ -493,13 +512,13 @@ await test("Engines", "GET /api/engine/ETH?timeframe=4h (estrutura, liquidez, MT
   expect(Array.isArray(d.liquidity.pools) && d.liquidity.pools.length > 0, "mapa de liquidez vazio");
   expect(d.mtf.rows.length >= 4 && Math.abs(d.mtf.alignmentScore) <= 100, "MTF inválido");
   expect(d.candles === undefined, "candles não deveriam vir sem candles=1");
-  const bad = await call("GET", "/api/engine/XXX?timeframe=4h", { auth: false });
+  const bad = await call("GET", "/api/engine/XXX?timeframe=4h", { auth: "pre" });
   expect(bad.res.status === 400, `ativo inválido → ${bad.res.status}`);
   return `${ext.trend} · ${ext.sequence} · último ${ext.lastEvent?.type ?? "—"} · pools ${d.liquidity.pools.length} · HTF ${d.mtf.alignmentScore} · qualidade ${d.quality?.status}`;
 });
 
 await test("Engines", "GET /api/market/quality (status por ativo + divergência entre fontes)", async () => {
-  const r = await call("GET", "/api/market/quality?timeframe=4h", { auth: false });
+  const r = await call("GET", "/api/market/quality?timeframe=4h", { auth: "pre" });
   expectStatus(r, 200);
   const d = r.json.data;
   const total = Object.values(d.counts).reduce((a, b) => a + b, 0);
@@ -508,15 +527,15 @@ await test("Engines", "GET /api/market/quality (status por ativo + divergência 
 });
 
 await test("Estatística", "GET /api/patterns/stats com recorte ativo×regime e métricas em R", async () => {
-  const r = await call("GET", "/api/patterns/stats?timeframe=4h&symbol=BTC&regime=bull", { auth: false });
+  const r = await call("GET", "/api/patterns/stats?timeframe=4h&symbol=BTC&regime=bull", { auth: "pre" });
   expectStatus(r, 200);
   const d = r.json.data;
   expect(d.symbol === "BTC" && d.regime === "bull", "recorte não aplicado");
-  const all = await call("GET", "/api/patterns/stats?timeframe=4h", { auth: false });
+  const all = await call("GET", "/api/patterns/stats?timeframe=4h", { auth: "pre" });
   const row = all.json.data.rows[0];
   for (const k of ["hit1R", "hit2R", "hit3R", "expectancyR", "profitFactor", "maxDrawdownR", "avgMfeR", "avgMaeR"]) expect(k in row, `campo ${k} ausente`);
   expect(row.hit1R >= row.hit2R && row.hit2R >= row.hit3R, "1R ≥ 2R ≥ 3R violado");
-  const inv = await call("GET", "/api/patterns/stats?timeframe=4h&regime=xyz", { auth: false });
+  const inv = await call("GET", "/api/patterns/stats?timeframe=4h&regime=xyz", { auth: "pre" });
   expectStatus(inv, 400);
   return `BTC bull: ${d.rows.length} padrões · geral: ${row.key} E=${row.expectancyR?.toFixed(2)}R n=${row.samples}`;
 });
@@ -526,7 +545,7 @@ await test("On-chain", "GET /api/market/whales (coleta do cron) e POST /api/cron
     const c = await call("POST", "/api/cron/whales", { auth: false, headers: { authorization: `Bearer ${CRON_SECRET}` } });
     expectStatus(c, 200);
   }
-  const r = await call("GET", "/api/market/whales", { auth: false });
+  const r = await call("GET", "/api/market/whales", { auth: "pre" });
   expectStatus(r, 200);
   const s = r.json.data.snapshot;
   if (!s) return "sem coleta ainda";
@@ -697,7 +716,7 @@ await test("Comercial", "GET /api/markets/setups e /api/markets/overview", async
   expectStatus(s, 200);
   expect(s.json.data.rows.length >= 25, `ranking com ${s.json.data.rows.length} ativos`);
   for (let i = 1; i < s.json.data.rows.length; i++) expect(s.json.data.rows[i - 1].score >= s.json.data.rows[i].score, "ranking fora de ordem");
-  const o = await call("GET", "/api/markets/overview", { auth: false });
+  const o = await call("GET", "/api/markets/overview");
   expectStatus(o, 200);
   return `${s.json.data.rows.length} ativos ranqueados · F&G ${o.json.data.fearGreed?.value ?? "n/d"} · dominância ${o.json.data.global?.btcDominance?.toFixed?.(1) ?? "n/d"}%`;
 });
@@ -746,10 +765,12 @@ await test("R2", "Market Monitor: criar, duplicado → 409, listar, eventos, pau
   const dup = await call("POST", "/api/monitors", { body: { symbol: "BTC", timeframe: "4h", exchange: "binance", instrument: "spot", kind: "SETUP" } });
   expectStatus(dup, 409, "duplicate");
   const s = await call("POST", "/api/monitors", { body: { symbol: "ETH", timeframe: "1h", kind: "STRATEGY", strategyId: state.strategyId } });
-  expectStatus(s, 201);
   const list = await call("GET", "/api/monitors");
   expectStatus(list, 200);
-  expect(list.json.data.items.length === 2, `${list.json.data.items.length} monitores`);
+  const limit = list.json.data.limit;
+  if (limit >= 2) expectStatus(s, 201);
+  else expectStatus(s, 403, "monitor_limit");
+  expect(list.json.data.items.length === Math.min(2, limit), `${list.json.data.items.length} monitores com limite ${limit}`);
   const ev = await call("GET", "/api/monitors/events?limit=5");
   expectStatus(ev, 200);
   const p = await call("PATCH", `/api/monitors/${c.json.data.monitor.id}`, { body: { active: false } });
@@ -1138,7 +1159,8 @@ await test("Simulador", "POST /api/simulations (salvar) + GET + DELETE", async (
 });
 
 await test("Suporte", "GET /api/support (meus chamados)", async () => {
-  await call("POST", "/api/support", { body: { email: EMAIL, subject: "Chamado do usuário", message: "Mensagem de teste vinculada à conta de teste." } });
+  const post = await callAuth("POST", "/api/support", { body: { email: EMAIL, subject: "Chamado do usuário", message: "Mensagem de teste vinculada à conta de teste." } });
+  expect(post.res.status < 300, `abertura do chamado: HTTP ${post.res.status}`);
   const r = await call("GET", "/api/support");
   expectStatus(r, 200);
   expect(r.json.data.items.length >= 1, "sem chamados");
@@ -1190,13 +1212,19 @@ await test("Planos", "POST /api/alerts channel=telegram como PLATINUM → 200", 
   return `alerta ${r.json.data.alert.id}`;
 });
 
-await test("Planos", "POST /api/plans/change FREE (volta)", async () => {
+await test("Planos", "Sem plano (FREE) → ferramentas 402; volta para PRO → 15m 403", async () => {
   if (state.planLocked) return "pulado (plano bloqueado)";
   const r = await call("POST", "/api/plans/change", { body: { plan: "FREE" } });
   expectStatus(r, 200);
+  for (const path of ["/api/scanner/table?timeframe=4h", "/api/alerts", "/api/agents", "/api/fibonacci?high=2&low=1&direction=up"]) {
+    const t = await call("GET", path);
+    expectStatus(t, 402, "subscription_required");
+  }
+  const back = await call("POST", "/api/plans/change", { body: { plan: "PRO" } });
+  expectStatus(back, 200);
   const t = await call("GET", "/api/scanner/table?timeframe=15m");
   expectStatus(t, 403, "plan_required");
-  return "FREE; 15m volta a 403";
+  return "FREE: 4 rotas → 402 · PRO: 15m → 403";
 });
 
 // ------------------------------------------------------------------ histórico / análises / imagem
@@ -1373,6 +1401,14 @@ if (!SKIP_RATE_LIMIT) {
     }
     expect(first429 > 0, "nunca retornou 429 em 12 tentativas");
     return `429 na tentativa ${first429}`;
+  });
+}
+
+if (preCookie) {
+  await test("Limpeza", "Conta de apoio (teste grátis) excluída", async () => {
+    const r = await callAuth("DELETE", "/api/auth/account", { auth: "pre", body: { confirm: "EXCLUIR", password: PASSWORD } });
+    expectStatus(r, 200);
+    return "excluída";
   });
 }
 

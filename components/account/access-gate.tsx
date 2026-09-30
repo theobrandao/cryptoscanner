@@ -32,7 +32,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
     return (
       <Gate title={feature} text={`Disponível no teste grátis de ${TRIAL_DAYS} dias e nos planos PRO e ELITE.`}>
         <Link href={`/registro?next=${next}`} className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">
-          Start 7-day trial
+          Testar {TRIAL_DAYS} dias grátis
         </Link>
         <Link href={`/login?next=${next}`} className="inline-flex h-10 items-center rounded-md border border-border px-5 text-sm">
           Entrar
@@ -42,9 +42,9 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
   if (!access) return <div className="skeleton m-4 h-64 rounded-lg" aria-busy="true" />;
   if (!access.entitlements.core)
     return (
-      <Gate title="Escolha seu plano" text="Seu período de teste terminou. Sua conta, watchlists, estratégias e monitores continuam salvos.">
+      <Gate title="Escolha seu plano" text="Esta ferramenta faz parte dos planos PRO e ELITE. Sua conta, favoritos, estratégias e monitores continuam salvos.">
         <Link href="/planos" className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">
-          View Plans
+          Ver planos
         </Link>
       </Gate>
     );
@@ -52,7 +52,7 @@ export function AccessGate({ need = "core", feature, children }: { need?: "core"
     return (
       <Gate title={`${feature} — ELITE`} text="Este recurso faz parte do plano ELITE.">
         <Link href="/planos" className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground">
-          View Plans
+          Ver planos
         </Link>
       </Gate>
     );

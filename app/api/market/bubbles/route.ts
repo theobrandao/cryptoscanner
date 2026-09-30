@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { z } from "zod";
 import { ApiError, enforceRateLimit, ok, parseQuery, withApi } from "@/lib/api";
 import { getBubbles, getUsdBrl } from "@/services/market/market-service";
+import { requireCoreUser } from "@/services/subscription-service";
 
 const querySchema = z.object({
   limit: z.coerce.number().int().min(10).max(100).default(100),
@@ -10,6 +11,7 @@ const querySchema = z.object({
 
 /** Mapa de bolhas: os 100 maiores ativos por volume 24h com variação em 1h/24h/7d/30d (CoinGecko → CoinPaprika → CoinLore, sem stablecoins/wrapped). */
 export const GET = withApi(async (req) => {
+  await requireCoreUser(req);
   await connection();
   await enforceRateLimit(req, "public");
   const q = parseQuery(req, querySchema);

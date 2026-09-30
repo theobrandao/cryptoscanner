@@ -11,6 +11,7 @@ import { billingNote, PLAN_FEATURES, type BillingProvider } from "@/lib/plans-co
 import { postJson } from "@/lib/client-api";
 import { MAIN_TOOLS, TOOL_CATEGORIES } from "@/lib/tools";
 import { cn } from "@/lib/utils";
+import { captureAffiliateParams, withAffiliateParams } from "@/lib/affiliate-params";
 
 export interface Prices {
   prices: { PRO: number; ELITE: number };
@@ -172,7 +173,7 @@ export function PlanCards({ data, trial }: { data: Prices | undefined; trial: nu
                 </Link>
               ) : null}
               {buy ? (
-                <a href={buy} rel="noopener" data-testid={`buy-${p}`} className={cn("flex h-12 items-center justify-center rounded-xl text-sm font-semibold", p === "ELITE" ? "bg-primary text-primary-foreground hover:brightness-110" : "border border-border hover:border-primary/50")}>
+                <a href={buy} rel="noopener" data-testid={`buy-${p}`} onClick={(e) => (e.currentTarget.href = withAffiliateParams(buy))} className={cn("flex h-12 items-center justify-center rounded-xl text-sm font-semibold", p === "ELITE" ? "bg-primary text-primary-foreground hover:brightness-110" : "border border-border hover:border-primary/50")}>
                   Assinar {p} agora
                 </a>
               ) : p === "ELITE" ? (
@@ -189,6 +190,7 @@ export function PlanCards({ data, trial }: { data: Prices | undefined; trial: nu
 }
 
 export function Landing({ content }: { content: LandingData }) {
+  React.useEffect(() => captureAffiliateParams(window.location.search), []);
   const { data } = useSWR<Prices>("/api/billing/prices", { revalidateOnFocus: false });
   const [open, setOpen] = React.useState<number | null>(0);
   const trial = data?.trialDays ?? 3;

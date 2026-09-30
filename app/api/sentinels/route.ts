@@ -1,15 +1,16 @@
 import { connection } from "next/server";
 import { requirePrisma } from "@/database/client";
-import { ApiError, ok, parseBody, requireUser, withApi } from "@/lib/api";
+import { ApiError, ok, parseBody, withApi } from "@/lib/api";
 import { ASSETS } from "@/lib/assets";
 import { PLANS, planAllowsTimeframe } from "@/lib/plans";
 import { SENTINEL_STRATEGIES, sentinelBodySchema } from "@/lib/validation/sentinel";
+import { requireCoreUser } from "@/services/subscription-service";
 
 
 /** Sentinelas do usuário (agentes do tipo sentinel) com o último relatório de cada um. */
 export const GET = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const prisma = requirePrisma();
   const items = await prisma.agent.findMany({
     where: { userId: user.id, kind: "sentinel" },
@@ -22,7 +23,7 @@ export const GET = withApi(async (req) => {
 /** Cria um Sentinela (um por moeda). Slots separados dos agentes comuns. */
 export const POST = withApi(async (req) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   const body = await parseBody(req, sentinelBodySchema);
   const plan = PLANS[user.plan];
   if (!planAllowsTimeframe(user.plan, body.timeframe)) throw new ApiError(403, `Timeframe ${body.timeframe.toUpperCase()} disponível apenas no plano PLATINUM`, "plan_required");

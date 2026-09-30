@@ -1,12 +1,13 @@
 import { connection } from "next/server";
 import { requirePrisma } from "@/database/client";
-import { ApiError, enforceRateLimit, ok, requireUser, withApi } from "@/lib/api";
+import { ApiError, enforceRateLimit, ok, withApi } from "@/lib/api";
 import { runUserAgent } from "@/services/user-agent-service";
+import { requireCoreUser } from "@/services/subscription-service";
 
 /** Executa o agente imediatamente (sem esperar o ciclo do worker). */
 export const POST = withApi(async (req, ctx) => {
   await connection();
-  const user = await requireUser(req);
+  const user = await requireCoreUser(req);
   await enforceRateLimit(req, "auth", `agent-run:${user.id}`);
   const { id } = await ctx.params;
   const agent = await requirePrisma().agent.findFirst({ where: { id: id ?? "", userId: user.id } });

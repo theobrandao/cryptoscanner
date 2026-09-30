@@ -52,8 +52,6 @@ export async function createMonitor(userId: string, access: AccessView, input: M
   const prisma = requirePrisma();
   const asset = getAsset(input.symbol);
   if (!asset) throw new ApiError(400, `Ativo desconhecido: ${input.symbol}`, "validation");
-  const count = await prisma.monitor.count({ where: { userId } });
-  if (count >= access.entitlements.maxMonitors) throw new ApiError(403, `Limite de ${access.entitlements.maxMonitors} monitores no seu plano`, "monitor_limit");
   if (!access.entitlements.timeframes.includes(input.timeframe)) throw new ApiError(402, `Timeframe ${input.timeframe} não incluído no seu plano`, "timeframe_locked");
   if (input.kind === "STRATEGY") {
     if (!input.strategyId) throw new ApiError(400, "Escolha a estratégia", "validation");
@@ -64,6 +62,9 @@ export async function createMonitor(userId: string, access: AccessView, input: M
     where: { userId, symbol: asset.symbol, timeframe: input.timeframe, exchange: input.exchange, instrument: input.instrument, kind: input.kind, strategyId: input.kind === "STRATEGY" ? input.strategyId : null },
   });
   if (dup) throw new ApiError(409, "Já existe um monitor igual", "duplicate");
+  // duplicado responde antes do limite: o usuário vê que o monitor já existe
+  const count = await prisma.monitor.count({ where: { userId } });
+  if (count >= access.entitlements.maxMonitors) throw new ApiError(403, `Limite de ${access.entitlements.maxMonitors} ${access.entitlements.maxMonitors === 1 ? "monitor" : "monitores"} no seu plano`, "monitor_limit");
   return prisma.monitor.create({
     data: {
       userId,

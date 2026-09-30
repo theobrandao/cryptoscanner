@@ -1,5 +1,5 @@
 import { getPrisma } from "@/database/client";
-import { ApiError } from "@/lib/api";
+import { ApiError, requireUser } from "@/lib/api";
 import type { SessionUser } from "@/lib/auth";
 import { ENTITLEMENTS, effectiveStatus, legacyPlanFor, tierFor, TRIAL_DAYS, type Entitlements, type SubscriptionStatus, type Tier } from "@/lib/entitlements";
 
@@ -70,8 +70,16 @@ function view(tier: Tier, sub: { plan: string; status: string; trialEndsAt: Date
 
 /** Exige acesso ao produto (trial/PRO/ELITE/admin). `elite` exige ELITE. */
 export async function requireEntitlement(user: SessionUser, need: "core" | "elite" = "core"): Promise<AccessView> {
-  const access = await getAccess(user.id);
+  // sem banco (testes/ambiente local sem Postgres) só o papel assinado no token decide: ADMIN passa, o resto não
+  const access = getPrisma() ? await getAccess(user.id) : view(tierFor(null, user.role), null);
   if (need === "core" && !access.entitlements.core) throw new ApiError(402, "Seu período de teste terminou. Escolha um plano para continuar.", "subscription_required");
   if (need === "elite" && !access.entitlements.elite) throw new ApiError(402, "Recurso do plano ELITE.", "elite_required");
   return access;
+}
+
+/** Usuário logado COM acesso ao produto (teste/PRO/ELITE/admin). Conta sem plano recebe 402. */
+export async function requireCoreUser(req: Request, need: "core" | "elite" = "core"): Promise<SessionUser> {
+  const user = await requireUser(req);
+  await requireEntitlement(user, need);
+  return user;
 }

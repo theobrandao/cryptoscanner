@@ -2,7 +2,7 @@ import { connection } from "next/server";
 import { ApiError, enforceRateLimit, ok, parseBody, withApi } from "@/lib/api";
 import { runSimulation, simulationInputSchema } from "@/services/simulation-service";
 
-/** Executa uma simulação histórica (DCA ou aporte único) — pública, sem persistir. */
+/** Executa uma simulação histórica (DCA ou aporte único) — pública (demonstração da página inicial), sem persistir. Salvar e listar exigem plano. */
 export const POST = withApi(async (req) => {
   await connection();
   await enforceRateLimit(req, "public");
