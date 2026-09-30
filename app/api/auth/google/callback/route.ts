@@ -51,6 +51,7 @@ export const GET = withApi(async (req) => {
   } catch (err) {
     if (err instanceof ApiError) {
       if (err.code === "terms_required") return fail("google_termos", "registro");
+      if (err.code === "account_blocked") return fail("conta_bloqueada");
       if (err.code === "invite_required") return fail("cadastro_restrito", "registro");
       return fail("google_falhou");
     }

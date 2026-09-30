@@ -14,8 +14,10 @@ export const GET = withApi(async (req) => {
   let user = session;
   let telegramChatId: string | null = null;
   if (prisma) {
-    const db = await prisma.user.findUnique({ where: { id: session.id }, select: { id: true, email: true, name: true, plan: true, role: true, telegramChatId: true } });
+    const db = await prisma.user.findUnique({ where: { id: session.id }, select: { id: true, email: true, name: true, plan: true, role: true, telegramChatId: true, blockedAt: true, passwordChangedAt: true } });
     if (!db) return ok({ user: null });
+    // conta bloqueada ou sessão encerrada (troca de senha / "Encerrar sessões" no Painel de controle): tela como deslogado
+    if (db.blockedAt || (db.passwordChangedAt && session.iat != null && session.iat * 1000 < db.passwordChangedAt.getTime() - 1000)) return ok({ user: null });
     user = { id: db.id, email: db.email, name: db.name, plan: db.plan, role: db.role };
     telegramChatId = db.telegramChatId;
   }

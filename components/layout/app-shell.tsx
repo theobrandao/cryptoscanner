@@ -21,6 +21,7 @@ import {
   Eye,
   EyeOff,
   Settings,
+  ShieldCheck,
   Sun,
   X,
 } from "lucide-react";
@@ -106,8 +107,8 @@ interface SubscriptionView {
  */
 function TrialCard() {
   const { user } = useSession();
-  const { data } = useSWR<SubscriptionView>(user ? "/api/billing/subscription" : null, { revalidateOnFocus: false });
-  if (!user || !data || (data.status !== "TRIALING" && data.status !== "EXPIRED" && data.status !== "PAST_DUE")) return null;
+  const { data } = useSWR<SubscriptionView>(user && user.role !== "ADMIN" ? "/api/billing/subscription" : null, { revalidateOnFocus: false });
+  if (!user || user.role === "ADMIN" || !data || (data.status !== "TRIALING" && data.status !== "EXPIRED" && data.status !== "PAST_DUE")) return null;
   if (data.status !== "TRIALING")
     return (
       <div className="mx-3 rounded-lg border border-warning/40 bg-warning/10 p-3">
@@ -167,6 +168,20 @@ function SideLink({ l, pathname, onClick, badge }: { l: NavLink; pathname: strin
   );
 }
 
+const ADMIN_LINK: NavLink = { href: "/admin", label: "Painel de controle", icon: ShieldCheck };
+
+/** Seção só para o administrador (nada é renderizado para os demais, nem durante o carregamento da sessão). */
+function AdminNav({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+  const { user } = useSession();
+  if (user?.role !== "ADMIN") return null;
+  return (
+    <nav className="flex flex-col gap-0.5 px-2" aria-label="Administração">
+      <span className="px-3 pb-0.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">Administração</span>
+      <SideLink l={ADMIN_LINK} pathname={pathname} onClick={onNavigate} />
+    </nav>
+  );
+}
+
 function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   const { selection } = useActiveSelection();
   const inAdvanced = ADVANCED_NAV.some((l) => isActive(pathname, l));
@@ -212,6 +227,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
           </nav>
         ) : null}
       </div>
+      <AdminNav pathname={pathname} onNavigate={onNavigate} />
       <div className="mt-auto flex flex-col gap-3">
         <TrialCard />
         <nav className="flex flex-col gap-0.5 px-2" aria-label="Conta">
@@ -410,7 +426,7 @@ function UserMenu() {
         <DropdownMenuItem onSelect={() => router.push("/preferencias")}>Preferências</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => router.push("/planos")}>Planos e pagamento</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => router.push("/status")}>Estado do sistema</DropdownMenuItem>
-        {user.role === "ADMIN" ? <DropdownMenuItem onSelect={() => router.push("/admin")}>Admin</DropdownMenuItem> : null}
+        {user.role === "ADMIN" ? <DropdownMenuItem onSelect={() => router.push("/admin")}>Painel de controle</DropdownMenuItem> : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={async () => {

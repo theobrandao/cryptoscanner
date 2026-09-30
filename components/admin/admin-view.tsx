@@ -4,8 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { Check, X } from "lucide-react";
+import { AdminAuditTab } from "@/components/admin/admin-audit";
+import { AdminUsersTab, EVENT_LABEL } from "@/components/admin/admin-users";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageShell, PageTitle } from "@/components/layout/page-shell";
 import { Alert } from "@/components/ui/misc";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useSession } from "@/hooks/use-session";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -34,9 +38,13 @@ function Kpi({ k, v, sub }: { k: string; v: string; sub?: string }) {
   );
 }
 
+const TAB_KEY = "cs-admin-tab";
+
 export function AdminView() {
   const { user, loading } = useSession();
-  const { data, error } = useSWR<Overview>(user?.role === "ADMIN" ? "/api/admin/overview" : null, { refreshInterval: 60_000 });
+  // aba lembrada neste navegador
+  const [saved, setTab] = useLocalStorage<string>(TAB_KEY, "visao");
+  const tab = saved === "usuarios" || saved === "registro" ? saved : "visao";
   if (loading) return <div className="skeleton m-4 h-64 rounded-lg" />;
   if (user?.role !== "ADMIN")
     return (
@@ -44,10 +52,34 @@ export function AdminView() {
         <Alert variant="danger">Acesso restrito ao administrador.</Alert>
       </PageShell>
     );
-  const s = data?.subscriptions;
   return (
     <PageShell className="max-w-[1400px]">
-      <PageTitle title="Admin" description="Base de usuários, trials, assinaturas, receita recorrente, funil de 30 dias e itens pendentes para vender." />
+      <PageTitle title="Painel de controle" description="Usuários, acessos, assinaturas, receita recorrente, funil de 30 dias e itens pendentes para vender." />
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="visao">Visão geral</TabsTrigger>
+          <TabsTrigger value="usuarios">Usuários</TabsTrigger>
+          <TabsTrigger value="registro">Registro de ações</TabsTrigger>
+        </TabsList>
+        <TabsContent value="visao">
+          <OverviewTab />
+        </TabsContent>
+        <TabsContent value="usuarios">
+          <AdminUsersTab />
+        </TabsContent>
+        <TabsContent value="registro">
+          <AdminAuditTab />
+        </TabsContent>
+      </Tabs>
+    </PageShell>
+  );
+}
+
+function OverviewTab() {
+  const { data, error } = useSWR<Overview>("/api/admin/overview", { refreshInterval: 60_000 });
+  const s = data?.subscriptions;
+  return (
+    <>
       {error ? <Alert variant="danger">{(error as Error).message}</Alert> : null}
       {!data ? <div className="skeleton h-64 rounded-lg" /> : null}
       {data && s ? (
@@ -78,7 +110,7 @@ export function AdminView() {
               <h2 className="mb-2 text-[13px] font-semibold">Funil (30 dias)</h2>
               {FUNNEL.map((k) => (
                 <div key={k} className="flex justify-between py-0.5 text-[12.5px]">
-                  <span className="text-muted-foreground">{k}</span>
+                  <span className="text-muted-foreground">{EVENT_LABEL[k] ?? k}</span>
                   <span className="tabular">{data.funnel30d[k] ?? 0}</span>
                 </div>
               ))}
@@ -110,6 +142,6 @@ export function AdminView() {
           </p>
         </div>
       ) : null}
-    </PageShell>
+    </>
   );
 }

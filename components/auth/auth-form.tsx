@@ -65,6 +65,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     google_termos: "Para criar a conta com o Google, marque o aceite dos Termos e clique de novo em Continuar com Google.",
     google_indisponivel: "Login com Google indisponível no momento.",
     cadastro_restrito: "Cadastro restrito nesta fase.",
+    conta_bloqueada: "Conta bloqueada. Fale com o suporte.",
   };
   const urlError = params.get("erro") ? (ERROS[params.get("erro")!] ?? "Falha no login.") : null;
 

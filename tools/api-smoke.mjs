@@ -806,6 +806,17 @@ await test("R2", "Derivatives View Details (3 exchanges) e onboarding; admin →
   return `OI agregado ${d.json.data.aggregated.openInterestUsd ? (d.json.data.aggregated.openInterestUsd / 1e9).toFixed(2) + " bi" : "n/d"} (${d.json.data.aggregated.venues} exchanges) · histórico ${d.json.data.history.venue ?? "n/d"} · onboarding ${o.json.data.done}/6`;
 });
 
+await test("Admin", "Painel de controle: usuário comum → 403 (lista, detalhe, ações, exclusão, CSV, registro); visitante → 401", async () => {
+  expectStatus(await call("GET", "/api/admin/users?tier=TRIAL&sort=nome"), 403, "forbidden");
+  expectStatus(await call("GET", "/api/admin/users/qualquer-id"), 403, "forbidden");
+  expectStatus(await call("POST", "/api/admin/users/qualquer-id/actions", { body: { action: "grant", plan: "ELITE", days: null } }), 403, "forbidden");
+  expectStatus(await call("DELETE", "/api/admin/users/qualquer-id", { body: { confirmEmail: EMAIL } }), 403, "forbidden");
+  expectStatus(await call("GET", "/api/admin/users/export"), 403, "forbidden");
+  expectStatus(await call("GET", "/api/admin/audit?page=1"), 403, "forbidden");
+  expectStatus(await call("GET", "/api/admin/users", { auth: false }), 401);
+  return "sem conta ADMIN no smoke: caminhos do administrador cobertos pelos testes unitários";
+});
+
 await test("Comercial", "Webhooks sem assinatura → 401 (Mercado Pago) e 401/503 (Kiwify); checkout sem token → 503", async () => {
   const w = await call("POST", "/api/billing/webhook", { auth: false, body: { type: "subscription_preapproval", data: { id: "x" } } });
   expectStatus(w, 401);

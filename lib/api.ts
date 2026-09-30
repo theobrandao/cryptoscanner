@@ -71,18 +71,29 @@ export function parseQuery<T>(req: Request, schema: ZodType<T>): T {
   return schema.parse(obj);
 }
 
+export const BLOCKED_MESSAGE = "Conta bloqueada. Fale com o suporte.";
+
 export async function requireUser(req: Request): Promise<SessionUser> {
   const user = await getSessionFromRequest(req);
   if (!user) throw new ApiError(401, "Faça login para usar este recurso", "unauthorized");
   // plano e papel relidos do banco: o JWT vale 7 dias e não pode carregar acesso desatualizado
   const prisma = getPrisma();
   if (prisma) {
-    const db = await prisma.user.findUnique({ where: { id: user.id }, select: { plan: true, role: true, email: true, name: true, passwordChangedAt: true } });
+    const db = await prisma.user.findUnique({ where: { id: user.id }, select: { plan: true, role: true, email: true, name: true, passwordChangedAt: true, blockedAt: true } });
     if (!db) throw new ApiError(401, "Sessão inválida", "unauthorized");
+    // conta bloqueada pelo administrador
+    if (db.blockedAt) throw new ApiError(403, BLOCKED_MESSAGE, "account_blocked");
     // senha trocada depois da emissão do token: sessão antiga deixa de valer
     if (db.passwordChangedAt && user.iat != null && user.iat * 1000 < db.passwordChangedAt.getTime() - 1000) throw new ApiError(401, "Sessão encerrada após troca de senha. Entre novamente.", "unauthorized");
     return { ...user, plan: db.plan, role: db.role, email: db.email, name: db.name };
   }
+  return user;
+}
+
+/** Usuário logado com papel ADMIN (relido do banco); os demais recebem 403. */
+export async function requireAdmin(req: Request): Promise<SessionUser> {
+  const user = await requireUser(req);
+  if (user.role !== "ADMIN") throw new ApiError(403, "Acesso restrito ao administrador", "forbidden");
   return user;
 }
 

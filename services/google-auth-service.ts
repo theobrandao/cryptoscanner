@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { requirePrisma } from "@/database/client";
-import { ApiError } from "@/lib/api";
+import { ApiError, BLOCKED_MESSAGE } from "@/lib/api";
 import { hashPassword } from "@/lib/auth";
 import { getEnv, isGoogleLoginConfigured, isOwnerEmail } from "@/lib/env";
 import { canRegister } from "@/lib/invite";
@@ -113,6 +113,7 @@ export async function signInWithGoogle(identity: GoogleIdentity, opts: { acceptT
   let user = await prisma.user.findFirst({ where: { OR: [{ googleSub: identity.sub }, { email: identity.email }] } });
   const owner = isOwnerEmail(identity.email);
   if (user) {
+    if (user.blockedAt) throw new ApiError(403, BLOCKED_MESSAGE, "account_blocked");
     const data: { googleSub?: string; plan?: "PLATINUM"; role?: "ADMIN" } = {};
     if (user.googleSub !== identity.sub) data.googleSub = identity.sub;
     if (owner && (user.plan !== "PLATINUM" || user.role !== "ADMIN")) {

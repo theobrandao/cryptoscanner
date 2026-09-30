@@ -2,7 +2,7 @@ import { connection } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePrisma } from "@/database/client";
-import { ApiError, enforceRateLimit, parseBody, withApi } from "@/lib/api";
+import { ApiError, BLOCKED_MESSAGE, enforceRateLimit, parseBody, withApi } from "@/lib/api";
 import { isOwnerEmail } from "@/lib/env";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions, verifyPassword } from "@/lib/auth";
 import { logAccess } from "@/services/access-log-service";
@@ -19,6 +19,8 @@ export const POST = withApi(async (req) => {
   let user = await prisma.user.findUnique({ where: { email: body.email } });
   // Mesma mensagem para e-mail inexistente e senha errada (não revela cadastro).
   if (!user || !(await verifyPassword(body.password, user.passwordHash))) throw new ApiError(401, "E-mail ou senha inválidos", "invalid_credentials");
+  // conta bloqueada pelo administrador (só depois da senha conferida: não revela o bloqueio a terceiros)
+  if (user.blockedAt) throw new ApiError(403, BLOCKED_MESSAGE, "account_blocked");
   // Dono (OWNER_EMAILS): garante ADMIN + PLATINUM mesmo para contas criadas antes da configuração.
   if (isOwnerEmail(user.email) && (user.plan !== "PLATINUM" || user.role !== "ADMIN")) {
     user = await prisma.user.update({ where: { id: user.id }, data: { plan: "PLATINUM", role: "ADMIN" } });
