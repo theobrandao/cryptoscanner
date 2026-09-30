@@ -41,9 +41,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# arquivos gerados pelo next dev para agentes de IA
-AGENTS.md
-CLAUDE.md
+# AGENTS.md (regras do Next.js, mantido pelo next dev) e CLAUDE.md (instruções do projeto) são versionados
 
 # snapshot local do Redis
 dump.rdb
+
+# Claude Code: saídas do Playwright MCP (capturas e traces de teste)
+.playwright-mcp/
