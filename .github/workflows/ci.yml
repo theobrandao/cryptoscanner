@@ -56,7 +56,7 @@ jobs:
       - name: Aguardar deploy com o commit atual
         env:
           # sem a variável do repositório, usa a URL pública de produção
-          BASE_URL: ${{ vars.PRODUCTION_URL || 'https://cryptoscanner-five.vercel.app' }}
+          BASE_URL: ${{ vars.PRODUCTION_URL || 'https://www.cryptoscanner.com.br' }}
           SHA: ${{ github.sha }}
         run: |
           for i in $(seq 1 60); do
@@ -67,7 +67,7 @@ jobs:
           echo "::warning title=Deploy não confirmado::após 10 min a produção responde commit '${commit:-desconhecido}', esperado $SHA; smoke roda contra a versão atual"
       - name: Smoke das APIs
         env:
-          BASE_URL: ${{ vars.PRODUCTION_URL || 'https://cryptoscanner-five.vercel.app' }}
+          BASE_URL: ${{ vars.PRODUCTION_URL || 'https://www.cryptoscanner.com.br' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           INVITE_CODE: ${{ secrets.INVITE_CODE }}
           SKIP_RATE_LIMIT: "1"

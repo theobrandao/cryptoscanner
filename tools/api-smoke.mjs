@@ -2,7 +2,7 @@
 /**
  * Teste de integração de TODAS as rotas da API contra um ambiente real (produção ou local).
  *
- *   BASE_URL=https://cryptoscanner-five.vercel.app CRON_SECRET=... node tools/api-smoke.mjs
+ *   BASE_URL=https://www.cryptoscanner.com.br CRON_SECRET=... node tools/api-smoke.mjs
  *
  * Cria um usuário descartável (e-mail com timestamp), exercita fluxos positivos e negativos,
  * gating de plano, rate limit e cabeçalhos de segurança. Saída: tabela Markdown em stdout e
@@ -15,7 +15,7 @@ try {
   const u = new URL(BASE);
   if (!/^https?:$/.test(u.protocol)) throw new Error("protocolo");
 } catch {
-  console.error(`BASE_URL inválida: "${process.env.BASE_URL ?? ""}". Ex.: BASE_URL=https://cryptoscanner-five.vercel.app`);
+  console.error(`BASE_URL inválida: "${process.env.BASE_URL ?? ""}". Ex.: BASE_URL=https://www.cryptoscanner.com.br`);
   process.exit(2);
 }
 const CRON_SECRET = process.env.CRON_SECRET ?? "";
