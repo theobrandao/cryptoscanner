@@ -6,9 +6,35 @@ import { buildLandingData } from "@/lib/marketing/landing-data";
 import { getPublicPrices } from "@/lib/billing/public-prices";
 import { faqPageLd, JsonLd, softwareApplicationLd } from "@/lib/seo/json-ld";
 import { salesFaq } from "@/lib/marketing/faq";
-
+import Script from 'next/script';
 export const metadata: Metadata = publicPageMetadata(PAGE_SEO.vendas);
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="pt-BR">
+      <body>
+        {/* Tag Global do Google Ads */}
+        <Script 
+          strategy="afterInteractive" 
+          src="https://www.googletagmanager.com/gtag/js?id=AW-18485599082" 
+        />
+        <Script
+          id="google-ads-init"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'AW-18485599082');
+            `,
+          }}
+        />
 
+        {children}
+      </body>
+    </html>
+  );
+}
 /** Página de vendas: destino dos anúncios e URL da página de vendas cadastrada na Kiwify. Preços e canal de venda saem no HTML (FAQ da Kiwify incluída). */
 export default function VendasPage() {
   const prices = getPublicPrices();
