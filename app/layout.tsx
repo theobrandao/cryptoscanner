@@ -7,7 +7,7 @@ import { themeInitScript } from "@/components/providers/theme-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { SITE_URL } from "@/lib/site";
 import { siteVerification } from "@/lib/env";
-
+import Script from 'next/script';
 /**
  * Inter variável servida pelo próprio site (um arquivo por subconjunto cobre todos os pesos; pré-carrega só o latino).
  * "optional" evita troca de fonte depois da pintura, que empurrava o layout. Símbolos de moeda fora do latino
@@ -42,7 +42,33 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-full flex-col">export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="pt-BR">
+      <body>
+        {/* Tag Global do Google Ads */}
+        <Script 
+          strategy="afterInteractive" 
+          src="https://www.googletagmanager.com/gtag/js?id=AW-18485599082" 
+        />
+        <Script
+          id="google-ads-init"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'AW-18485599082');
+            `,
+          }}
+        />
+
+        {children}
+      </body>
+    </html>
+  );
+}
         <PwaRegister />
         <AppProviders>
           <AppShell>{children}</AppShell>
