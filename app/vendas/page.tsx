@@ -16,6 +16,27 @@ export default function VendasPage() {
     <>
       <JsonLd data={[softwareApplicationLd("/vendas"), faqPageLd(salesFaq(prices.trialDays, prices.provider === "kiwify"), "/vendas")]} />
       <SalesPage content={buildLandingData()} initialPrices={prices} />
+    </>import Script from 'next/script';
+
+export default function VendasPage() {
+  // ... seu código existente ...
+
+  return (
+    <>
+      {/* Resto da sua página Vendas ... */}
+      
+      {/* Snippet de Evento disparado apenas nesta página */}
+      <Script
+        id="google-ads-conversion"
+        strategy="afterInteractive"
+        dangerouslySetInnerHTML={{
+          __html: `
+            gtag('event', 'conversion', {'send_to': 'AW-18485599082/zgaICOS2oYwdEOq2z-5E'});
+          `,
+        }}
+      />
     </>
+  );
+}
   );
 }
